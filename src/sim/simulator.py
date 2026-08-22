@@ -20,6 +20,8 @@ The scenario column is for evaluation ONLY - never a model feature.
 """
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
@@ -29,6 +31,28 @@ RNG = np.random.default_rng
 DAY = 24 * 3600
 START_TS = 1_760_000_000  # arbitrary epoch anchor
 N_DAYS = 30
+
+# ---------------------------------------------------------------- entity ids
+# Entity IDs used to be semantic: d_FARM_F, pi_STOLEN_S3, ip_CLUSTER_I,
+# d_ATO_A17. That made the eval easier than reality - an investigator reading
+# "pi_STOLEN_*" can name the attack without doing any analysis, and in a real
+# stream no identifier announces its own intent.
+#
+# Every ID - legitimate AND attack - now runs through the same deterministic
+# hash, so all IDs are drawn from one indistinguishable format and carry zero
+# information about their origin. Ground truth lives ONLY in the `scenario`
+# column, which no agent tool exposes.
+#
+# This is a pure relabelling: the hash consumes no RNG draws, so the random
+# stream is untouched, and every feature counts entity SETS rather than parsing
+# ID strings - so model metrics must come out bit-identical. train.py asserts it.
+ID_SALT = "fsi-v1"
+
+
+def oid(kind: str, key) -> str:
+    """Opaque, stable, collision-resistant id. Same shape for every entity."""
+    h = hashlib.sha1(f"{ID_SALT}|{kind}|{key}".encode()).hexdigest()[:8]
+    return f"{kind}_{h}"
 
 # ---------------------------------------------------------------- entities
 @dataclass
@@ -42,9 +66,9 @@ class World:
         for cid in range(self.n_customers):
             self.customers[cid] = {
                 "home_geo": int(self.rng.integers(0, 20)),
-                "device": f"d{cid}",             # personal device
-                "ip": f"ip{int(self.rng.integers(0, 1500))}",  # shared ISP pool
-                "instrument": f"pi{cid}",
+                "device": oid("d", f"cust{cid}"),        # personal device
+                "ip": oid("ip", f"pool{int(self.rng.integers(0, 1500))}"),  # shared ISP pool
+                "instrument": oid("pi", f"cust{cid}"),
                 "avg_amount": float(self.rng.lognormal(6.5, 0.6)),  # ~INR 665 median
                 "created_day": int(self.rng.integers(-400, 0)),
             }
@@ -58,7 +82,7 @@ def _base_txn(w: World, rng, ts, merchant_id, cid=None) -> dict:
     return {
         "ts": int(ts),
         "merchant_id": f"m{merchant_id}",
-        "customer_id": f"c{cid}",
+        "customer_id": oid("c", cid),
         "device_id": c["device"],
         "ip": c["ip"],
         "instrument_id": c["instrument"],
@@ -103,16 +127,16 @@ def s1_fraud_spike(w, rng, merchant=3, day=24, tag="s1_fraud_spike", n=180, pfx=
     SMALL pool of attacker-controlled devices/IPs on guest-checkout accounts.
     Signals this creates: first-seen instruments, device/IP fan-out, velocity."""
     rows, day_start = [], START_TS + day * DAY
-    atk_devices = [f"d_CT_{pfx}{i}" for i in range(3)]
-    atk_ips = [f"ip_CT_{pfx}{i}" for i in range(2)]
+    atk_devices = [oid("d", f"ct{pfx}{i}") for i in range(3)]
+    atk_ips = [oid("ip", f"ct{pfx}{i}") for i in range(2)]
     times = _poisson_times(rng, day_start + 10 * 3600, n, hour_bias=False)
     for i, t in enumerate(times):
         r = _base_txn(w, rng, t, merchant)
         r.update(is_fraud=1, scenario=tag,
-                 customer_id=f"c_CT_{pfx}{i % 60}",            # throwaway guest accounts
+                 customer_id=oid("c", f"ct{pfx}{i % 60}"),      # throwaway guest accounts
                  device_id=str(rng.choice(atk_devices)),
                  ip=str(rng.choice(atk_ips)),
-                 instrument_id=f"pi_STOLEN_{pfx}{i}",          # a NEW stolen card each time
+                 instrument_id=oid("pi", f"stolen{pfx}{i}"),    # a NEW stolen card each time
                  customer_created_day=int(day),
                  payment_method="card",
                  amount=round(float(rng.choice([10, 25, 49, 99]) * rng.uniform(1, 30)), 2))
@@ -123,10 +147,10 @@ def s1_fraud_spike(w, rng, merchant=3, day=24, tag="s1_fraud_spike", n=180, pfx=
 def s2_device_farm(w, rng, merchant=5, day=25, tag="s2_device_farm", pfx="F", n=130):
     """ONE device shared by ~50 fresh accounts using several instruments."""
     rows, day_start = [], START_TS + day * DAY
-    farm_device, farm_ip = f"d_FARM_{pfx}", f"ip_FARM_{pfx}"
-    instruments = [f"pi_FARM_{pfx}{i}" for i in range(8)]
+    farm_device, farm_ip = oid("d", f"farm{pfx}"), oid("ip", f"farm{pfx}")
+    instruments = [oid("pi", f"farm{pfx}{i}") for i in range(8)]
     for i, t in enumerate(np.sort(day_start + 12 * 3600 + rng.uniform(0, 5 * 3600, n))):
-        acct = f"c{pfx}{i % 50}"  # 50 synthetic accounts
+        acct = oid("c", f"farm{pfx}{i % 50}")  # 50 synthetic accounts
         r = {**_base_txn(w, rng, t, merchant),
              "customer_id": acct, "device_id": farm_device, "ip": farm_ip,
              "instrument_id": str(rng.choice(instruments)),
@@ -140,10 +164,11 @@ def s3_ip_cluster(w, rng, merchant=7, day=26, tag="s3_ip_cluster", pfx="I", n=10
     """One IP, many accounts, abnormal velocity (each acct has own device)."""
     rows, day_start = [], START_TS + day * DAY
     for i, t in enumerate(np.sort(day_start + 14 * 3600 + rng.uniform(0, 3 * 3600, n))):
-        acct = f"c{pfx}{i % 40}"
+        acct = oid("c", f"clu{pfx}{i % 40}")
         r = {**_base_txn(w, rng, t, merchant),
-             "customer_id": acct, "device_id": f"d{pfx}{i % 40}", "ip": f"ip_CLUSTER_{pfx}",
-             "instrument_id": f"pi{pfx}{i % 40}",
+             "customer_id": acct, "device_id": oid("d", f"clu{pfx}{i % 40}"),
+             "ip": oid("ip", f"clu{pfx}"),
+             "instrument_id": oid("pi", f"clu{pfx}{i % 40}"),
              "customer_created_day": int(day - rng.integers(0, 5)),
              "is_fraud": 1, "scenario": tag}
         rows.append(r)
@@ -159,7 +184,7 @@ def s4_account_takeover(w, rng, merchant=2, day=27, n_victims=25, tag="s4_accoun
         for k in range(int(rng.integers(2, 5))):
             t = day_start + rng.uniform(1 * 3600, 23 * 3600)
             r = _base_txn(w, rng, t, merchant, int(v))
-            r.update(device_id=f"d_ATO_{pfx}{int(v)}",       # NEW device
+            r.update(device_id=oid("d", f"ato{pfx}{int(v)}"),  # NEW device
                      geo=int((c["home_geo"] + 10) % 20),     # NEW location
                      amount=round(c["avg_amount"] * float(rng.uniform(5, 12)), 2),
                      is_fraud=1, scenario=tag)
@@ -170,10 +195,10 @@ def s4_account_takeover(w, rng, merchant=2, day=27, n_victims=25, tag="s4_accoun
 def s5_fraud_ring(w, rng, merchant=9, day=28, tag="s5_fraud_ring", pfx="R", n=120):
     """15 accounts densely sharing 4 devices, 3 IPs, 5 instruments."""
     rows, day_start = [], START_TS + day * DAY
-    devices = [f"d_RING_{pfx}{i}" for i in range(4)]
-    ips = [f"ip_RING_{pfx}{i}" for i in range(3)]
-    instruments = [f"pi_RING_{pfx}{i}" for i in range(5)]
-    accounts = [f"c{pfx}{i}" for i in range(15)]
+    devices = [oid("d", f"ring{pfx}{i}") for i in range(4)]
+    ips = [oid("ip", f"ring{pfx}{i}") for i in range(3)]
+    instruments = [oid("pi", f"ring{pfx}{i}") for i in range(5)]
+    accounts = [oid("c", f"ring{pfx}{i}") for i in range(15)]
     for t in np.sort(day_start + 9 * 3600 + rng.uniform(0, 10 * 3600, n)):
         r = {**_base_txn(w, rng, t, merchant),
              "customer_id": str(rng.choice(accounts)),
@@ -238,6 +263,32 @@ def generate(seed: int = 7) -> pd.DataFrame:
 
     df = pd.DataFrame(rows).sort_values("ts").reset_index(drop=True)
     return df
+
+
+def generate_holdout(seed: int = 99) -> pd.DataFrame:
+    """A SECOND world for held-out agent evaluation.
+
+    Different RNG seed, different merchants, different days from generate().
+    Used only to score the investigator on cases that influenced no design
+    decision - the ten original cases were looked at repeatedly while building
+    tools, so they cannot measure generalisation any more.
+
+    Deliberately NOT used for model training or any reported ML metric."""
+    rng = RNG(seed)
+    w = World(rng=rng)
+    rows = gen_baseline(w, rng)
+
+    # historical attacks so the period looks lived-in
+    rows += s2_device_farm(w, rng, merchant=7, day=9, tag="s2_hist_ho", pfx="HOH", n=90)
+    rows += s5_fraud_ring(w, rng, merchant=2, day=13, tag="s5_hist_ho", pfx="ROH", n=80)
+
+    # held-out TEST-period attacks on merchants unused by the 10 original cases
+    rows += s2_device_farm(w, rng, merchant=0, day=25, tag="s2_device_farm",
+                            pfx="HO_F", n=130)
+    rows += s5_fraud_ring(w, rng, merchant=4, day=27, tag="s5_fraud_ring",
+                            pfx="HO_R", n=120)
+    # merchant 10 gets no injected attack - the quiet held-out case
+    return pd.DataFrame(rows).sort_values("ts").reset_index(drop=True)
 
 
 if __name__ == "__main__":

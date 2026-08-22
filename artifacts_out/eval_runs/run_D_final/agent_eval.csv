@@ -1,0 +1,14 @@
+case,merchant,expected_cause,got_cause,expected_action,got_action,validated_action,confidence,exposure_inr,correct_cause,evidence_valid,correct_action,escalates_when_unsure,policy_violations,degraded,degraded_reason,n_tool_calls,held_out
+card_testing,m3,card_testing,fraud_ring,restrict,review,review,0.95,133019.12,0,1,0,1,0,0,,7,0
+device_farm,m5,device_farm,device_farm,restrict,restrict,restrict,0.95,103912.83,1,1,1,1,0,0,,7,0
+ip_cluster,m7,ip_cluster,ip_cluster,restrict,step_up,step_up,0.92,94244.05,1,1,0,1,0,0,,7,0
+account_takeover,m2,account_takeover,account_takeover,review,step_up,step_up,0.92,550021.89,1,1,0,1,0,0,,7,0
+fraud_ring,m9,fraud_ring,fraud_ring,restrict,restrict,restrict,0.92,113307.04,1,1,1,1,0,0,,7,0
+flash_sale_legitimate,m11,legitimate_traffic,legitimate_traffic,allow,allow,allow,0.78,3482.43,1,1,1,1,0,0,,7,0
+quiet_merchant_a,m1,legitimate_traffic,account_takeover,allow,review,review,0.65,19380.89,0,1,0,1,0,0,,7,0
+quiet_merchant_b,m4,legitimate_traffic,legitimate_traffic,allow,allow,allow,0.72,4300.74,1,1,1,1,0,0,,7,0
+quiet_merchant_c,m6,legitimate_traffic,unclear,allow,review,review,0.4,4537.77,0,1,0,1,0,0,,7,0
+quiet_merchant_d,m8,legitimate_traffic,unclear,allow,review,review,0.35,15240.8,0,1,0,1,0,0,,7,0
+holdout_device_farm,m0,device_farm,device_farm,restrict,restrict,restrict,0.95,105866.68,1,1,1,1,0,0,,7,1
+holdout_fraud_ring,m4,fraud_ring,fraud_ring,restrict,restrict,restrict,0.95,93779.92,1,1,1,1,0,0,,7,1
+holdout_quiet,m10,legitimate_traffic,account_takeover,allow,review,review,0.45,12252.58,0,1,0,1,0,0,,7,1

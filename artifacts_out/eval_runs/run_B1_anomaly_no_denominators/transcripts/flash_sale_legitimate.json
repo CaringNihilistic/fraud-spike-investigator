@@ -1,0 +1,286 @@
+{
+  "case": "flash_sale_legitimate",
+  "merchant": "m11",
+  "ground_truth": {
+    "cause": "legitimate_traffic",
+    "expected_action": "allow",
+    "low_signal": false
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m11"
+      },
+      "output": {
+        "merchant_id": "m11",
+        "window_start_ts": 1762074099,
+        "window_end_ts": 1762591705,
+        "total_txns": 2284,
+        "baseline_flagged_rate_ewma": 0.0,
+        "peak_flagged_rate": 0.0333,
+        "peak_flagged_rate_window_ended_ts": 1762252433,
+        "peak_spike_z": 1.1,
+        "peak_vs_baseline_multiple": null,
+        "current_flagged_rate_last_30_txns": 0.0,
+        "spike_detector_fired": false,
+        "spike_fired_at_ts": null,
+        "avg_amount_inr": 690.4,
+        "reading_note": "peak_flagged_rate is the WORST 30-transaction window in this merchant's history; current_flagged_rate_last_30_txns is only the state at the end of the window. A finished attack shows a high peak and a low current value - that is an attack that ENDED, not an absence of attack."
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m11"
+      },
+      "output": {
+        "merchant_id": "m11",
+        "window_hours": 143.78,
+        "txns_per_hour_overall": 15.89,
+        "flagged_txns": 2,
+        "flagged_span_hours": 41.95,
+        "flagged_per_hour": 0.05,
+        "peak_hour_txns": 250
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m11"
+      },
+      "output": {
+        "merchant_id": "m11",
+        "flagged_count": 2,
+        "distinct_customers": 2,
+        "distinct_devices": 2,
+        "distinct_ips": 2,
+        "distinct_instruments": 2,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d2483",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d3716",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip10",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip607",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 1.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m11",
+        "limit": 15
+      },
+      "output": {
+        "merchant_id": "m11",
+        "flagged_count": 2,
+        "total_count": 2284,
+        "transactions": [
+          {
+            "ts": 1762252433,
+            "risk": 1.0,
+            "amount_inr": 2521.01,
+            "customer": "c2483",
+            "device": "d2483",
+            "ip": "ip607",
+            "instrument": "pi2483"
+          },
+          {
+            "ts": 1762403437,
+            "risk": 0.833,
+            "amount_inr": 961.42,
+            "customer": "c3716",
+            "device": "d3716",
+            "ip": "ip10",
+            "instrument": "pi3716"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_customer_anomalies",
+      "input": {
+        "merchant_id": "m11",
+        "limit": 15
+      },
+      "output": {
+        "merchant_id": "m11",
+        "flagged_count": 2,
+        "share_on_new_device_for_customer": 0.0,
+        "share_with_geo_mismatch": 0.0,
+        "median_amount_vs_customer_own_average": 2.67,
+        "share_spending_over_3x_own_average": 0.5,
+        "median_customer_age_days": 248.4,
+        "share_accounts_newer_than_30_days": 0.0,
+        "interpretation_note": "High new-device + high geo-mismatch + high amount-vs-own-average on OLD accounts describes established customers behaving unlike themselves. High new-account share with low amount deviation describes freshly created accounts instead.",
+        "transactions": [
+          {
+            "customer": "c2483",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 3.01,
+            "account_age_days": 318.1,
+            "amount_inr": 2521.01
+          },
+          {
+            "customer": "c3716",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 2.33,
+            "account_age_days": 178.8,
+            "amount_inr": 961.42
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m11"
+      },
+      "output": {
+        "merchant_id": "m11",
+        "flagged_txn_count": 2,
+        "exposure_at_risk_inr": 3482.43,
+        "probability_weighted_expected_loss_inr": 3322.19,
+        "recoverable_via_step_up_inr": 2989.97,
+        "review_cost_if_all_reviewed_inr": 100.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m11",
+        "cause": "unclear",
+        "confidence": 0.35,
+        "evidence": [
+          "Only 2 flagged transactions over 143.78-hour window (41.95 hours apart) \u2014 a drip, not a burst attack.",
+          "Spike Z-score of 1.1 \u2014 weak statistical signal; baseline flagged rate 0.0%, peak 3.33%, current 0%.",
+          "Entity network shows zero consolidation: 2 distinct customers, 2 distinct devices, 2 distinct IPs, 2 distinct instruments. Each transaction is completely isolated.",
+          "Both customers established (318 and 179 days old), no new devices, no geo mismatches.",
+          "Both customers spending 2.3\u20133.0\u00d7 their own historical average (c2483: 3.01\u00d7, c3716: 2.33\u00d7).",
+          "Total exposure: \u20b93,482.43 at risk; expected weighted loss \u20b93,322.19; recoverable via step-up \u20b92,989.97."
+        ],
+        "exposure_inr": 3482.43,
+        "recommended_action": "review"
+      },
+      "output": {
+        "merchant_id": "m11",
+        "cause": "unclear",
+        "evidence": [
+          "Only 2 flagged transactions over 143.78-hour window (41.95 hours apart) \u2014 a drip, not a burst attack.",
+          "Spike Z-score of 1.1 \u2014 weak statistical signal; baseline flagged rate 0.0%, peak 3.33%, current 0%.",
+          "Entity network shows zero consolidation: 2 distinct customers, 2 distinct devices, 2 distinct IPs, 2 distinct instruments. Each transaction is completely isolated.",
+          "Both customers established (318 and 179 days old), no new devices, no geo mismatches.",
+          "Both customers spending 2.3\u20133.0\u00d7 their own historical average (c2483: 3.01\u00d7, c3716: 2.33\u00d7).",
+          "Total exposure: \u20b93,482.43 at risk; expected weighted loss \u20b93,322.19; recoverable via step-up \u20b92,989.97."
+        ],
+        "exposure_inr": 3482.43,
+        "recommended_action": "review",
+        "confidence": 0.35
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "74b4120a50c1d86d",
+      "output_hash": "6001ad01ceb6b3ff",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "74b4120a50c1d86d",
+      "output_hash": "f01da1bc47f19eda",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_entity_network",
+      "inputs_hash": "74b4120a50c1d86d",
+      "output_hash": "c17ea4c19ee054b5",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "7257d5d2d06b9a85",
+      "output_hash": "c32aa76c81ca7d67",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "get_customer_anomalies",
+      "inputs_hash": "7257d5d2d06b9a85",
+      "output_hash": "5485cec688f7fdd5",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "calculate_exposure",
+      "inputs_hash": "74b4120a50c1d86d",
+      "output_hash": "107012c855fe5947",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 6,
+      "tool": "write_investigation_report",
+      "inputs_hash": "f855ff43e7751ade",
+      "output_hash": "f855ff43e7751ade",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m11",
+    "cause": "unclear",
+    "evidence": [
+      "Only 2 flagged transactions over 143.78-hour window (41.95 hours apart) \u2014 a drip, not a burst attack.",
+      "Spike Z-score of 1.1 \u2014 weak statistical signal; baseline flagged rate 0.0%, peak 3.33%, current 0%.",
+      "Entity network shows zero consolidation: 2 distinct customers, 2 distinct devices, 2 distinct IPs, 2 distinct instruments. Each transaction is completely isolated.",
+      "Both customers established (318 and 179 days old), no new devices, no geo mismatches.",
+      "Both customers spending 2.3\u20133.0\u00d7 their own historical average (c2483: 3.01\u00d7, c3716: 2.33\u00d7).",
+      "Total exposure: \u20b93,482.43 at risk; expected weighted loss \u20b93,322.19; recoverable via step-up \u20b92,989.97."
+    ],
+    "exposure_inr": 3482.43,
+    "recommended_action": "review",
+    "confidence": 0.35
+  },
+  "validated_action": "review"
+}

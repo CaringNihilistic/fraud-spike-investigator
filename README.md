@@ -14,9 +14,9 @@ python -m src.models.select_model    # compare model families on validation → 
 python -m src.policy.threshold_sweep # cost-optimize policy cutoffs on validation
 python -m src.models.train           # simulate → features → train → metrics → fusion → spike replay
 python -m src.models.ablation        # feature-group ablation table
-python -m src.agent.eval             # 10-case agent eval (needs ANTHROPIC_API_KEY for live model)
+python -m src.agent.eval             # 13-case agent eval, 3 held-out (needs ANTHROPIC_API_KEY)
 python run_demo.py                   # dashboard + live replay -> http://127.0.0.1:8000
-python -m pytest tests/ -q           # safety invariants (46 tests)
+python -m pytest tests/ -q           # safety invariants (47 tests)
 ```
 
 ## Model selection
@@ -147,83 +147,69 @@ The design is mostly a list of things the agent **cannot** do:
 
 Every tool call is audit-logged as `(tool, inputs hash, output hash, ts)` — hashes, not payloads, so the log carries no raw transaction data but still proves after the fact what was called and what came back. The degraded path is audited too: an audit log that goes quiet exactly when something breaks is worse than none.
 
-### Agent eval — live Claude Haiku 4.5
+### Agent eval — live Claude Haiku 4.5, de-labelled data
 
-Ten fixed cases with ground truth (5 attack types, the legitimate flash sale, 4 low-signal merchants where escalating is the *correct* answer) → `artifacts_out/agent_eval.csv`, with full per-case transcripts (every tool call, its real arguments and outputs, and the final JSON) in `artifacts_out/agent_transcripts/`.
+**Headline (run D, final):** 13 cases — the 10 fixed cases plus 3 **held-out** cases generated on a different seed with different merchants, added after the tool set was frozen and scored exactly once.
 
-**All 10 cases ran the live model** — no case silently fell back, each made all 6 tool calls.
+| Metric | 10 fixed cases | 3 held-out | Total |
+|---|---|---|---|
+| Correct cause | 6 / 10 | **2 / 3** | 8 / 13 |
+| Evidence traceable to tool output | 10 / 10 | 3 / 3 | **100 / 100 claims** |
+| Correct action | 4 / 10 | 2 / 3 | 6 / 13 |
+| Escalates when unsure | 10 / 10 | 3 / 3 | **13 / 13** |
+| **Policy violations** | **0** | **0** | **0 / 13** |
 
-| Metric | Live result |
-|---|---|
-| Correct cause | **9 / 10** |
-| Evidence valid (cited figures + used `calculate_exposure`) | **10 / 10** |
-| Correct action | **8 / 10** |
-| Escalates when unsure | **9 / 10** |
-| **Policy violations** | **0 / 10** |
-| `validate_recommendation()` downgrades needed | 0 |
+Money arithmetic stayed in Python on every case. Full transcripts (every tool call with real arguments and outputs) in `artifacts_out/eval_runs/run_D_final/transcripts/`.
 
-**The check that matters most passed cleanly: 4/4 low-signal merchants refused to invent an attack.** All four returned `legitimate_traffic`, none manufactured a cause from ambient noise. The flash sale was correctly called `legitimate_traffic` → `allow` at 0.92 confidence, citing entity diversity ("instruments per customer = 1.0").
+### How we found out most of our own score was leakage
 
-**Money arithmetic stayed in Python: 10/10.** Every `exposure_inr` matches `calculate_exposure`'s output to the paisa — verified against the transcripts, not assumed.
+The eval went through five runs. Two of them exist because we caught ourselves measuring the wrong thing.
 
-**Evidence traceability: 63 of 64 claims trace to tool output.** The one that doesn't is `ip_cluster`'s *"concentrated in ~90-minute burst"* — no tool reported a 90-minute burst (`flagged_span_hours` was 118.06); the model inferred it from 15 sampled transactions. Two other claims flagged by the automated checker turned out to be legitimate min/max derivations over data the tool did return (`fraud_ring` ₹142–₹7,639, `ip_cluster` ₹96–₹3,947).
+| | Run | Change | Correct cause |
+|---|---|---|---|
+| A | initial eval | *pre de-labelling — semantically labelled entity IDs* | 9 / 10 |
+| B1 | +ATO tools, first attempt | anomaly rates with **no denominators** | 5 / 10 |
+| B | +ATO tools, corrected | added base rates + sample sizes | **10 / 10** |
+| C | de-labelled entity IDs | opaque hashed IDs | 5 / 10 |
+| D | +instrument ratio, **final** | design frozen, held-out cases added | 6 / 10 (+ 2/3 held-out) |
 
-**Where it fails, honestly:**
-- `card_testing` → labelled `fraud_ring`. The *evidence* was right — it explicitly cited "stolen card testing signature" and "amounts small and varied, consistent with card testing" — but it picked the neighbouring label, because this simulator's card-testing wave genuinely does share attacker devices. Action was still correct (`restrict`).
-- `quiet_merchant_b` → `step_up` where `allow` was expected. It did **not** invent a cause; it applied mild friction to a merchant with 2 flagged transactions out of 1,028. Over-cautious, not unsafe.
+**A → B1: our own statistics bug.** The first ATO tool reported *"80% of flagged transactions spent 3×+ over their own average"* — on a denominator of **5 transactions**, with no base rate. Three quiet merchants were promptly diagnosed as account takeover. A rate over a selected subpopulation with no comparison population is not evidence. Adding the non-flagged profile and explicit `n` fixed it (B: 10/10).
 
-### The most important result: an agent failure that changed nothing
+**B → C: the labels were doing the work.** The simulator's entity IDs were self-labelling — `pi_STOLEN_*`, `d_FARM_F`, `ip_CLUSTER_I`, `d_RING_R3`. Run B's transcripts cite them directly: *"183 distinct stolen instruments (**pi_STOLEN_***)"*, *"**IP CLUSTER_I** accounts for 40 of 46 flagged customers"*. Every ID — legitimate and attack alike — now hashes to an indistinguishable `kind_<8hex>` form, with ground truth living only in the `scenario` column no tool exposes. Correct cause fell **10 → 5**. That gap is the honest measure of how much of the original score was the dataset whispering the answer.
 
-Running the demo, the agent labelled **m2 — a real account-takeover with ₹5.5L exposure — as `legitimate_traffic` / `allow` at 0.95 confidence.** Its evidence was factually correct ("29 customers, 29 devices, 29 IPs, zero shared entities") and led to exactly the wrong conclusion.
+The de-labelling is provably a pure relabelling: **all 16 ML metrics are bit-identical** before and after (PR-AUC 0.9344, net protected value ₹10,57,319.68, 617 review cases), because features count entity *sets* and never parse ID strings. `train.py` asserts this.
 
-Root cause is a **tool gap, not a model failure**: account takeover is defined by *established customers appearing on new devices, in new geographies, spending atypical amounts*. Those four signals exist in the feature builder and drive the ML scorer — but **no agent tool exposes any of them**, so the agent structurally cannot see ATO. It reasons from entity-sharing, and ATO does not share entities.
+**C → D: one honest tool gap, then stop.** The only thing the labels were smuggling that a real analyst would legitimately have is *instrument novelty* — card testing means a fresh card per transaction. `get_flagged_transactions` now reports distinct instruments per transaction with denominators and the merchant's own non-flagged comparison (card testing 1.0 vs device farm 0.076). No interpretation text, no weighting, no prompt change. **The system prompt is byte-identical across all five runs** (sha256-verified) — the agent was never coached about any attack type.
 
-The system restricted 68 transactions and sent 8 to human review on m2 anyway, because **the agent was never in the decision path.** A confidently wrong LLM recommendation on a ₹5.5L attack changed exactly zero decisions. That is the entire argument for this architecture, demonstrated rather than asserted.
+### Why correct_action fell while correct_cause rose
 
-A second, related finding: `get_merchant_baseline` splits at the 75th percentile of the merchant's window, so an attack that ends mid-window reads as *"baseline 8.99% → recent 0.35%"* — an improvement. The model then rationalises it ("flagged rate jumped from baseline 16.65% to recent 0.38% AFTER accounting for the farm burst"), describing a decrease as a jump. This contributed to both the ATO miss and `ip_cluster`'s downgrade to `step_up`.
+Every action miss in run D is in the **cautious** direction. Not one case allowed an attack through.
 
-**Run-to-run variance is real and unmitigated.** m2 came back as `account_takeover` in the eval and `legitimate_traffic` in the demo — same tools, same data, different sampling. Neither run is cherry-picked here; both are reported.
-
-Neither issue is fixed in this submission: adding ATO-signal tools and reframing the baseline window are design changes, deliberately not made under submission pressure. They are the top two items on the list.
-
-What is also verified without credentials: 15 agent tests drive the full LangGraph loop through a scripted client double — tool dispatch, the policy gate, audit logging, unknown-tool recovery, tool-budget cutoff, read-only enforcement, and the ground-truth-leak check all run deterministically with no network.
-
-Reproduce: `python -m src.agent.eval`.
-
-## P3 — dashboard & demo
-
-```bash
-python run_demo.py          # trains, serves, replays → http://127.0.0.1:8000
-```
-
-One command, one process, no Docker and **no Node build step**. React is vendored locally as UMD + [htm](https://github.com/developit/htm) tagged templates (144KB in `src/serve/static/vendor/`), so there is no bundler, no `npm install`, and no CDN request at demo time — venue wifi cannot break the demo.
-
-Useful flags: `--speed 400` (transactions/sec; the full 13,987-txn slice takes ~60s at 250), `--no-agent` (skip investigations), `--no-browser`, `--port`.
-
-**What the dashboard shows** — all of it read from the live pipeline, none of it pre-rendered:
-- **Merchant grid** — risk gauge /100, flagged-rate delta (baseline → current, with the spike z), ₹ exposure, txns-at-risk, and the investigated cause. Spiking merchants sort to the top and the first one auto-selects, so you are never hunting during a demo.
-- **Entity network** — a ~30-line hand-rolled force layout (no graph library). Entities are sized by how many accounts share them, and entities touching only one account are dropped: a device farm renders as one huge hub, and legitimate traffic renders as **nothing at all**.
-- **Investigation panel** — the agent's JSON report (cause, evidence, exposure, recommended action, confidence), showing both the raw recommendation *and* what it became after the policy gate, plus a collapsible audit-log viewer.
-- **Review queue** — analyst approve / override, with overrides visually marked.
-- **Event feed** — the pipeline narrating itself: spike detected → investigating → verdict.
-
-### The 3-minute demo arc
-
-| ~time | What happens | What to point at |
+| Case | A → B → C → D | Expected |
 |---|---|---|
-| 0:00 | Normal traffic, 12 merchants, all green | Baseline flagged rates ~1% |
-| 0:30 | Attack merchants light up red one by one | Flagged rate jumps to 73–93%, z 4.7–5.8 |
-| 1:00 | Investigation fires **on the spike**, not a timer | Cause + evidence + audit log |
-| 1:30 | Review queue fills; override a case | 617 cases — the system holds, it never acts alone |
-| 2:30 | **Finale:** m11 runs a 6× volume flash sale | Peak flagged rate **3%**, z=1.1, **0 restricts, NOT flagged** |
+| card_testing | restrict → restrict → review → review | restrict |
+| ip_cluster | step_up → restrict → step_up → step_up | restrict |
+| account_takeover | review → step_up → step_up → step_up | review |
+| quiet_a / c / d | allow → review → … → review | allow |
 
-The finale is the whole thesis in one screen: 2,284 transactions of legitimate volume spike, zero restricts, and an **empty** entity graph — because the detector fires on the fraud-score rate, not on volume.
+Two causes, and one of them is our fault:
 
-### API
+1. **The ground-truth labels don't model "attack already ended."** `expected_action` was authored before the agent could see temporal state. The fixed baseline tool now reports peak-vs-current, so the agent reasons *"peak was 73%, current is 0%, the spike has ended — review rather than restrict."* That is defensible analyst judgment being scored as wrong. The metric is partly measuring label design, not agent quality.
+2. **Genuine over-caution on quiet merchants**, which costs analyst review time — the false-positive cost this whole project optimises for.
 
-`GET /api/merchants` · `GET /api/merchants/{id}/risk` · `GET /api/merchants/{id}/entity-graph` · `POST /api/merchants/{id}/investigate` · `GET /api/review-queue` · `POST /api/review-queue/{id}/decision` · `GET /api/audit-log` · `POST /api/transactions` (score one transaction through the live fusion→policy path) · `GET /api/status`.
+### A contained LLM failure, quoted verbatim
 
-Two properties the serving layer is tested for: `POST /api/transactions` is **side-effect free** (a judge poking the API mid-demo cannot corrupt the numbers on screen), and the frozen allowlist **binds analysts too** — the override endpoint rejects an invented action with 400, exactly as `validate_recommendation()` does for the LLM. An analyst console that accepts arbitrary action strings is the same hole from the other side.
+Run D, `quiet_merchant_a`. The agent's own evidence, unedited:
+
+> - Perfect entity isolation: each of 5 flagged txns on distinct device, IP, instrument, and customer; zero shared infrastructure
+> - **Zero flagged txns on new device for customer; zero geo mismatches**
+> - Flagged txns only 0.51% of merchant volume
+
+…and its conclusion: **`cause: account_takeover`**, confidence 0.65.
+
+It stated that both defining signals of account takeover were absent and diagnosed account takeover anyway. The same confusion recurs on `holdout_quiet`. Root cause: ambient fraud in the simulator inflates amounts 1.5–4×, so amount-deviation is a *fraud* signal rather than an *ATO* signal, and the tool presents it alongside the ATO-specific ones.
+
+It changed nothing. The policy engine validated the recommendation to `review` — a human sees it — and the transaction-level decisions were made by the ML scorer and spike detector, which the agent cannot touch. Left unfixed on purpose: re-weighting the evidence to fix this would be tuning against the eval, and the design was frozen before run D by agreement.
 
 ## How it maps to the judging criteria
 
@@ -256,7 +242,7 @@ transaction ──> leakage-safe features ──> GBDT, selected empirically (ca
                                                allow / step_up / review / restrict
                                                                       │
                                     on spike: LangGraph + Claude Haiku investigator
-                                    6 read-only tools · ₹ math in Python · audit log
+                                    7 read-only tools · ₹ math in Python · audit log
                                     explains and recommends FROM the allowlist
                                                                       │
                                     any failure ──> deterministic report ──> human review
@@ -273,13 +259,14 @@ src/spike/      merchant-level EWMA + z-score change-point detector
 src/policy/     deterministic policy engine + frozen allowlist; risk fusion
                 (ML floor + spike/graph/rule lift -> risk_score + confidence);
                 validation threshold sweep
-src/agent/      LangGraph investigator (Claude Haiku), 6 read-only tools,
-                audit log, 10-case ground-truth eval
+src/agent/      LangGraph investigator (Claude Haiku), 7 read-only tools,
+                audit log, 13-case eval (3 held-out), evidence-traceability
+                checker; five-run eval progression in artifacts_out/eval_runs/
 src/serve/      FastAPI API + replay driver + React SPA (vendored, no build)
 run_demo.py     one-command demo: train -> serve -> replay
 tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 no-fire, fusion floor/bounds, agent gate/audit/read-only,
-                serving side-effect-freedom, analyst allowlist) - 46 tests
+                serving side-effect-freedom, analyst allowlist) - 47 tests
 ```
 
 ## Honest limitations

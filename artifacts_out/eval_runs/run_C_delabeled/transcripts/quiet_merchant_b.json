@@ -1,0 +1,310 @@
+{
+  "case": "quiet_merchant_b",
+  "merchant": "m4",
+  "ground_truth": {
+    "cause": "legitimate_traffic",
+    "expected_action": "allow",
+    "low_signal": true
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m4"
+      },
+      "output": {
+        "merchant_id": "m4",
+        "window_start_ts": 1762074459,
+        "window_end_ts": 1762590911,
+        "total_txns": 1028,
+        "baseline_flagged_rate_ewma": 0.0029,
+        "peak_flagged_rate": 0.0333,
+        "peak_flagged_rate_window_ended_ts": 1762112271,
+        "peak_spike_z": 1.1,
+        "peak_vs_baseline_multiple": 11.37,
+        "current_flagged_rate_last_30_txns": 0.0,
+        "spike_detector_fired": false,
+        "spike_fired_at_ts": null,
+        "avg_amount_inr": 842.4,
+        "reading_note": "peak_flagged_rate is the WORST 30-transaction window in this merchant's history; current_flagged_rate_last_30_txns is only the state at the end of the window. A finished attack shows a high peak and a low current value - that is an attack that ENDED, not an absence of attack."
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m4"
+      },
+      "output": {
+        "merchant_id": "m4",
+        "flagged_count": 2,
+        "distinct_customers": 2,
+        "distinct_devices": 2,
+        "distinct_ips": 2,
+        "distinct_instruments": 2,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d_64f374fd",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d_e4c2002d",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip_04a7ed74",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip_ff823b14",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 1.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m4"
+      },
+      "output": {
+        "merchant_id": "m4",
+        "window_hours": 143.46,
+        "txns_per_hour_overall": 7.17,
+        "flagged_txns": 2,
+        "flagged_span_hours": 117.6,
+        "flagged_per_hour": 0.02,
+        "peak_hour_txns": 17
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m4"
+      },
+      "output": {
+        "merchant_id": "m4",
+        "flagged_count": 2,
+        "total_count": 1028,
+        "transactions": [
+          {
+            "ts": 1762112271,
+            "risk": 1.0,
+            "amount_inr": 1399.66,
+            "customer": "c_345a80b8",
+            "device": "d_64f374fd",
+            "ip": "ip_ff823b14",
+            "instrument": "pi_1ab4925f"
+          },
+          {
+            "ts": 1762535614,
+            "risk": 0.833,
+            "amount_inr": 2901.08,
+            "customer": "c_43ff3f0a",
+            "device": "d_e4c2002d",
+            "ip": "ip_04a7ed74",
+            "instrument": "pi_2464b31a"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_customer_anomalies",
+      "input": {
+        "merchant_id": "m4"
+      },
+      "output": {
+        "merchant_id": "m4",
+        "flagged_count": 2,
+        "total_txns": 1028,
+        "flagged_share_of_all_txns": 0.0019,
+        "flagged_profile": {
+          "n": 2,
+          "share_on_new_device_for_customer": 0.0,
+          "share_with_geo_mismatch": 0.0,
+          "median_amount_vs_customer_own_average": 2.58,
+          "share_spending_over_3x_own_average": 0.0,
+          "median_customer_age_days": 286.9,
+          "share_accounts_newer_than_30_days": 0.0
+        },
+        "non_flagged_profile_same_merchant": {
+          "n": 1026,
+          "share_on_new_device_for_customer": 0.0,
+          "share_with_geo_mismatch": 0.0,
+          "median_amount_vs_customer_own_average": 1.0,
+          "share_spending_over_3x_own_average": 0.0,
+          "median_customer_age_days": 224.9,
+          "share_accounts_newer_than_30_days": 0.008
+        },
+        "flagged_vs_non_flagged_lift": {
+          "share_on_new_device_for_customer": 1.0,
+          "share_with_geo_mismatch": 1.0,
+          "share_spending_over_3x_own_average": 1.0,
+          "share_accounts_newer_than_30_days": 0.0
+        },
+        "interpretation_note": "Compare flagged_profile against non_flagged_profile_same_merchant and weigh by n. A share computed over a handful of transactions is weak evidence however extreme it looks; a modest share over hundreds is strong. Lift near 1.0 means the flagged transactions are indistinguishable from this merchant's ordinary traffic on that dimension.",
+        "transactions": [
+          {
+            "customer": "c_345a80b8",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 2.77,
+            "account_age_days": 420.4,
+            "amount_inr": 1399.66
+          },
+          {
+            "customer": "c_43ff3f0a",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 2.4,
+            "account_age_days": 153.3,
+            "amount_inr": 2901.08
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m4"
+      },
+      "output": {
+        "merchant_id": "m4",
+        "flagged_txn_count": 2,
+        "exposure_at_risk_inr": 4300.74,
+        "probability_weighted_expected_loss_inr": 3817.23,
+        "recoverable_via_step_up_inr": 3435.5,
+        "review_cost_if_all_reviewed_inr": 100.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m4",
+        "cause": "legitimate_traffic",
+        "confidence": 0.92,
+        "evidence": [
+          "Spike has ended: baseline flagged rate 0.29%, peak was 3.33% but current rate last 30 txns is 0.0%",
+          "Only 2 flagged txns over 1028 total txns (0.19% flagged rate)",
+          "Zero entity clustering: 2 customers, 2 devices, 2 IPs, 2 instruments\u2014each flagged txn fully isolated",
+          "Slow drip velocity: 0.02 flagged per hour over 117.6-hour span, not a burst",
+          "Established customers (420 and 153 days old), zero new accounts",
+          "No device-newness or geo-mismatch anomalies (lift 1.0)",
+          "Amounts 2.77\u00d7 and 2.4\u00d7 customer's own average\u2014elevated but not extreme and typical for merchant",
+          "Flagged txn profile indistinguishable from non-flagged on behavioral dimensions"
+        ],
+        "exposure_inr": 4300.74,
+        "recommended_action": "allow"
+      },
+      "output": {
+        "merchant_id": "m4",
+        "cause": "legitimate_traffic",
+        "evidence": [
+          "Spike has ended: baseline flagged rate 0.29%, peak was 3.33% but current rate last 30 txns is 0.0%",
+          "Only 2 flagged txns over 1028 total txns (0.19% flagged rate)",
+          "Zero entity clustering: 2 customers, 2 devices, 2 IPs, 2 instruments\u2014each flagged txn fully isolated",
+          "Slow drip velocity: 0.02 flagged per hour over 117.6-hour span, not a burst",
+          "Established customers (420 and 153 days old), zero new accounts",
+          "No device-newness or geo-mismatch anomalies (lift 1.0)",
+          "Amounts 2.77\u00d7 and 2.4\u00d7 customer's own average\u2014elevated but not extreme and typical for merchant",
+          "Flagged txn profile indistinguishable from non-flagged on behavioral dimensions"
+        ],
+        "exposure_inr": 4300.74,
+        "recommended_action": "allow",
+        "confidence": 0.92
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "2f91f236865f4f05",
+      "output_hash": "119976f64cebdb05",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_entity_network",
+      "inputs_hash": "2f91f236865f4f05",
+      "output_hash": "574f6d16a32b03ad",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "2f91f236865f4f05",
+      "output_hash": "6223fb01bf2cfa57",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "2f91f236865f4f05",
+      "output_hash": "00cacb1161398333",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "get_customer_anomalies",
+      "inputs_hash": "2f91f236865f4f05",
+      "output_hash": "9fd657bd995c1b82",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "calculate_exposure",
+      "inputs_hash": "2f91f236865f4f05",
+      "output_hash": "053aba848feaeba3",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 6,
+      "tool": "write_investigation_report",
+      "inputs_hash": "349ab478083c0f49",
+      "output_hash": "349ab478083c0f49",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m4",
+    "cause": "legitimate_traffic",
+    "evidence": [
+      "Spike has ended: baseline flagged rate 0.29%, peak was 3.33% but current rate last 30 txns is 0.0%",
+      "Only 2 flagged txns over 1028 total txns (0.19% flagged rate)",
+      "Zero entity clustering: 2 customers, 2 devices, 2 IPs, 2 instruments\u2014each flagged txn fully isolated",
+      "Slow drip velocity: 0.02 flagged per hour over 117.6-hour span, not a burst",
+      "Established customers (420 and 153 days old), zero new accounts",
+      "No device-newness or geo-mismatch anomalies (lift 1.0)",
+      "Amounts 2.77\u00d7 and 2.4\u00d7 customer's own average\u2014elevated but not extreme and typical for merchant",
+      "Flagged txn profile indistinguishable from non-flagged on behavioral dimensions"
+    ],
+    "exposure_inr": 4300.74,
+    "recommended_action": "allow",
+    "confidence": 0.92
+  },
+  "validated_action": "allow"
+}
