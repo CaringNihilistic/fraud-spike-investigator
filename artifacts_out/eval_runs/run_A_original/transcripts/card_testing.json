@@ -1,0 +1,381 @@
+{
+  "case": "card_testing",
+  "merchant": "m3",
+  "ground_truth": {
+    "cause": "card_testing",
+    "expected_action": "restrict",
+    "low_signal": false
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m3"
+      },
+      "output": {
+        "merchant_id": "m3",
+        "baseline_txn_count": 964,
+        "baseline_flagged_rate": 0.1888,
+        "baseline_avg_amount_inr": 815.88,
+        "recent_txn_count": 322,
+        "recent_flagged_rate": 0.0031,
+        "recent_avg_amount_inr": 789.18,
+        "flagged_rate_multiple": 0.02
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m3"
+      },
+      "output": {
+        "merchant_id": "m3",
+        "flagged_count": 183,
+        "distinct_customers": 63,
+        "distinct_devices": 6,
+        "distinct_ips": 5,
+        "distinct_instruments": 183,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d_CT_S2",
+            "distinct_accounts": 42
+          },
+          {
+            "entity": "d_CT_S0",
+            "distinct_accounts": 41
+          },
+          {
+            "entity": "d_CT_S1",
+            "distinct_accounts": 38
+          },
+          {
+            "entity": "d2380",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d251",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip_CT_S1",
+            "distinct_accounts": 55
+          },
+          {
+            "entity": "ip_CT_S0",
+            "distinct_accounts": 49
+          },
+          {
+            "entity": "ip500",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip756",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip68",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 2.9
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m3"
+      },
+      "output": {
+        "merchant_id": "m3",
+        "window_hours": 143.54,
+        "txns_per_hour_overall": 8.96,
+        "flagged_txns": 183,
+        "flagged_span_hours": 126.77,
+        "flagged_per_hour": 1.44,
+        "peak_hour_txns": 25
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m3"
+      },
+      "output": {
+        "merchant_id": "m3",
+        "flagged_count": 183,
+        "total_count": 1286,
+        "transactions": [
+          {
+            "ts": 1762110658,
+            "risk": 1.0,
+            "amount_inr": 651.36,
+            "customer": "c_CT_S0",
+            "device": "d_CT_S1",
+            "ip": "ip_CT_S1",
+            "instrument": "pi_STOLEN_S0"
+          },
+          {
+            "ts": 1762111455,
+            "risk": 1.0,
+            "amount_inr": 416.73,
+            "customer": "c_CT_S1",
+            "device": "d_CT_S0",
+            "ip": "ip_CT_S0",
+            "instrument": "pi_STOLEN_S1"
+          },
+          {
+            "ts": 1762112799,
+            "risk": 1.0,
+            "amount_inr": 1174.31,
+            "customer": "c_CT_S2",
+            "device": "d_CT_S1",
+            "ip": "ip_CT_S1",
+            "instrument": "pi_STOLEN_S2"
+          },
+          {
+            "ts": 1762112831,
+            "risk": 1.0,
+            "amount_inr": 145.83,
+            "customer": "c_CT_S3",
+            "device": "d_CT_S0",
+            "ip": "ip_CT_S1",
+            "instrument": "pi_STOLEN_S3"
+          },
+          {
+            "ts": 1762113059,
+            "risk": 1.0,
+            "amount_inr": 481.46,
+            "customer": "c_CT_S4",
+            "device": "d_CT_S2",
+            "ip": "ip_CT_S0",
+            "instrument": "pi_STOLEN_S4"
+          },
+          {
+            "ts": 1762113301,
+            "risk": 1.0,
+            "amount_inr": 574.4,
+            "customer": "c_CT_S5",
+            "device": "d_CT_S1",
+            "ip": "ip_CT_S1",
+            "instrument": "pi_STOLEN_S5"
+          },
+          {
+            "ts": 1762113364,
+            "risk": 1.0,
+            "amount_inr": 1222.11,
+            "customer": "c_CT_S6",
+            "device": "d_CT_S1",
+            "ip": "ip_CT_S1",
+            "instrument": "pi_STOLEN_S6"
+          },
+          {
+            "ts": 1762113980,
+            "risk": 1.0,
+            "amount_inr": 346.19,
+            "customer": "c_CT_S7",
+            "device": "d_CT_S2",
+            "ip": "ip_CT_S1",
+            "instrument": "pi_STOLEN_S7"
+          },
+          {
+            "ts": 1762114045,
+            "risk": 1.0,
+            "amount_inr": 29.07,
+            "customer": "c_CT_S8",
+            "device": "d_CT_S2",
+            "ip": "ip_CT_S0",
+            "instrument": "pi_STOLEN_S8"
+          },
+          {
+            "ts": 1762114425,
+            "risk": 1.0,
+            "amount_inr": 58.81,
+            "customer": "c_CT_S9",
+            "device": "d_CT_S1",
+            "ip": "ip_CT_S0",
+            "instrument": "pi_STOLEN_S9"
+          },
+          {
+            "ts": 1762114497,
+            "risk": 1.0,
+            "amount_inr": 607.61,
+            "customer": "c_CT_S10",
+            "device": "d_CT_S2",
+            "ip": "ip_CT_S0",
+            "instrument": "pi_STOLEN_S10"
+          },
+          {
+            "ts": 1762115123,
+            "risk": 1.0,
+            "amount_inr": 1656.36,
+            "customer": "c_CT_S11",
+            "device": "d_CT_S2",
+            "ip": "ip_CT_S1",
+            "instrument": "pi_STOLEN_S11"
+          },
+          {
+            "ts": 1762115731,
+            "risk": 1.0,
+            "amount_inr": 2266.31,
+            "customer": "c_CT_S12",
+            "device": "d_CT_S0",
+            "ip": "ip_CT_S1",
+            "instrument": "pi_STOLEN_S12"
+          },
+          {
+            "ts": 1762119520,
+            "risk": 1.0,
+            "amount_inr": 190.23,
+            "customer": "c_CT_S13",
+            "device": "d_CT_S1",
+            "ip": "ip_CT_S0",
+            "instrument": "pi_STOLEN_S13"
+          },
+          {
+            "ts": 1762119545,
+            "risk": 1.0,
+            "amount_inr": 849.24,
+            "customer": "c_CT_S14",
+            "device": "d_CT_S2",
+            "ip": "ip_CT_S0",
+            "instrument": "pi_STOLEN_S14"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m3"
+      },
+      "output": {
+        "merchant_id": "m3",
+        "flagged_txn_count": 183,
+        "exposure_at_risk_inr": 133019.12,
+        "probability_weighted_expected_loss_inr": 132275.68,
+        "recoverable_via_step_up_inr": 119048.11,
+        "review_cost_if_all_reviewed_inr": 9150.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m3",
+        "cause": "fraud_ring",
+        "confidence": 0.95,
+        "evidence": [
+          "Baseline flagged rate 18.88% \u2192 recent 0.31% (rate_multiple 0.02), yet spike detector fired on absolute volume",
+          "Device concentration: 3 devices (d_CT_S2, d_CT_S0, d_CT_S1) account for 121/183 flagged txns; d_CT_S2 spans 42 distinct accounts",
+          "IP concentration: ip_CT_S1 and ip_CT_S0 cover 104 of 183 flagged txns across 63 customers",
+          "All 183 flagged instruments marked 'pi_STOLEN_Sx' \u2013 stolen card testing signature",
+          "All 183 transactions scored risk=1.0 (maximum)",
+          "Velocity: 183 flagged txns over 126.77 hours (1.44/hr avg, 25/hr peak) \u2013 concentrated burst attack",
+          "Amount variation: \u20b929\u2013\u20b92,266 range, small and varied \u2013 consistent with card testing strategy",
+          "Financial exposure: \u20b9133,019 at risk, \u20b9132,276 probability-weighted expected loss"
+        ],
+        "exposure_inr": 133019.12,
+        "recommended_action": "restrict"
+      },
+      "output": {
+        "merchant_id": "m3",
+        "cause": "fraud_ring",
+        "evidence": [
+          "Baseline flagged rate 18.88% \u2192 recent 0.31% (rate_multiple 0.02), yet spike detector fired on absolute volume",
+          "Device concentration: 3 devices (d_CT_S2, d_CT_S0, d_CT_S1) account for 121/183 flagged txns; d_CT_S2 spans 42 distinct accounts",
+          "IP concentration: ip_CT_S1 and ip_CT_S0 cover 104 of 183 flagged txns across 63 customers",
+          "All 183 flagged instruments marked 'pi_STOLEN_Sx' \u2013 stolen card testing signature",
+          "All 183 transactions scored risk=1.0 (maximum)",
+          "Velocity: 183 flagged txns over 126.77 hours (1.44/hr avg, 25/hr peak) \u2013 concentrated burst attack",
+          "Amount variation: \u20b929\u2013\u20b92,266 range, small and varied \u2013 consistent with card testing strategy",
+          "Financial exposure: \u20b9133,019 at risk, \u20b9132,276 probability-weighted expected loss"
+        ],
+        "exposure_inr": 133019.12,
+        "recommended_action": "restrict",
+        "confidence": 0.95
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "8bd202db8ff81bfb",
+      "output_hash": "9c8d94306a1adbe2",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_entity_network",
+      "inputs_hash": "8bd202db8ff81bfb",
+      "output_hash": "9eae67632a2c41c4",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "8bd202db8ff81bfb",
+      "output_hash": "35cf35bfa395918f",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "8bd202db8ff81bfb",
+      "output_hash": "0280f0446f953d88",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "calculate_exposure",
+      "inputs_hash": "8bd202db8ff81bfb",
+      "output_hash": "a9348f2070c5ed95",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "write_investigation_report",
+      "inputs_hash": "3c6680a65522f2a3",
+      "output_hash": "3c6680a65522f2a3",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m3",
+    "cause": "fraud_ring",
+    "evidence": [
+      "Baseline flagged rate 18.88% \u2192 recent 0.31% (rate_multiple 0.02), yet spike detector fired on absolute volume",
+      "Device concentration: 3 devices (d_CT_S2, d_CT_S0, d_CT_S1) account for 121/183 flagged txns; d_CT_S2 spans 42 distinct accounts",
+      "IP concentration: ip_CT_S1 and ip_CT_S0 cover 104 of 183 flagged txns across 63 customers",
+      "All 183 flagged instruments marked 'pi_STOLEN_Sx' \u2013 stolen card testing signature",
+      "All 183 transactions scored risk=1.0 (maximum)",
+      "Velocity: 183 flagged txns over 126.77 hours (1.44/hr avg, 25/hr peak) \u2013 concentrated burst attack",
+      "Amount variation: \u20b929\u2013\u20b92,266 range, small and varied \u2013 consistent with card testing strategy",
+      "Financial exposure: \u20b9133,019 at risk, \u20b9132,276 probability-weighted expected loss"
+    ],
+    "exposure_inr": 133019.12,
+    "recommended_action": "restrict",
+    "confidence": 0.95
+  },
+  "validated_action": "restrict"
+}

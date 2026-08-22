@@ -1,0 +1,283 @@
+{
+  "case": "quiet_merchant_a",
+  "merchant": "m1",
+  "ground_truth": {
+    "cause": "legitimate_traffic",
+    "expected_action": "allow",
+    "low_signal": true
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m1"
+      },
+      "output": {
+        "merchant_id": "m1",
+        "baseline_txn_count": 741,
+        "baseline_flagged_rate": 0.0067,
+        "baseline_avg_amount_inr": 816.22,
+        "recent_txn_count": 247,
+        "recent_flagged_rate": 0.0,
+        "recent_avg_amount_inr": 819.18,
+        "flagged_rate_multiple": 0.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m1"
+      },
+      "output": {
+        "merchant_id": "m1",
+        "flagged_count": 5,
+        "distinct_customers": 5,
+        "distinct_devices": 5,
+        "distinct_ips": 5,
+        "distinct_instruments": 5,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d1554",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d1586",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d2493",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d664",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d846",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip1116",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip206",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip37",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip440",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip546",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 1.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m1"
+      },
+      "output": {
+        "merchant_id": "m1",
+        "window_hours": 143.76,
+        "txns_per_hour_overall": 6.87,
+        "flagged_txns": 5,
+        "flagged_span_hours": 45.22,
+        "flagged_per_hour": 0.11,
+        "peak_hour_txns": 19
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m1",
+        "limit": 15
+      },
+      "output": {
+        "merchant_id": "m1",
+        "flagged_count": 5,
+        "total_count": 988,
+        "transactions": [
+          {
+            "ts": 1762317835,
+            "risk": 1.0,
+            "amount_inr": 7505.61,
+            "customer": "c846",
+            "device": "d846",
+            "ip": "ip37",
+            "instrument": "pi846"
+          },
+          {
+            "ts": 1762371806,
+            "risk": 1.0,
+            "amount_inr": 1211.05,
+            "customer": "c2493",
+            "device": "d2493",
+            "ip": "ip1116",
+            "instrument": "pi2493"
+          },
+          {
+            "ts": 1762454263,
+            "risk": 1.0,
+            "amount_inr": 5610.39,
+            "customer": "c1554",
+            "device": "d1554",
+            "ip": "ip206",
+            "instrument": "pi1554"
+          },
+          {
+            "ts": 1762291475,
+            "risk": 0.833,
+            "amount_inr": 2089.75,
+            "customer": "c664",
+            "device": "d664",
+            "ip": "ip440",
+            "instrument": "pi664"
+          },
+          {
+            "ts": 1762439741,
+            "risk": 0.833,
+            "amount_inr": 2964.09,
+            "customer": "c1586",
+            "device": "d1586",
+            "ip": "ip546",
+            "instrument": "pi1586"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m1"
+      },
+      "output": {
+        "merchant_id": "m1",
+        "flagged_txn_count": 5,
+        "exposure_at_risk_inr": 19380.89,
+        "probability_weighted_expected_loss_inr": 18538.58,
+        "recoverable_via_step_up_inr": 16684.72,
+        "review_cost_if_all_reviewed_inr": 250.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m1",
+        "cause": "legitimate_traffic",
+        "confidence": 0.92,
+        "evidence": [
+          "5 flagged txns across 5 distinct customers, 5 distinct devices, 5 distinct IPs, 5 distinct instruments \u2013 zero entity sharing",
+          "Recent flagged rate 0% vs baseline 0.67% \u2013 recent activity cleaner than historical",
+          "Velocity 0.11 flagged txns/hour spread over 45.22 hours \u2013 no burst concentration",
+          "Flagged amounts \u20b91,211\u2013\u20b97,506 with normal variance around baseline avg \u20b9819",
+          "Peak hour 19 txns within normal operating envelope for 6.87 txn/hr merchant"
+        ],
+        "exposure_inr": 19380.89,
+        "recommended_action": "allow"
+      },
+      "output": {
+        "merchant_id": "m1",
+        "cause": "legitimate_traffic",
+        "evidence": [
+          "5 flagged txns across 5 distinct customers, 5 distinct devices, 5 distinct IPs, 5 distinct instruments \u2013 zero entity sharing",
+          "Recent flagged rate 0% vs baseline 0.67% \u2013 recent activity cleaner than historical",
+          "Velocity 0.11 flagged txns/hour spread over 45.22 hours \u2013 no burst concentration",
+          "Flagged amounts \u20b91,211\u2013\u20b97,506 with normal variance around baseline avg \u20b9819",
+          "Peak hour 19 txns within normal operating envelope for 6.87 txn/hr merchant"
+        ],
+        "exposure_inr": 19380.89,
+        "recommended_action": "allow",
+        "confidence": 0.92
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "5bf51bb65d9e0528",
+      "output_hash": "7ff2fa728b1967c6",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_entity_network",
+      "inputs_hash": "5bf51bb65d9e0528",
+      "output_hash": "2293c029afee0c84",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "5bf51bb65d9e0528",
+      "output_hash": "f282ed4970b75450",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "83624a7b8fbced97",
+      "output_hash": "9d90b4ac31f86980",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "calculate_exposure",
+      "inputs_hash": "5bf51bb65d9e0528",
+      "output_hash": "cee121a43d8cfab0",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "write_investigation_report",
+      "inputs_hash": "e8b6eb3614e900b3",
+      "output_hash": "e8b6eb3614e900b3",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m1",
+    "cause": "legitimate_traffic",
+    "evidence": [
+      "5 flagged txns across 5 distinct customers, 5 distinct devices, 5 distinct IPs, 5 distinct instruments \u2013 zero entity sharing",
+      "Recent flagged rate 0% vs baseline 0.67% \u2013 recent activity cleaner than historical",
+      "Velocity 0.11 flagged txns/hour spread over 45.22 hours \u2013 no burst concentration",
+      "Flagged amounts \u20b91,211\u2013\u20b97,506 with normal variance around baseline avg \u20b9819",
+      "Peak hour 19 txns within normal operating envelope for 6.87 txn/hr merchant"
+    ],
+    "exposure_inr": 19380.89,
+    "recommended_action": "allow",
+    "confidence": 0.92
+  },
+  "validated_action": "allow"
+}

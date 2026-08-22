@@ -1,0 +1,375 @@
+{
+  "case": "account_takeover",
+  "merchant": "m2",
+  "ground_truth": {
+    "cause": "account_takeover",
+    "expected_action": "review",
+    "low_signal": false
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m2"
+      },
+      "output": {
+        "merchant_id": "m2",
+        "baseline_txn_count": 868,
+        "baseline_flagged_rate": 0.0899,
+        "baseline_avg_amount_inr": 1408.96,
+        "recent_txn_count": 289,
+        "recent_flagged_rate": 0.0035,
+        "recent_avg_amount_inr": 853.86,
+        "flagged_rate_multiple": 0.04
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m2"
+      },
+      "output": {
+        "merchant_id": "m2",
+        "flagged_count": 79,
+        "distinct_customers": 29,
+        "distinct_devices": 29,
+        "distinct_ips": 29,
+        "distinct_instruments": 29,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d1284",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d2420",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d258",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d377",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d_ATO_A1006",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip1030",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip1038",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip1077",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip1105",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip1202",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 1.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m2"
+      },
+      "output": {
+        "merchant_id": "m2",
+        "window_hours": 143.75,
+        "txns_per_hour_overall": 8.05,
+        "flagged_txns": 79,
+        "flagged_span_hours": 101.03,
+        "flagged_per_hour": 0.78,
+        "peak_hour_txns": 30
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m2"
+      },
+      "output": {
+        "merchant_id": "m2",
+        "flagged_count": 79,
+        "total_count": 1157,
+        "transactions": [
+          {
+            "ts": 1762209155,
+            "risk": 1.0,
+            "amount_inr": 4482.02,
+            "customer": "c258",
+            "device": "d258",
+            "ip": "ip1444",
+            "instrument": "pi258"
+          },
+          {
+            "ts": 1762337201,
+            "risk": 1.0,
+            "amount_inr": 6045.32,
+            "customer": "c1006",
+            "device": "d_ATO_A1006",
+            "ip": "ip1414",
+            "instrument": "pi1006"
+          },
+          {
+            "ts": 1762338392,
+            "risk": 1.0,
+            "amount_inr": 7194.66,
+            "customer": "c3935",
+            "device": "d_ATO_A3935",
+            "ip": "ip1077",
+            "instrument": "pi3935"
+          },
+          {
+            "ts": 1762338607,
+            "risk": 1.0,
+            "amount_inr": 3564.05,
+            "customer": "c2757",
+            "device": "d_ATO_A2757",
+            "ip": "ip1038",
+            "instrument": "pi2757"
+          },
+          {
+            "ts": 1762338632,
+            "risk": 1.0,
+            "amount_inr": 4047.52,
+            "customer": "c917",
+            "device": "d_ATO_A917",
+            "ip": "ip3",
+            "instrument": "pi917"
+          },
+          {
+            "ts": 1762338844,
+            "risk": 1.0,
+            "amount_inr": 3719.88,
+            "customer": "c2517",
+            "device": "d_ATO_A2517",
+            "ip": "ip461",
+            "instrument": "pi2517"
+          },
+          {
+            "ts": 1762339810,
+            "risk": 1.0,
+            "amount_inr": 3954.44,
+            "customer": "c917",
+            "device": "d_ATO_A917",
+            "ip": "ip3",
+            "instrument": "pi917"
+          },
+          {
+            "ts": 1762340228,
+            "risk": 1.0,
+            "amount_inr": 3727.34,
+            "customer": "c1465",
+            "device": "d_ATO_A1465",
+            "ip": "ip563",
+            "instrument": "pi1465"
+          },
+          {
+            "ts": 1762340411,
+            "risk": 1.0,
+            "amount_inr": 6380.48,
+            "customer": "c1923",
+            "device": "d_ATO_A1923",
+            "ip": "ip1324",
+            "instrument": "pi1923"
+          },
+          {
+            "ts": 1762340419,
+            "risk": 1.0,
+            "amount_inr": 5421.74,
+            "customer": "c2985",
+            "device": "d_ATO_A2985",
+            "ip": "ip241",
+            "instrument": "pi2985"
+          },
+          {
+            "ts": 1762341465,
+            "risk": 1.0,
+            "amount_inr": 2792.77,
+            "customer": "c2757",
+            "device": "d_ATO_A2757",
+            "ip": "ip1038",
+            "instrument": "pi2757"
+          },
+          {
+            "ts": 1762341834,
+            "risk": 1.0,
+            "amount_inr": 11459.34,
+            "customer": "c2342",
+            "device": "d_ATO_A2342",
+            "ip": "ip1105",
+            "instrument": "pi2342"
+          },
+          {
+            "ts": 1762342742,
+            "risk": 1.0,
+            "amount_inr": 5267.85,
+            "customer": "c1626",
+            "device": "d_ATO_A1626",
+            "ip": "ip20",
+            "instrument": "pi1626"
+          },
+          {
+            "ts": 1762343672,
+            "risk": 1.0,
+            "amount_inr": 8315.66,
+            "customer": "c1923",
+            "device": "d_ATO_A1923",
+            "ip": "ip1324",
+            "instrument": "pi1923"
+          },
+          {
+            "ts": 1762344814,
+            "risk": 1.0,
+            "amount_inr": 9757.79,
+            "customer": "c2342",
+            "device": "d_ATO_A2342",
+            "ip": "ip1105",
+            "instrument": "pi2342"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m2"
+      },
+      "output": {
+        "merchant_id": "m2",
+        "flagged_txn_count": 79,
+        "exposure_at_risk_inr": 550021.89,
+        "probability_weighted_expected_loss_inr": 548177.22,
+        "recoverable_via_step_up_inr": 493359.5,
+        "review_cost_if_all_reviewed_inr": 3950.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m2",
+        "cause": "account_takeover",
+        "confidence": 0.75,
+        "evidence": [
+          "79 flagged transactions with perfect 1:1 customer-to-device, customer-to-IP mapping (no shared infrastructure)",
+          "All flagged transactions scored risk=1.0 with high amounts: \u20b92,793\u2013\u20b911,459 (vs. baseline avg \u20b91,409)",
+          "Device naming convention suggests ATO: d_ATO_A1006, d_ATO_A3935, d_ATO_A2757, etc.",
+          "Recent flagged rate 0.35% vs baseline 8.99% \u2014 detector fired on shift in rate or absolute high-risk volume",
+          "Velocity: 0.78 flagged txn/hour over 101 hours \u2014 sustained pattern, not burst attack",
+          "Exposure at risk: \u20b9550,021.89; probability-weighted loss \u20b9548,177.22"
+        ],
+        "exposure_inr": 550021.89,
+        "recommended_action": "review"
+      },
+      "output": {
+        "merchant_id": "m2",
+        "cause": "account_takeover",
+        "evidence": [
+          "79 flagged transactions with perfect 1:1 customer-to-device, customer-to-IP mapping (no shared infrastructure)",
+          "All flagged transactions scored risk=1.0 with high amounts: \u20b92,793\u2013\u20b911,459 (vs. baseline avg \u20b91,409)",
+          "Device naming convention suggests ATO: d_ATO_A1006, d_ATO_A3935, d_ATO_A2757, etc.",
+          "Recent flagged rate 0.35% vs baseline 8.99% \u2014 detector fired on shift in rate or absolute high-risk volume",
+          "Velocity: 0.78 flagged txn/hour over 101 hours \u2014 sustained pattern, not burst attack",
+          "Exposure at risk: \u20b9550,021.89; probability-weighted loss \u20b9548,177.22"
+        ],
+        "exposure_inr": 550021.89,
+        "recommended_action": "review",
+        "confidence": 0.75
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "da672e4e80a83f55",
+      "output_hash": "667397a1f8bdd08a",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_entity_network",
+      "inputs_hash": "da672e4e80a83f55",
+      "output_hash": "2eb5aa3c77773aa1",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "da672e4e80a83f55",
+      "output_hash": "714e98723e18d979",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "da672e4e80a83f55",
+      "output_hash": "33718579c7865453",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "calculate_exposure",
+      "inputs_hash": "da672e4e80a83f55",
+      "output_hash": "d4eaa72ec525c46c",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "write_investigation_report",
+      "inputs_hash": "bc4127d9eca20bcf",
+      "output_hash": "bc4127d9eca20bcf",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m2",
+    "cause": "account_takeover",
+    "evidence": [
+      "79 flagged transactions with perfect 1:1 customer-to-device, customer-to-IP mapping (no shared infrastructure)",
+      "All flagged transactions scored risk=1.0 with high amounts: \u20b92,793\u2013\u20b911,459 (vs. baseline avg \u20b91,409)",
+      "Device naming convention suggests ATO: d_ATO_A1006, d_ATO_A3935, d_ATO_A2757, etc.",
+      "Recent flagged rate 0.35% vs baseline 8.99% \u2014 detector fired on shift in rate or absolute high-risk volume",
+      "Velocity: 0.78 flagged txn/hour over 101 hours \u2014 sustained pattern, not burst attack",
+      "Exposure at risk: \u20b9550,021.89; probability-weighted loss \u20b9548,177.22"
+    ],
+    "exposure_inr": 550021.89,
+    "recommended_action": "review",
+    "confidence": 0.75
+  },
+  "validated_action": "review"
+}

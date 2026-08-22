@@ -1,0 +1,268 @@
+{
+  "case": "quiet_merchant_d",
+  "merchant": "m8",
+  "ground_truth": {
+    "cause": "legitimate_traffic",
+    "expected_action": "allow",
+    "low_signal": true
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m8"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "baseline_txn_count": 775,
+        "baseline_flagged_rate": 0.0052,
+        "baseline_avg_amount_inr": 862.47,
+        "recent_txn_count": 258,
+        "recent_flagged_rate": 0.0,
+        "recent_avg_amount_inr": 826.11,
+        "flagged_rate_multiple": 0.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m8"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "flagged_count": 4,
+        "distinct_customers": 4,
+        "distinct_devices": 4,
+        "distinct_ips": 4,
+        "distinct_instruments": 4,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d2000",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d2339",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d307",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d805",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip23",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip383",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip584",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip719",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 1.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m8"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "window_hours": 143.75,
+        "txns_per_hour_overall": 7.19,
+        "flagged_txns": 4,
+        "flagged_span_hours": 68.43,
+        "flagged_per_hour": 0.06,
+        "peak_hour_txns": 20
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m8"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "flagged_count": 4,
+        "total_count": 1033,
+        "transactions": [
+          {
+            "ts": 1762162416,
+            "risk": 1.0,
+            "amount_inr": 7962.75,
+            "customer": "c307",
+            "device": "d307",
+            "ip": "ip584",
+            "instrument": "pi307"
+          },
+          {
+            "ts": 1762297786,
+            "risk": 1.0,
+            "amount_inr": 2730.74,
+            "customer": "c805",
+            "device": "d805",
+            "ip": "ip383",
+            "instrument": "pi805"
+          },
+          {
+            "ts": 1762124773,
+            "risk": 0.833,
+            "amount_inr": 2213.52,
+            "customer": "c2000",
+            "device": "d2000",
+            "ip": "ip23",
+            "instrument": "pi2000"
+          },
+          {
+            "ts": 1762371121,
+            "risk": 0.641,
+            "amount_inr": 2333.79,
+            "customer": "c2339",
+            "device": "d2339",
+            "ip": "ip719",
+            "instrument": "pi2339"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m8"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "flagged_txn_count": 4,
+        "exposure_at_risk_inr": 15240.8,
+        "probability_weighted_expected_loss_inr": 14034.29,
+        "recoverable_via_step_up_inr": 12630.86,
+        "review_cost_if_all_reviewed_inr": 200.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m8",
+        "cause": "legitimate_traffic",
+        "confidence": 0.85,
+        "evidence": [
+          "Recent flagged rate is 0.0% vs baseline 0.52% - flagged rate has DECREASED, not spiked",
+          "Entity network shows perfect 1:1:1:1 ratio: 4 flagged txns across 4 distinct customers, 4 devices, 4 IPs, 4 instruments - zero shared entities indicating isolation of transactions",
+          "Velocity: 0.06 flagged txns/hour spread over 68.43 hours - dispersed, not concentrated attack (peak hour was 20 total txns, only 4 flagged)",
+          "Transaction amounts are moderate: 7962.75, 2730.74, 2213.52, 2333.79 INR - consistent with baseline avg of 826.11 INR",
+          "Overall transaction volume is normal: 258 recent txns over 143.75 hours (7.19 txns/hr) within expected merchant pattern",
+          "Risk scores on flagged txns range 0.641-1.0 but each is isolated to a single device/IP/customer - no clustering or ring behavior"
+        ],
+        "exposure_inr": 15240.8,
+        "recommended_action": "allow"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "cause": "legitimate_traffic",
+        "evidence": [
+          "Recent flagged rate is 0.0% vs baseline 0.52% - flagged rate has DECREASED, not spiked",
+          "Entity network shows perfect 1:1:1:1 ratio: 4 flagged txns across 4 distinct customers, 4 devices, 4 IPs, 4 instruments - zero shared entities indicating isolation of transactions",
+          "Velocity: 0.06 flagged txns/hour spread over 68.43 hours - dispersed, not concentrated attack (peak hour was 20 total txns, only 4 flagged)",
+          "Transaction amounts are moderate: 7962.75, 2730.74, 2213.52, 2333.79 INR - consistent with baseline avg of 826.11 INR",
+          "Overall transaction volume is normal: 258 recent txns over 143.75 hours (7.19 txns/hr) within expected merchant pattern",
+          "Risk scores on flagged txns range 0.641-1.0 but each is isolated to a single device/IP/customer - no clustering or ring behavior"
+        ],
+        "exposure_inr": 15240.8,
+        "recommended_action": "allow",
+        "confidence": 0.85
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "d362853a3d259faa",
+      "output_hash": "5f13e6a56a113c39",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_entity_network",
+      "inputs_hash": "d362853a3d259faa",
+      "output_hash": "6279e2c678b2d42d",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "d362853a3d259faa",
+      "output_hash": "e0a7b28fe27b00b5",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "d362853a3d259faa",
+      "output_hash": "9086e19f7c12eea1",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "calculate_exposure",
+      "inputs_hash": "d362853a3d259faa",
+      "output_hash": "836a28cf41614d81",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "write_investigation_report",
+      "inputs_hash": "10c208599e958731",
+      "output_hash": "10c208599e958731",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m8",
+    "cause": "legitimate_traffic",
+    "evidence": [
+      "Recent flagged rate is 0.0% vs baseline 0.52% - flagged rate has DECREASED, not spiked",
+      "Entity network shows perfect 1:1:1:1 ratio: 4 flagged txns across 4 distinct customers, 4 devices, 4 IPs, 4 instruments - zero shared entities indicating isolation of transactions",
+      "Velocity: 0.06 flagged txns/hour spread over 68.43 hours - dispersed, not concentrated attack (peak hour was 20 total txns, only 4 flagged)",
+      "Transaction amounts are moderate: 7962.75, 2730.74, 2213.52, 2333.79 INR - consistent with baseline avg of 826.11 INR",
+      "Overall transaction volume is normal: 258 recent txns over 143.75 hours (7.19 txns/hr) within expected merchant pattern",
+      "Risk scores on flagged txns range 0.641-1.0 but each is isolated to a single device/IP/customer - no clustering or ring behavior"
+    ],
+    "exposure_inr": 15240.8,
+    "recommended_action": "allow",
+    "confidence": 0.85
+  },
+  "validated_action": "allow"
+}

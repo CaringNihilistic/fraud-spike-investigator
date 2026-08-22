@@ -1,0 +1,378 @@
+{
+  "case": "fraud_ring",
+  "merchant": "m9",
+  "ground_truth": {
+    "cause": "fraud_ring",
+    "expected_action": "restrict",
+    "low_signal": false
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m9"
+      },
+      "output": {
+        "merchant_id": "m9",
+        "baseline_txn_count": 871,
+        "baseline_flagged_rate": 0.0873,
+        "baseline_avg_amount_inr": 831.16,
+        "recent_txn_count": 290,
+        "recent_flagged_rate": 0.1448,
+        "recent_avg_amount_inr": 818.49,
+        "flagged_rate_multiple": 1.66
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m9"
+      },
+      "output": {
+        "merchant_id": "m9",
+        "window_hours": 143.18,
+        "txns_per_hour_overall": 8.11,
+        "flagged_txns": 118,
+        "flagged_span_hours": 33.81,
+        "flagged_per_hour": 3.49,
+        "peak_hour_txns": 31
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m9"
+      },
+      "output": {
+        "merchant_id": "m9",
+        "flagged_count": 118,
+        "distinct_customers": 19,
+        "distinct_devices": 8,
+        "distinct_ips": 7,
+        "distinct_instruments": 9,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d_RING_R3",
+            "distinct_accounts": 14
+          },
+          {
+            "entity": "d_RING_R1",
+            "distinct_accounts": 12
+          },
+          {
+            "entity": "d_RING_R2",
+            "distinct_accounts": 12
+          },
+          {
+            "entity": "d_RING_R0",
+            "distinct_accounts": 11
+          },
+          {
+            "entity": "d822",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip_RING_R0",
+            "distinct_accounts": 15
+          },
+          {
+            "entity": "ip_RING_R1",
+            "distinct_accounts": 14
+          },
+          {
+            "entity": "ip_RING_R2",
+            "distinct_accounts": 14
+          },
+          {
+            "entity": "ip743",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip1468",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 0.47
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m9"
+      },
+      "output": {
+        "merchant_id": "m9",
+        "flagged_count": 118,
+        "total_count": 1161,
+        "transactions": [
+          {
+            "ts": 1762453371,
+            "risk": 1.0,
+            "amount_inr": 501.87,
+            "customer": "cR9",
+            "device": "d_RING_R3",
+            "ip": "ip_RING_R1",
+            "instrument": "pi_RING_R1"
+          },
+          {
+            "ts": 1762454269,
+            "risk": 1.0,
+            "amount_inr": 413.33,
+            "customer": "cR5",
+            "device": "d_RING_R2",
+            "ip": "ip_RING_R1",
+            "instrument": "pi_RING_R0"
+          },
+          {
+            "ts": 1762454345,
+            "risk": 1.0,
+            "amount_inr": 2110.8,
+            "customer": "cR3",
+            "device": "d_RING_R2",
+            "ip": "ip_RING_R1",
+            "instrument": "pi_RING_R3"
+          },
+          {
+            "ts": 1762455116,
+            "risk": 1.0,
+            "amount_inr": 215.94,
+            "customer": "cR13",
+            "device": "d_RING_R1",
+            "ip": "ip_RING_R1",
+            "instrument": "pi_RING_R2"
+          },
+          {
+            "ts": 1762455161,
+            "risk": 1.0,
+            "amount_inr": 3460.04,
+            "customer": "c822",
+            "device": "d822",
+            "ip": "ip1149",
+            "instrument": "pi822"
+          },
+          {
+            "ts": 1762455482,
+            "risk": 1.0,
+            "amount_inr": 142.91,
+            "customer": "cR7",
+            "device": "d_RING_R2",
+            "ip": "ip_RING_R1",
+            "instrument": "pi_RING_R2"
+          },
+          {
+            "ts": 1762455946,
+            "risk": 1.0,
+            "amount_inr": 1367.11,
+            "customer": "cR7",
+            "device": "d_RING_R0",
+            "ip": "ip_RING_R2",
+            "instrument": "pi_RING_R2"
+          },
+          {
+            "ts": 1762457685,
+            "risk": 1.0,
+            "amount_inr": 7639.53,
+            "customer": "cR2",
+            "device": "d_RING_R1",
+            "ip": "ip_RING_R2",
+            "instrument": "pi_RING_R4"
+          },
+          {
+            "ts": 1762457818,
+            "risk": 1.0,
+            "amount_inr": 281.68,
+            "customer": "cR0",
+            "device": "d_RING_R1",
+            "ip": "ip_RING_R1",
+            "instrument": "pi_RING_R3"
+          },
+          {
+            "ts": 1762458134,
+            "risk": 1.0,
+            "amount_inr": 535.22,
+            "customer": "cR6",
+            "device": "d_RING_R0",
+            "ip": "ip_RING_R0",
+            "instrument": "pi_RING_R3"
+          },
+          {
+            "ts": 1762458622,
+            "risk": 1.0,
+            "amount_inr": 454.41,
+            "customer": "cR10",
+            "device": "d_RING_R3",
+            "ip": "ip_RING_R2",
+            "instrument": "pi_RING_R0"
+          },
+          {
+            "ts": 1762458773,
+            "risk": 1.0,
+            "amount_inr": 659.73,
+            "customer": "cR12",
+            "device": "d_RING_R2",
+            "ip": "ip_RING_R0",
+            "instrument": "pi_RING_R3"
+          },
+          {
+            "ts": 1762458820,
+            "risk": 1.0,
+            "amount_inr": 1889.28,
+            "customer": "cR5",
+            "device": "d_RING_R2",
+            "ip": "ip_RING_R0",
+            "instrument": "pi_RING_R3"
+          },
+          {
+            "ts": 1762458849,
+            "risk": 1.0,
+            "amount_inr": 271.94,
+            "customer": "cR3",
+            "device": "d_RING_R2",
+            "ip": "ip_RING_R1",
+            "instrument": "pi_RING_R2"
+          },
+          {
+            "ts": 1762458996,
+            "risk": 1.0,
+            "amount_inr": 423.76,
+            "customer": "cR9",
+            "device": "d_RING_R1",
+            "ip": "ip_RING_R1",
+            "instrument": "pi_RING_R4"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m9"
+      },
+      "output": {
+        "merchant_id": "m9",
+        "flagged_txn_count": 118,
+        "exposure_at_risk_inr": 113307.04,
+        "probability_weighted_expected_loss_inr": 112717.86,
+        "recoverable_via_step_up_inr": 101446.08,
+        "review_cost_if_all_reviewed_inr": 5900.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m9",
+        "cause": "fraud_ring",
+        "confidence": 0.95,
+        "evidence": [
+          "Flagged rate increased 1.66x: 8.73% baseline \u2192 14.48% recent (abnormal spike confirmed)",
+          "118 flagged transactions concentrated in 33.81 hours at 3.49/hour (burst pattern, not drip)",
+          "Extreme device fanout: d_RING_R3 spans 14 accounts, d_RING_R1 spans 12 accounts, d_RING_R2 spans 12 accounts across only 8 total devices",
+          "Extreme IP fanout: ip_RING_R0, ip_RING_R1, ip_RING_R2 each span 14-15 distinct customer accounts across only 7 total IPs",
+          "19 distinct customers sharing 8 devices and 9 instruments (0.47 instruments/customer indicates shared infrastructure, not fresh card purchases per customer)",
+          "All 15 sampled transactions show risk score 1.0; coordinated naming pattern (d_RING_R*, ip_RING_R*) indicates organized activity",
+          "Transaction amounts vary (\u20b9142\u2013\u20b97,639) consistent with fraud ring testing multiple account-instrument combinations"
+        ],
+        "exposure_inr": 113307.04,
+        "recommended_action": "restrict"
+      },
+      "output": {
+        "merchant_id": "m9",
+        "cause": "fraud_ring",
+        "evidence": [
+          "Flagged rate increased 1.66x: 8.73% baseline \u2192 14.48% recent (abnormal spike confirmed)",
+          "118 flagged transactions concentrated in 33.81 hours at 3.49/hour (burst pattern, not drip)",
+          "Extreme device fanout: d_RING_R3 spans 14 accounts, d_RING_R1 spans 12 accounts, d_RING_R2 spans 12 accounts across only 8 total devices",
+          "Extreme IP fanout: ip_RING_R0, ip_RING_R1, ip_RING_R2 each span 14-15 distinct customer accounts across only 7 total IPs",
+          "19 distinct customers sharing 8 devices and 9 instruments (0.47 instruments/customer indicates shared infrastructure, not fresh card purchases per customer)",
+          "All 15 sampled transactions show risk score 1.0; coordinated naming pattern (d_RING_R*, ip_RING_R*) indicates organized activity",
+          "Transaction amounts vary (\u20b9142\u2013\u20b97,639) consistent with fraud ring testing multiple account-instrument combinations"
+        ],
+        "exposure_inr": 113307.04,
+        "recommended_action": "restrict",
+        "confidence": 0.95
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "9b015912e747dbcc",
+      "output_hash": "e9a712d13717bdb2",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "9b015912e747dbcc",
+      "output_hash": "cec3ae7aac5f3d66",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_entity_network",
+      "inputs_hash": "9b015912e747dbcc",
+      "output_hash": "f29ab3bad69abf6b",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "9b015912e747dbcc",
+      "output_hash": "f113096a599d257c",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "calculate_exposure",
+      "inputs_hash": "9b015912e747dbcc",
+      "output_hash": "296c45a8ac2b8d4b",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "write_investigation_report",
+      "inputs_hash": "da634c7fac1c085b",
+      "output_hash": "da634c7fac1c085b",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m9",
+    "cause": "fraud_ring",
+    "evidence": [
+      "Flagged rate increased 1.66x: 8.73% baseline \u2192 14.48% recent (abnormal spike confirmed)",
+      "118 flagged transactions concentrated in 33.81 hours at 3.49/hour (burst pattern, not drip)",
+      "Extreme device fanout: d_RING_R3 spans 14 accounts, d_RING_R1 spans 12 accounts, d_RING_R2 spans 12 accounts across only 8 total devices",
+      "Extreme IP fanout: ip_RING_R0, ip_RING_R1, ip_RING_R2 each span 14-15 distinct customer accounts across only 7 total IPs",
+      "19 distinct customers sharing 8 devices and 9 instruments (0.47 instruments/customer indicates shared infrastructure, not fresh card purchases per customer)",
+      "All 15 sampled transactions show risk score 1.0; coordinated naming pattern (d_RING_R*, ip_RING_R*) indicates organized activity",
+      "Transaction amounts vary (\u20b9142\u2013\u20b97,639) consistent with fraud ring testing multiple account-instrument combinations"
+    ],
+    "exposure_inr": 113307.04,
+    "recommended_action": "restrict",
+    "confidence": 0.95
+  },
+  "validated_action": "restrict"
+}

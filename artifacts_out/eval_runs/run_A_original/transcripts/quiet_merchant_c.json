@@ -1,0 +1,237 @@
+{
+  "case": "quiet_merchant_c",
+  "merchant": "m6",
+  "ground_truth": {
+    "cause": "legitimate_traffic",
+    "expected_action": "allow",
+    "low_signal": true
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m6"
+      },
+      "output": {
+        "merchant_id": "m6",
+        "baseline_txn_count": 719,
+        "baseline_flagged_rate": 0.0028,
+        "baseline_avg_amount_inr": 830.83,
+        "recent_txn_count": 240,
+        "recent_flagged_rate": 0.0,
+        "recent_avg_amount_inr": 882.09,
+        "flagged_rate_multiple": 0.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m6"
+      },
+      "output": {
+        "merchant_id": "m6",
+        "window_hours": 143.48,
+        "txns_per_hour_overall": 6.68,
+        "flagged_txns": 2,
+        "flagged_span_hours": 48.97,
+        "flagged_per_hour": 0.04,
+        "peak_hour_txns": 15
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m6"
+      },
+      "output": {
+        "merchant_id": "m6",
+        "flagged_count": 2,
+        "distinct_customers": 2,
+        "distinct_devices": 2,
+        "distinct_ips": 2,
+        "distinct_instruments": 2,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d1185",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d2161",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip1389",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip434",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 1.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m6"
+      },
+      "output": {
+        "merchant_id": "m6",
+        "flagged_count": 2,
+        "total_count": 959,
+        "transactions": [
+          {
+            "ts": 1762455003,
+            "risk": 1.0,
+            "amount_inr": 3448.04,
+            "customer": "c2161",
+            "device": "d2161",
+            "ip": "ip434",
+            "instrument": "pi2161"
+          },
+          {
+            "ts": 1762278704,
+            "risk": 0.833,
+            "amount_inr": 1089.73,
+            "customer": "c1185",
+            "device": "d1185",
+            "ip": "ip1389",
+            "instrument": "pi1185"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m6"
+      },
+      "output": {
+        "merchant_id": "m6",
+        "flagged_txn_count": 2,
+        "exposure_at_risk_inr": 4537.77,
+        "probability_weighted_expected_loss_inr": 4356.15,
+        "recoverable_via_step_up_inr": 3920.53,
+        "review_cost_if_all_reviewed_inr": 100.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m6",
+        "cause": "legitimate_traffic",
+        "confidence": 0.82,
+        "evidence": [
+          "Recent flagged rate 0.0% vs baseline 0.28% \u2013 flagged rate is not elevated, contradicting spike detection hypothesis",
+          "Only 2 flagged transactions out of 959 total (0.21%); not concentrated",
+          "Flagged transactions spread over 48.97 hours \u2013 steady drip, not burst attack",
+          "Entity network highly diverse: 2 distinct customers, 2 devices, 2 IPs, 2 instruments; each device and IP used by exactly 1 customer (no fanout)",
+          "Transaction 1 (c2161): \u20b93,448.04, risk=1.0; Transaction 2 (c1185): \u20b91,089.73, risk=0.833 \u2013 independent customers",
+          "Amounts consistent with baseline average (\u20b9882.09 recent vs \u20b9830.83 baseline)",
+          "No shared infrastructure across flagged transactions suggesting fraud ring or farm"
+        ],
+        "exposure_inr": 4537.77,
+        "recommended_action": "allow"
+      },
+      "output": {
+        "merchant_id": "m6",
+        "cause": "legitimate_traffic",
+        "evidence": [
+          "Recent flagged rate 0.0% vs baseline 0.28% \u2013 flagged rate is not elevated, contradicting spike detection hypothesis",
+          "Only 2 flagged transactions out of 959 total (0.21%); not concentrated",
+          "Flagged transactions spread over 48.97 hours \u2013 steady drip, not burst attack",
+          "Entity network highly diverse: 2 distinct customers, 2 devices, 2 IPs, 2 instruments; each device and IP used by exactly 1 customer (no fanout)",
+          "Transaction 1 (c2161): \u20b93,448.04, risk=1.0; Transaction 2 (c1185): \u20b91,089.73, risk=0.833 \u2013 independent customers",
+          "Amounts consistent with baseline average (\u20b9882.09 recent vs \u20b9830.83 baseline)",
+          "No shared infrastructure across flagged transactions suggesting fraud ring or farm"
+        ],
+        "exposure_inr": 4537.77,
+        "recommended_action": "allow",
+        "confidence": 0.82
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "6ca56944e146417f",
+      "output_hash": "95ec1d45a1ddba21",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "6ca56944e146417f",
+      "output_hash": "e49e1ce7b63e47a2",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_entity_network",
+      "inputs_hash": "6ca56944e146417f",
+      "output_hash": "156b150f718caf33",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "6ca56944e146417f",
+      "output_hash": "e739c80ab3494d83",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "calculate_exposure",
+      "inputs_hash": "6ca56944e146417f",
+      "output_hash": "836b03a2be5fa2c8",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "write_investigation_report",
+      "inputs_hash": "88536fa2c0bfad65",
+      "output_hash": "88536fa2c0bfad65",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m6",
+    "cause": "legitimate_traffic",
+    "evidence": [
+      "Recent flagged rate 0.0% vs baseline 0.28% \u2013 flagged rate is not elevated, contradicting spike detection hypothesis",
+      "Only 2 flagged transactions out of 959 total (0.21%); not concentrated",
+      "Flagged transactions spread over 48.97 hours \u2013 steady drip, not burst attack",
+      "Entity network highly diverse: 2 distinct customers, 2 devices, 2 IPs, 2 instruments; each device and IP used by exactly 1 customer (no fanout)",
+      "Transaction 1 (c2161): \u20b93,448.04, risk=1.0; Transaction 2 (c1185): \u20b91,089.73, risk=0.833 \u2013 independent customers",
+      "Amounts consistent with baseline average (\u20b9882.09 recent vs \u20b9830.83 baseline)",
+      "No shared infrastructure across flagged transactions suggesting fraud ring or farm"
+    ],
+    "exposure_inr": 4537.77,
+    "recommended_action": "allow",
+    "confidence": 0.82
+  },
+  "validated_action": "allow"
+}

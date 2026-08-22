@@ -1,0 +1,39 @@
+# --- secrets: never commit ---
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets.*
+
+# --- generated output: reproducible from `python -m src.models.train` ---
+artifacts_out/
+data/
+# ...but the A/B/C eval progression is a submission exhibit, not scratch output.
+!artifacts_out/
+artifacts_out/*
+!artifacts_out/eval_runs/
+# CatBoost writes training telemetry to CWD during model selection.
+catboost_info/
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# --- editors / os ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# NOTE: src/serve/static/vendor/ is deliberately NOT ignored. Those three
+# files (react, react-dom, htm) are what make the demo build-free and
+# offline-safe - ignoring them would break `python run_demo.py` on a clean
+# clone, which is the single most important thing a judge will run.

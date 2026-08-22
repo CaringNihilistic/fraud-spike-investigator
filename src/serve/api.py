@@ -1,0 +1,186 @@
+"""FastAPI serving layer + static SPA host.
+
+Endpoints are thin: they read PipelineState snapshots and return JSON. All
+risk logic lives in src/policy and src/spike - nothing here decides anything.
+
+POST /transactions exists so the API is a real serving surface (score one
+transaction through the live pipeline), not just a viewer for the replay.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+from src.agent.tools import InvestigationContext
+from src.policy.engine import ALLOWLIST, Action, decide
+from src.policy.fusion import RiskSignals, evaluate_rules, fuse_for_policy
+from src.serve.state import STATE
+
+STATIC = Path(__file__).parent / "static"
+
+app = FastAPI(title="Fraud Spike Investigator",
+              description="Merchant-level fraud-spike detection, entity correlation, "
+                          "and policy-gated investigation. Defense-only.",
+              version="0.3.0")
+
+# The investigation context is attached at startup by run_demo.py so
+# /investigate can run against the same scored slice the replay uses.
+_CTX: InvestigationContext | None = None
+
+
+def set_context(ctx: InvestigationContext):
+    global _CTX
+    _CTX = ctx
+
+
+# ------------------------------------------------------------------ models
+class TransactionIn(BaseModel):
+    merchant_id: str
+    customer_id: str
+    device_id: str
+    ip: str
+    instrument_id: str
+    amount: float = Field(gt=0)
+    ts: int
+    p_fraud: float = Field(ge=0, le=1, description="calibrated ML probability")
+    component_size: float = 1.0
+    device_account_count: float = 0
+    ip_account_count: float = 0
+    instrument_customer_count: float = 0
+    cust_txn_5m: float = 0
+
+
+class AnalystDecision(BaseModel):
+    action: str
+    note: str | None = None
+
+
+# ------------------------------------------------------------------ routes
+@app.get("/api/health")
+def health():
+    return {"ok": True, "replay": STATE.status()["finished"] and "done" or "running"}
+
+
+@app.get("/api/status")
+def status():
+    """Replay progress + the demo narration feed."""
+    return STATE.status()
+
+
+@app.post("/api/replay/speed")
+def set_speed(speed: float):
+    if not 1 <= speed <= 20000:
+        raise HTTPException(400, "speed must be between 1 and 20000 txns/sec")
+    STATE.speed = float(speed)
+    STATE.log_event("system", f"speed set to {speed:.0f} txns/sec")
+    return {"speed_tps": STATE.speed}
+
+
+@app.post("/api/replay/pause")
+def pause(paused: bool = True):
+    STATE.paused = bool(paused)
+    STATE.log_event("system", "paused" if paused else "resumed")
+    return {"paused": STATE.paused}
+
+
+@app.get("/api/merchants")
+def merchants():
+    """Overview grid - spiking merchants sort to the top."""
+    return {"merchants": STATE.snapshot_merchants()}
+
+
+@app.get("/api/merchants/{merchant_id}/risk")
+def merchant_risk(merchant_id: str):
+    m = STATE.snapshot_merchant(merchant_id)
+    if m is None:
+        raise HTTPException(404, f"unknown merchant {merchant_id}")
+    return m
+
+
+@app.get("/api/merchants/{merchant_id}/entity-graph")
+def entity_graph(merchant_id: str, min_accounts: int = 2):
+    return STATE.entity_graph(merchant_id, min_accounts=min_accounts)
+
+
+@app.get("/api/merchants/{merchant_id}/investigation")
+def investigation(merchant_id: str):
+    with STATE._lock:
+        m = STATE.merchants.get(merchant_id)
+        rep = m.investigation if m else None
+    if rep is None:
+        raise HTTPException(404, "no investigation for this merchant yet")
+    return rep
+
+
+@app.post("/api/merchants/{merchant_id}/investigate")
+def run_investigation(merchant_id: str):
+    """Trigger an investigation on demand (the replay also fires these on spike)."""
+    if _CTX is None:
+        raise HTTPException(503, "investigation context not ready")
+    from src.agent.investigator import investigate as _investigate
+    res = _investigate(_CTX, merchant_id)
+    STATE.set_investigation(merchant_id, res.report, res.audit.to_records(),
+                            res.degraded, res.validated_action.value)
+    return {**res.report, "degraded": res.degraded,
+            "validated_action": res.validated_action.value,
+            "audit": res.audit.to_records()}
+
+
+@app.get("/api/review-queue")
+def review_queue(pending_only: bool = False):
+    q = STATE.snapshot_queue(pending_only=pending_only)
+    return {"cases": q, "pending": sum(1 for c in q if c["analyst_action"] is None)}
+
+
+@app.post("/api/review-queue/{case_id}/decision")
+def decide_case(case_id: int, body: AnalystDecision):
+    """Analyst approve/override. The allowlist binds humans too - an analyst
+    cannot invent an action any more than the LLM can."""
+    if body.action not in ALLOWLIST:
+        raise HTTPException(400, f"action must be one of {sorted(ALLOWLIST)}")
+    out = STATE.decide_case(case_id, body.action, body.note)
+    if out is None:
+        raise HTTPException(404, f"unknown case {case_id}")
+    return out
+
+
+@app.get("/api/audit-log")
+def audit_log(limit: int = 200):
+    with STATE._lock:
+        return {"entries": STATE.audit[-limit:], "total": len(STATE.audit)}
+
+
+@app.post("/api/transactions")
+def score_transaction(txn: TransactionIn):
+    """Score ONE transaction through the live fusion -> policy path.
+
+    Note this does not mutate replay state - it is the serving surface, so a
+    caller can ask "what would you do with this?" without perturbing the demo."""
+    risk, conf, fused = fuse_for_policy(RiskSignals(
+        p_fraud=txn.p_fraud, spike_z=None, component_size=txn.component_size,
+        rule_hits=evaluate_rules(
+            device_account_count=txn.device_account_count,
+            ip_account_count=txn.ip_account_count,
+            instrument_customer_count=txn.instrument_customer_count,
+            cust_txn_5m=txn.cust_txn_5m)))
+    m = STATE.snapshot_merchant(txn.merchant_id)
+    spiking = bool(m and m["in_spike"])
+    d = decide(risk_score=risk, confidence=conf, merchant_in_spike=spiking)
+    return {"merchant_id": txn.merchant_id, "risk_score": fused.risk_score,
+            "confidence": fused.confidence, "components": fused.components,
+            "fusion_reason": fused.reason, "merchant_in_spike": spiking,
+            "action": d.action.value, "reason": d.reason,
+            "requires_human": d.requires_human}
+
+
+# ------------------------------------------------------------------ static
+@app.get("/")
+def index():
+    return FileResponse(STATIC / "index.html")
+
+
+app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")

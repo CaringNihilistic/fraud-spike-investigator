@@ -1,0 +1,232 @@
+{
+  "case": "flash_sale_legitimate",
+  "merchant": "m11",
+  "ground_truth": {
+    "cause": "legitimate_traffic",
+    "expected_action": "allow",
+    "low_signal": false
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m11"
+      },
+      "output": {
+        "merchant_id": "m11",
+        "baseline_txn_count": 1713,
+        "baseline_flagged_rate": 0.0012,
+        "baseline_avg_amount_inr": 728.47,
+        "recent_txn_count": 571,
+        "recent_flagged_rate": 0.0,
+        "recent_avg_amount_inr": 576.18,
+        "flagged_rate_multiple": 0.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m11"
+      },
+      "output": {
+        "merchant_id": "m11",
+        "flagged_count": 2,
+        "distinct_customers": 2,
+        "distinct_devices": 2,
+        "distinct_ips": 2,
+        "distinct_instruments": 2,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d2483",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d3716",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip10",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip607",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 1.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m11"
+      },
+      "output": {
+        "merchant_id": "m11",
+        "window_hours": 143.78,
+        "txns_per_hour_overall": 15.89,
+        "flagged_txns": 2,
+        "flagged_span_hours": 41.95,
+        "flagged_per_hour": 0.05,
+        "peak_hour_txns": 250
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m11",
+        "limit": 15
+      },
+      "output": {
+        "merchant_id": "m11",
+        "flagged_count": 2,
+        "total_count": 2284,
+        "transactions": [
+          {
+            "ts": 1762252433,
+            "risk": 1.0,
+            "amount_inr": 2521.01,
+            "customer": "c2483",
+            "device": "d2483",
+            "ip": "ip607",
+            "instrument": "pi2483"
+          },
+          {
+            "ts": 1762403437,
+            "risk": 0.833,
+            "amount_inr": 961.42,
+            "customer": "c3716",
+            "device": "d3716",
+            "ip": "ip10",
+            "instrument": "pi3716"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m11"
+      },
+      "output": {
+        "merchant_id": "m11",
+        "flagged_txn_count": 2,
+        "exposure_at_risk_inr": 3482.43,
+        "probability_weighted_expected_loss_inr": 3322.19,
+        "recoverable_via_step_up_inr": 2989.97,
+        "review_cost_if_all_reviewed_inr": 100.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m11",
+        "cause": "legitimate_traffic",
+        "confidence": 0.92,
+        "evidence": [
+          "Recent flagged rate 0% vs baseline 0.12% - actual recent window shows no elevation",
+          "Only 2 flagged txns out of 2,284 total (0.087%) - within normal distribution",
+          "Perfect entity diversity: 2 devices, 2 IPs, 2 instruments across 2 customers - zero shared devices or IPs across accounts",
+          "Steady velocity: 15.89 txn/hour over 143.78 hours with flagged txns spread over 41.95 hours - no burst pattern",
+          "Flagged amounts \u20b92,521.01 (risk 1.0) and \u20b9961.42 (risk 0.833) are isolated high-risk scores within normal scoring range"
+        ],
+        "exposure_inr": 3482.43,
+        "recommended_action": "allow"
+      },
+      "output": {
+        "merchant_id": "m11",
+        "cause": "legitimate_traffic",
+        "evidence": [
+          "Recent flagged rate 0% vs baseline 0.12% - actual recent window shows no elevation",
+          "Only 2 flagged txns out of 2,284 total (0.087%) - within normal distribution",
+          "Perfect entity diversity: 2 devices, 2 IPs, 2 instruments across 2 customers - zero shared devices or IPs across accounts",
+          "Steady velocity: 15.89 txn/hour over 143.78 hours with flagged txns spread over 41.95 hours - no burst pattern",
+          "Flagged amounts \u20b92,521.01 (risk 1.0) and \u20b9961.42 (risk 0.833) are isolated high-risk scores within normal scoring range"
+        ],
+        "exposure_inr": 3482.43,
+        "recommended_action": "allow",
+        "confidence": 0.92
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "74b4120a50c1d86d",
+      "output_hash": "62e761921d88b97e",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_entity_network",
+      "inputs_hash": "74b4120a50c1d86d",
+      "output_hash": "c17ea4c19ee054b5",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "74b4120a50c1d86d",
+      "output_hash": "f01da1bc47f19eda",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "7257d5d2d06b9a85",
+      "output_hash": "c32aa76c81ca7d67",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "calculate_exposure",
+      "inputs_hash": "74b4120a50c1d86d",
+      "output_hash": "107012c855fe5947",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "write_investigation_report",
+      "inputs_hash": "eff4a271b032be3a",
+      "output_hash": "eff4a271b032be3a",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m11",
+    "cause": "legitimate_traffic",
+    "evidence": [
+      "Recent flagged rate 0% vs baseline 0.12% - actual recent window shows no elevation",
+      "Only 2 flagged txns out of 2,284 total (0.087%) - within normal distribution",
+      "Perfect entity diversity: 2 devices, 2 IPs, 2 instruments across 2 customers - zero shared devices or IPs across accounts",
+      "Steady velocity: 15.89 txn/hour over 143.78 hours with flagged txns spread over 41.95 hours - no burst pattern",
+      "Flagged amounts \u20b92,521.01 (risk 1.0) and \u20b9961.42 (risk 0.833) are isolated high-risk scores within normal scoring range"
+    ],
+    "exposure_inr": 3482.43,
+    "recommended_action": "allow",
+    "confidence": 0.92
+  },
+  "validated_action": "allow"
+}
