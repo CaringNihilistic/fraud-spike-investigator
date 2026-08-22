@@ -1,4 +1,4 @@
-"""The six READ-ONLY investigation tools.
+"""The seven READ-ONLY investigation tools.
 
 Design rules, each enforced here rather than by prompt instruction:
   * READ-ONLY. Every tool takes a merchant/window and returns a summary. None
@@ -50,27 +50,61 @@ class InvestigationContext:
 
 # ------------------------------------------------------------------ tools
 def get_merchant_baseline(ctx: InvestigationContext, merchant_id: str) -> dict:
-    """Normal behaviour for this merchant vs the spike window.
+    """Normal behaviour for this merchant, and its worst window.
 
-    Baseline = the merchant's earlier hours; spike window = its most recent
-    hours. Splitting on the merchant's own history is what lets the agent say
-    'this is abnormal FOR THIS MERCHANT' rather than 'this looks big'."""
-    g = ctx.merchant_slice(merchant_id)
+    Uses the SPIKE DETECTOR'S OWN slow-EWMA baseline - one definition of
+    "normal" across the whole system, not a second one invented here.
+
+    The previous version split the merchant's window at the 75th percentile of
+    timestamps and called the tail "recent". For an attack that ENDS mid-window
+    - which is every attack in this dataset - that reads as
+    "baseline 8.99% -> recent 0.35%", i.e. improving, during an active
+    incident. The agent then rationalised the contradiction instead of
+    distrusting it, once describing a decrease as a "jump". Reporting the PEAK
+    window alongside the baseline removes the ambiguity, and every window is
+    labelled with explicit bounds so direction cannot be misread."""
+    from src.spike.detector import StreamingSpikeDetector
+
+    g = ctx.merchant_slice(merchant_id).sort_values("ts")
     if g.empty:
         return {"merchant_id": merchant_id, "error": "no transactions"}
-    cut = g.ts.quantile(0.75)
-    base, recent = g[g.ts <= cut], g[g.ts > cut]
+
+    det = StreamingSpikeDetector()
+    peak_rate, peak_z, peak_ts, fired_at = 0.0, 0.0, None, None
+    for r in g.itertuples(index=False):
+        z = det.spike_z(merchant_id)
+        fire = det.update(merchant_id, int(r.ts), float(r.p))
+        if fire is not None and fired_at is None:
+            fired_at = int(fire)
+        rate = det.hot_rate(merchant_id)
+        if rate > peak_rate:
+            peak_rate, peak_ts = rate, int(r.ts)
+        peak_z = max(peak_z, z)
+
     return {
         "merchant_id": merchant_id,
-        "baseline_txn_count": int(len(base)),
-        "baseline_flagged_rate": round(float((base.p >= HIGH_RISK_CUT).mean()), 4),
-        "baseline_avg_amount_inr": round(float(base.amount.mean()), 2),
-        "recent_txn_count": int(len(recent)),
-        "recent_flagged_rate": round(float((recent.p >= HIGH_RISK_CUT).mean()), 4),
-        "recent_avg_amount_inr": round(float(recent.amount.mean()), 2),
-        "flagged_rate_multiple": round(
-            float((recent.p >= HIGH_RISK_CUT).mean() /
-                  max(1e-6, (base.p >= HIGH_RISK_CUT).mean())), 2),
+        "window_start_ts": int(g.ts.min()), "window_end_ts": int(g.ts.max()),
+        "total_txns": int(len(g)),
+        # "normal" per the detector's own slow EWMA over the whole window
+        "baseline_flagged_rate_ewma": round(float(det.baseline_rate(merchant_id)), 4),
+        # worst 30-transaction window observed, and when it happened
+        "peak_flagged_rate": round(float(peak_rate), 4),
+        "peak_flagged_rate_window_ended_ts": peak_ts,
+        "peak_spike_z": round(float(peak_z), 2),
+        "peak_vs_baseline_multiple": (
+            round(float(peak_rate / det.baseline_rate(merchant_id)), 2)
+            if det.baseline_rate(merchant_id) > 0.001 else None),
+        # current state at the END of the window (may be calm again post-attack)
+        "current_flagged_rate_last_30_txns": round(float(det.hot_rate(merchant_id)), 4),
+        "spike_detector_fired": fired_at is not None,
+        "spike_fired_at_ts": fired_at,
+        "avg_amount_inr": round(float(g.amount.mean()), 2),
+        "reading_note": (
+            "peak_flagged_rate is the WORST 30-transaction window in this "
+            "merchant's history; current_flagged_rate_last_30_txns is only the "
+            "state at the end of the window. A finished attack shows a high "
+            "peak and a low current value - that is an attack that ENDED, not "
+            "an absence of attack."),
     }
 
 
@@ -78,11 +112,24 @@ def get_flagged_transactions(ctx: InvestigationContext, merchant_id: str,
                              limit: int = 15) -> dict:
     """The highest-risk transactions, as evidence the agent can cite."""
     g = ctx.merchant_slice(merchant_id)
-    hot = g[g.p >= HIGH_RISK_CUT].nlargest(min(limit, 50), "p")
+    flagged = g[g.p >= HIGH_RISK_CUT]
+    unflagged = g[g.p < HIGH_RISK_CUT]
+    hot = flagged.nlargest(min(limit, 50), "p")
+
+    def instr_ratio(d):
+        return round(float(d.instrument_id.nunique() / len(d)), 3) if len(d) else None
+
     return {
         "merchant_id": merchant_id,
         "flagged_count": int((g.p >= HIGH_RISK_CUT).sum()),
         "total_count": int(len(g)),
+        # Distinct payment instruments per transaction, with denominators, and
+        # the same ratio over this merchant's non-flagged traffic for comparison.
+        "flagged_distinct_instruments": int(flagged.instrument_id.nunique()),
+        "flagged_distinct_instruments_per_txn": instr_ratio(flagged),
+        "non_flagged_count": int(len(unflagged)),
+        "non_flagged_distinct_instruments": int(unflagged.instrument_id.nunique()),
+        "non_flagged_distinct_instruments_per_txn": instr_ratio(unflagged),
         "transactions": [
             {"ts": int(r.ts), "risk": round(float(r.p), 3),
              "amount_inr": round(float(r.amount), 2),
@@ -139,6 +186,88 @@ def get_velocity_summary(ctx: InvestigationContext, merchant_id: str) -> dict:
         "flagged_span_hours": round(float(hot_span_h), 2),
         "flagged_per_hour": round(float(len(hot) / hot_span_h), 2) if hot_span_h > 0 else None,
         "peak_hour_txns": int(g.groupby(g.ts // 3600).size().max()),
+    }
+
+
+def get_customer_anomalies(ctx: InvestigationContext, merchant_id: str,
+                           limit: int = 15) -> dict:
+    """Per-customer behavioural deviation among flagged transactions.
+
+    Closes a structural blind spot. Every other tool describes ENTITY SHARING
+    (one device across many accounts, one IP across many accounts), which is
+    the signature of farms, clusters and rings. Account takeover has the
+    opposite shape: each victim gets their OWN new device, so entity-sharing
+    tools see "29 customers, 29 devices, 29 IPs - no sharing" and conclude the
+    traffic is legitimate. It is not; the victims are real customers behaving
+    unlike themselves.
+
+    These four signals already existed in the feature builder and drove the ML
+    scorer - the agent simply could not see them. Read-only like every other
+    tool, and it still never exposes is_fraud or scenario."""
+    g = ctx.merchant_slice(merchant_id)
+    cols = ["is_new_device_for_customer", "geo_mismatch", "amount_dev_ratio",
+            "customer_age_days"]
+    missing = [c for c in cols if c not in g.columns]
+    if missing:
+        return {"merchant_id": merchant_id,
+                "error": f"anomaly features unavailable: {missing}"}
+    hot = g[g.p >= HIGH_RISK_CUT]
+    cold = g[g.p < HIGH_RISK_CUT]
+    if hot.empty:
+        return {"merchant_id": merchant_id, "flagged_count": 0,
+                "note": "no flagged transactions to profile"}
+
+    def profile(d):
+        if d.empty:
+            return None
+        return {
+            "n": int(len(d)),
+            "share_on_new_device_for_customer": round(float(d.is_new_device_for_customer.mean()), 3),
+            "share_with_geo_mismatch": round(float(d.geo_mismatch.mean()), 3),
+            "median_amount_vs_customer_own_average": round(float(d.amount_dev_ratio.median()), 2),
+            "share_spending_over_3x_own_average": round(float((d.amount_dev_ratio >= 3).mean()), 3),
+            "median_customer_age_days": round(float(d.customer_age_days.median()), 1),
+            "share_accounts_newer_than_30_days": round(float((d.customer_age_days < 30).mean()), 3),
+        }
+
+    f, c = profile(hot), profile(cold)
+    lift = {}
+    if c:
+        for k in ("share_on_new_device_for_customer", "share_with_geo_mismatch",
+                  "share_spending_over_3x_own_average", "share_accounts_newer_than_30_days"):
+            lift[k] = (round(f[k] / c[k], 2) if c[k] > 0.001 else
+                       ("no_baseline_occurrences" if f[k] > 0 else 1.0))
+
+    top = hot.nlargest(min(limit, 50), "p")
+    return {
+        "merchant_id": merchant_id,
+        "flagged_count": int(len(hot)),
+        "total_txns": int(len(g)),
+        "flagged_share_of_all_txns": round(float(len(hot) / max(1, len(g))), 4),
+        # A rate is meaningless without its denominator and a comparison
+        # population. Reporting only the flagged profile made 4-of-5 ambient
+        # fraud transactions on a quiet merchant look like a coordinated
+        # campaign, because "80%" reads as strong until you see n=5 and the
+        # merchant's own baseline right beside it.
+        "flagged_profile": f,
+        "non_flagged_profile_same_merchant": c,
+        "flagged_vs_non_flagged_lift": lift,
+        "interpretation_note": (
+            "Compare flagged_profile against non_flagged_profile_same_merchant "
+            "and weigh by n. A share computed over a handful of transactions is "
+            "weak evidence however extreme it looks; a modest share over "
+            "hundreds is strong. Lift near 1.0 means the flagged transactions "
+            "are indistinguishable from this merchant's ordinary traffic on "
+            "that dimension."),
+        "transactions": [
+            {"customer": r.customer_id,
+             "on_new_device": bool(r.is_new_device_for_customer),
+             "geo_mismatch": bool(r.geo_mismatch),
+             "amount_vs_own_avg": round(float(r.amount_dev_ratio), 2),
+             "account_age_days": round(float(r.customer_age_days), 1),
+             "amount_inr": round(float(r.amount), 2)}
+            for r in top.itertuples(index=False)
+        ],
     }
 
 
@@ -205,6 +334,16 @@ TOOL_SCHEMAS = [
                     "attack from a steady low-level drip.",
      "input_schema": {"type": "object", "properties": {
          "merchant_id": {"type": "string"}}, "required": ["merchant_id"]}},
+    {"name": "get_customer_anomalies",
+     "description": "Per-customer behavioural deviation among flagged transactions: "
+                    "share on a NEW device for that customer, share with a geo "
+                    "mismatch, spend vs the customer's OWN historical average, and "
+                    "account age. Use when entity-sharing looks absent - established "
+                    "customers behaving unlike themselves leave no shared entities.",
+     "input_schema": {"type": "object", "properties": {
+         "merchant_id": {"type": "string"},
+         "limit": {"type": "integer", "description": "max transactions, default 15"}},
+         "required": ["merchant_id"]}},
     {"name": "calculate_exposure",
      "description": "Deterministic rupee exposure arithmetic. ALWAYS use this for money "
                     "figures - never compute rupee amounts yourself.",
@@ -233,6 +372,7 @@ TOOL_FNS = {
     "get_flagged_transactions": get_flagged_transactions,
     "get_entity_network": get_entity_network,
     "get_velocity_summary": get_velocity_summary,
+    "get_customer_anomalies": get_customer_anomalies,
     "calculate_exposure": calculate_exposure,
     "write_investigation_report": write_investigation_report,
 }

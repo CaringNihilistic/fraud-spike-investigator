@@ -1,0 +1,517 @@
+{
+  "case": "device_farm",
+  "merchant": "m5",
+  "ground_truth": {
+    "cause": "device_farm",
+    "expected_action": "restrict",
+    "low_signal": false
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m5"
+      },
+      "output": {
+        "merchant_id": "m5",
+        "window_start_ts": 1762075507,
+        "window_end_ts": 1762590374,
+        "total_txns": 1041,
+        "baseline_flagged_rate_ewma": 0.0059,
+        "peak_flagged_rate": 0.9,
+        "peak_flagged_rate_window_ended_ts": 1762216380,
+        "peak_spike_z": 5.77,
+        "peak_vs_baseline_multiple": 152.66,
+        "current_flagged_rate_last_30_txns": 0.0,
+        "spike_detector_fired": true,
+        "spike_fired_at_ts": 1762204519,
+        "avg_amount_inr": 810.87,
+        "reading_note": "peak_flagged_rate is the WORST 30-transaction window in this merchant's history; current_flagged_rate_last_30_txns is only the state at the end of the window. A finished attack shows a high peak and a low current value - that is an attack that ENDED, not an absence of attack."
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m5"
+      },
+      "output": {
+        "merchant_id": "m5",
+        "flagged_count": 131,
+        "distinct_customers": 52,
+        "distinct_devices": 3,
+        "distinct_ips": 3,
+        "distinct_instruments": 10,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d_FARM_F",
+            "distinct_accounts": 50
+          },
+          {
+            "entity": "d1287",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d1809",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip_FARM_F",
+            "distinct_accounts": 50
+          },
+          {
+            "entity": "ip1336",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip996",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 0.19
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m5"
+      },
+      "output": {
+        "merchant_id": "m5",
+        "window_hours": 143.02,
+        "txns_per_hour_overall": 7.28,
+        "flagged_txns": 131,
+        "flagged_span_hours": 96.02,
+        "flagged_per_hour": 1.36,
+        "peak_hour_txns": 45
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m5"
+      },
+      "output": {
+        "merchant_id": "m5",
+        "flagged_count": 131,
+        "total_count": 1041,
+        "transactions": [
+          {
+            "ts": 1762203507,
+            "risk": 1.0,
+            "amount_inr": 655.15,
+            "customer": "cF1",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F4"
+          },
+          {
+            "ts": 1762203679,
+            "risk": 1.0,
+            "amount_inr": 327.73,
+            "customer": "cF2",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F4"
+          },
+          {
+            "ts": 1762203694,
+            "risk": 1.0,
+            "amount_inr": 437.33,
+            "customer": "cF3",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F3"
+          },
+          {
+            "ts": 1762203791,
+            "risk": 1.0,
+            "amount_inr": 469.74,
+            "customer": "cF4",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F5"
+          },
+          {
+            "ts": 1762204067,
+            "risk": 1.0,
+            "amount_inr": 1031.22,
+            "customer": "cF5",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F5"
+          },
+          {
+            "ts": 1762204104,
+            "risk": 1.0,
+            "amount_inr": 155.03,
+            "customer": "cF6",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F5"
+          },
+          {
+            "ts": 1762204241,
+            "risk": 1.0,
+            "amount_inr": 518.92,
+            "customer": "cF7",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F0"
+          },
+          {
+            "ts": 1762204519,
+            "risk": 1.0,
+            "amount_inr": 1214.26,
+            "customer": "cF8",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F7"
+          },
+          {
+            "ts": 1762204653,
+            "risk": 1.0,
+            "amount_inr": 586.72,
+            "customer": "cF9",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F0"
+          },
+          {
+            "ts": 1762204675,
+            "risk": 1.0,
+            "amount_inr": 542.54,
+            "customer": "cF10",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F6"
+          },
+          {
+            "ts": 1762204928,
+            "risk": 1.0,
+            "amount_inr": 1015.67,
+            "customer": "cF11",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F6"
+          },
+          {
+            "ts": 1762204974,
+            "risk": 1.0,
+            "amount_inr": 172.84,
+            "customer": "cF12",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F1"
+          },
+          {
+            "ts": 1762205236,
+            "risk": 1.0,
+            "amount_inr": 436.81,
+            "customer": "cF13",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F0"
+          },
+          {
+            "ts": 1762205393,
+            "risk": 1.0,
+            "amount_inr": 440.26,
+            "customer": "cF14",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F0"
+          },
+          {
+            "ts": 1762205460,
+            "risk": 1.0,
+            "amount_inr": 581.55,
+            "customer": "cF15",
+            "device": "d_FARM_F",
+            "ip": "ip_FARM_F",
+            "instrument": "pi_FARM_F0"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m5"
+      },
+      "output": {
+        "merchant_id": "m5",
+        "flagged_txn_count": 131,
+        "exposure_at_risk_inr": 103912.83,
+        "probability_weighted_expected_loss_inr": 103912.83,
+        "recoverable_via_step_up_inr": 93521.55,
+        "review_cost_if_all_reviewed_inr": 6550.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_customer_anomalies",
+      "input": {
+        "merchant_id": "m5",
+        "limit": 15
+      },
+      "output": {
+        "merchant_id": "m5",
+        "flagged_count": 131,
+        "share_on_new_device_for_customer": 0.0,
+        "share_with_geo_mismatch": 0.55,
+        "median_amount_vs_customer_own_average": 1.0,
+        "share_spending_over_3x_own_average": 0.015,
+        "median_customer_age_days": 1.6,
+        "share_accounts_newer_than_30_days": 0.985,
+        "interpretation_note": "High new-device + high geo-mismatch + high amount-vs-own-average on OLD accounts describes established customers behaving unlike themselves. High new-account share with low amount deviation describes freshly created accounts instead.",
+        "transactions": [
+          {
+            "customer": "cF1",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 0.5,
+            "amount_inr": 655.15
+          },
+          {
+            "customer": "cF2",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 1.5,
+            "amount_inr": 327.73
+          },
+          {
+            "customer": "cF3",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 2.5,
+            "amount_inr": 437.33
+          },
+          {
+            "customer": "cF4",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 2.5,
+            "amount_inr": 469.74
+          },
+          {
+            "customer": "cF5",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 0.5,
+            "amount_inr": 1031.22
+          },
+          {
+            "customer": "cF6",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 2.5,
+            "amount_inr": 155.03
+          },
+          {
+            "customer": "cF7",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 1.5,
+            "amount_inr": 518.92
+          },
+          {
+            "customer": "cF8",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 2.5,
+            "amount_inr": 1214.26
+          },
+          {
+            "customer": "cF9",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 0.5,
+            "amount_inr": 586.72
+          },
+          {
+            "customer": "cF10",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 1.5,
+            "amount_inr": 542.54
+          },
+          {
+            "customer": "cF11",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 2.5,
+            "amount_inr": 1015.67
+          },
+          {
+            "customer": "cF12",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 0.5,
+            "amount_inr": 172.84
+          },
+          {
+            "customer": "cF13",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 1.5,
+            "amount_inr": 436.81
+          },
+          {
+            "customer": "cF14",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 1.5,
+            "amount_inr": 440.26
+          },
+          {
+            "customer": "cF15",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 1.5,
+            "amount_inr": 581.55
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m5",
+        "cause": "device_farm",
+        "confidence": 0.99,
+        "evidence": [
+          "Entity network shows ONE device (d_FARM_F) and ONE IP (ip_FARM_F) spanning 50 distinct customer accounts across 131 flagged transactions",
+          "Peak flagged rate reached 90% (152.66\u00d7 baseline, z-score 5.77) within a concentrated 96-hour attack window at 1.36 flagged txns/hour",
+          "98.5% of flagged accounts are newly created (<30 days old), median age 1.6 days; all transactions are first-time for those accounts",
+          "Flagged transactions span only 10 distinct payment instruments (10 cards across 50+ accounts suggests instrument reuse)",
+          "All 131 flagged transactions show maximum risk score (1.0); zero current flagged rate indicates attack has ended",
+          "Amounts are varied (\u20b9155\u2013\u20b91,214) but consistent with normal merchant average (\u20b9810.87), indicating pattern testing rather than value fraud",
+          "Timestamps show rapid sequential firing: cF1\u2013cF15 transactions all within 5 minutes on 2025-10-28 ~03:58\u201304:03 UTC"
+        ],
+        "exposure_inr": 103912.83,
+        "recommended_action": "restrict"
+      },
+      "output": {
+        "merchant_id": "m5",
+        "cause": "device_farm",
+        "evidence": [
+          "Entity network shows ONE device (d_FARM_F) and ONE IP (ip_FARM_F) spanning 50 distinct customer accounts across 131 flagged transactions",
+          "Peak flagged rate reached 90% (152.66\u00d7 baseline, z-score 5.77) within a concentrated 96-hour attack window at 1.36 flagged txns/hour",
+          "98.5% of flagged accounts are newly created (<30 days old), median age 1.6 days; all transactions are first-time for those accounts",
+          "Flagged transactions span only 10 distinct payment instruments (10 cards across 50+ accounts suggests instrument reuse)",
+          "All 131 flagged transactions show maximum risk score (1.0); zero current flagged rate indicates attack has ended",
+          "Amounts are varied (\u20b9155\u2013\u20b91,214) but consistent with normal merchant average (\u20b9810.87), indicating pattern testing rather than value fraud",
+          "Timestamps show rapid sequential firing: cF1\u2013cF15 transactions all within 5 minutes on 2025-10-28 ~03:58\u201304:03 UTC"
+        ],
+        "exposure_inr": 103912.83,
+        "recommended_action": "restrict",
+        "confidence": 0.99
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "7862fd31a44db17f",
+      "output_hash": "715a2d190d9818d1",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_entity_network",
+      "inputs_hash": "7862fd31a44db17f",
+      "output_hash": "32eb14beb2bd88eb",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "7862fd31a44db17f",
+      "output_hash": "59b9d095e3cabcda",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "7862fd31a44db17f",
+      "output_hash": "a51bafd443fef7c9",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "calculate_exposure",
+      "inputs_hash": "7862fd31a44db17f",
+      "output_hash": "b5865c33e28c8462",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "get_customer_anomalies",
+      "inputs_hash": "eb7bd316a39383ba",
+      "output_hash": "b43c69fce92d0667",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 6,
+      "tool": "write_investigation_report",
+      "inputs_hash": "2384917760e6a323",
+      "output_hash": "2384917760e6a323",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m5",
+    "cause": "device_farm",
+    "evidence": [
+      "Entity network shows ONE device (d_FARM_F) and ONE IP (ip_FARM_F) spanning 50 distinct customer accounts across 131 flagged transactions",
+      "Peak flagged rate reached 90% (152.66\u00d7 baseline, z-score 5.77) within a concentrated 96-hour attack window at 1.36 flagged txns/hour",
+      "98.5% of flagged accounts are newly created (<30 days old), median age 1.6 days; all transactions are first-time for those accounts",
+      "Flagged transactions span only 10 distinct payment instruments (10 cards across 50+ accounts suggests instrument reuse)",
+      "All 131 flagged transactions show maximum risk score (1.0); zero current flagged rate indicates attack has ended",
+      "Amounts are varied (\u20b9155\u2013\u20b91,214) but consistent with normal merchant average (\u20b9810.87), indicating pattern testing rather than value fraud",
+      "Timestamps show rapid sequential firing: cF1\u2013cF15 transactions all within 5 minutes on 2025-10-28 ~03:58\u201304:03 UTC"
+    ],
+    "exposure_inr": 103912.83,
+    "recommended_action": "restrict",
+    "confidence": 0.99
+  },
+  "validated_action": "restrict"
+}

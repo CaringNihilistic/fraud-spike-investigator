@@ -1,0 +1,339 @@
+{
+  "case": "quiet_merchant_d",
+  "merchant": "m8",
+  "ground_truth": {
+    "cause": "legitimate_traffic",
+    "expected_action": "allow",
+    "low_signal": true
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m8"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "window_start_ts": 1762074290,
+        "window_end_ts": 1762591808,
+        "total_txns": 1033,
+        "baseline_flagged_rate_ewma": 0.0002,
+        "peak_flagged_rate": 0.0333,
+        "peak_flagged_rate_window_ended_ts": 1762124773,
+        "peak_spike_z": 1.1,
+        "peak_vs_baseline_multiple": null,
+        "current_flagged_rate_last_30_txns": 0.0,
+        "spike_detector_fired": false,
+        "spike_fired_at_ts": null,
+        "avg_amount_inr": 853.39,
+        "reading_note": "peak_flagged_rate is the WORST 30-transaction window in this merchant's history; current_flagged_rate_last_30_txns is only the state at the end of the window. A finished attack shows a high peak and a low current value - that is an attack that ENDED, not an absence of attack."
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m8"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "window_hours": 143.75,
+        "txns_per_hour_overall": 7.19,
+        "flagged_txns": 4,
+        "flagged_span_hours": 68.43,
+        "flagged_per_hour": 0.06,
+        "peak_hour_txns": 20
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m8"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "flagged_count": 4,
+        "distinct_customers": 4,
+        "distinct_devices": 4,
+        "distinct_ips": 4,
+        "distinct_instruments": 4,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d2000",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d2339",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d307",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d805",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip23",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip383",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip584",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip719",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 1.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m8",
+        "limit": 15
+      },
+      "output": {
+        "merchant_id": "m8",
+        "flagged_count": 4,
+        "total_count": 1033,
+        "transactions": [
+          {
+            "ts": 1762162416,
+            "risk": 1.0,
+            "amount_inr": 7962.75,
+            "customer": "c307",
+            "device": "d307",
+            "ip": "ip584",
+            "instrument": "pi307"
+          },
+          {
+            "ts": 1762297786,
+            "risk": 1.0,
+            "amount_inr": 2730.74,
+            "customer": "c805",
+            "device": "d805",
+            "ip": "ip383",
+            "instrument": "pi805"
+          },
+          {
+            "ts": 1762124773,
+            "risk": 0.833,
+            "amount_inr": 2213.52,
+            "customer": "c2000",
+            "device": "d2000",
+            "ip": "ip23",
+            "instrument": "pi2000"
+          },
+          {
+            "ts": 1762371121,
+            "risk": 0.641,
+            "amount_inr": 2333.79,
+            "customer": "c2339",
+            "device": "d2339",
+            "ip": "ip719",
+            "instrument": "pi2339"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_customer_anomalies",
+      "input": {
+        "merchant_id": "m8",
+        "limit": 15
+      },
+      "output": {
+        "merchant_id": "m8",
+        "flagged_count": 4,
+        "share_on_new_device_for_customer": 0.0,
+        "share_with_geo_mismatch": 0.0,
+        "median_amount_vs_customer_own_average": 2.99,
+        "share_spending_over_3x_own_average": 0.5,
+        "median_customer_age_days": 229.3,
+        "share_accounts_newer_than_30_days": 0.0,
+        "interpretation_note": "High new-device + high geo-mismatch + high amount-vs-own-average on OLD accounts describes established customers behaving unlike themselves. High new-account share with low amount deviation describes freshly created accounts instead.",
+        "transactions": [
+          {
+            "customer": "c307",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 2.82,
+            "account_age_days": 301.0,
+            "amount_inr": 7962.75
+          },
+          {
+            "customer": "c805",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 3.52,
+            "account_age_days": 157.6,
+            "amount_inr": 2730.74
+          },
+          {
+            "customer": "c2000",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 3.16,
+            "account_age_days": 377.6,
+            "amount_inr": 2213.52
+          },
+          {
+            "customer": "c2339",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 2.36,
+            "account_age_days": 88.4,
+            "amount_inr": 2333.79
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m8"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "flagged_txn_count": 4,
+        "exposure_at_risk_inr": 15240.8,
+        "probability_weighted_expected_loss_inr": 14034.29,
+        "recoverable_via_step_up_inr": 12630.86,
+        "review_cost_if_all_reviewed_inr": 200.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m8",
+        "cause": "legitimate_traffic",
+        "confidence": 0.72,
+        "evidence": [
+          "4 flagged transactions out of 1033 total (0.39% flagged rate)",
+          "Entity network: 4 distinct customers, 4 distinct devices, 4 distinct IPs, 4 distinct instruments\u2014no shared entities across flagged txns",
+          "Velocity: 0.06 flagged txns/hour over 68.43 hours\u2014slow drip pattern, not burst attack",
+          "Customer anomalies: All 4 customers established (median age 229 days, 0% newer than 30 days); 50% spending >3x own average; 0% on new device; 0% geo mismatch",
+          "Baseline shows historical peak rate of 0.0333 ended at ts 1762124773; current flagged rate last 30 txns is 0.0\u2014attack pattern is resolved",
+          "Flagged amounts: \u20b97,962.75 (c307), \u20b92,730.74 (c805), \u20b92,213.52 (c2000), \u20b92,333.79 (c2339)\u2014consistent with unusual-but-legitimate high-value transactions",
+          "No device-farm, IP-cluster, or fraud-ring indicators; no account-takeover signals (established accounts, own devices/IPs/geos)"
+        ],
+        "exposure_inr": 15240.8,
+        "recommended_action": "review"
+      },
+      "output": {
+        "merchant_id": "m8",
+        "cause": "legitimate_traffic",
+        "evidence": [
+          "4 flagged transactions out of 1033 total (0.39% flagged rate)",
+          "Entity network: 4 distinct customers, 4 distinct devices, 4 distinct IPs, 4 distinct instruments\u2014no shared entities across flagged txns",
+          "Velocity: 0.06 flagged txns/hour over 68.43 hours\u2014slow drip pattern, not burst attack",
+          "Customer anomalies: All 4 customers established (median age 229 days, 0% newer than 30 days); 50% spending >3x own average; 0% on new device; 0% geo mismatch",
+          "Baseline shows historical peak rate of 0.0333 ended at ts 1762124773; current flagged rate last 30 txns is 0.0\u2014attack pattern is resolved",
+          "Flagged amounts: \u20b97,962.75 (c307), \u20b92,730.74 (c805), \u20b92,213.52 (c2000), \u20b92,333.79 (c2339)\u2014consistent with unusual-but-legitimate high-value transactions",
+          "No device-farm, IP-cluster, or fraud-ring indicators; no account-takeover signals (established accounts, own devices/IPs/geos)"
+        ],
+        "exposure_inr": 15240.8,
+        "recommended_action": "review",
+        "confidence": 0.72
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "d362853a3d259faa",
+      "output_hash": "b24c59ba6abf3f23",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "d362853a3d259faa",
+      "output_hash": "e0a7b28fe27b00b5",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_entity_network",
+      "inputs_hash": "d362853a3d259faa",
+      "output_hash": "6279e2c678b2d42d",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "111f6c2d934b4adb",
+      "output_hash": "9086e19f7c12eea1",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "get_customer_anomalies",
+      "inputs_hash": "111f6c2d934b4adb",
+      "output_hash": "c308e2f547e47051",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "calculate_exposure",
+      "inputs_hash": "d362853a3d259faa",
+      "output_hash": "836a28cf41614d81",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 6,
+      "tool": "write_investigation_report",
+      "inputs_hash": "3717030473571cb1",
+      "output_hash": "3717030473571cb1",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m8",
+    "cause": "legitimate_traffic",
+    "evidence": [
+      "4 flagged transactions out of 1033 total (0.39% flagged rate)",
+      "Entity network: 4 distinct customers, 4 distinct devices, 4 distinct IPs, 4 distinct instruments\u2014no shared entities across flagged txns",
+      "Velocity: 0.06 flagged txns/hour over 68.43 hours\u2014slow drip pattern, not burst attack",
+      "Customer anomalies: All 4 customers established (median age 229 days, 0% newer than 30 days); 50% spending >3x own average; 0% on new device; 0% geo mismatch",
+      "Baseline shows historical peak rate of 0.0333 ended at ts 1762124773; current flagged rate last 30 txns is 0.0\u2014attack pattern is resolved",
+      "Flagged amounts: \u20b97,962.75 (c307), \u20b92,730.74 (c805), \u20b92,213.52 (c2000), \u20b92,333.79 (c2339)\u2014consistent with unusual-but-legitimate high-value transactions",
+      "No device-farm, IP-cluster, or fraud-ring indicators; no account-takeover signals (established accounts, own devices/IPs/geos)"
+    ],
+    "exposure_inr": 15240.8,
+    "recommended_action": "review",
+    "confidence": 0.72
+  },
+  "validated_action": "review"
+}

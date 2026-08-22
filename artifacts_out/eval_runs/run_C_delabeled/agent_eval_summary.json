@@ -1,0 +1,10 @@
+{
+  "n_cases": 10,
+  "correct_cause": "5/10",
+  "evidence_valid": "10/10",
+  "correct_action": "4/10",
+  "escalates_when_unsure": "9/10",
+  "policy_violations": 0,
+  "all_cases_degraded": false,
+  "mode": "live LLM"
+}

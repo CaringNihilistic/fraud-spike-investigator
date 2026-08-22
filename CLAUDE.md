@@ -15,7 +15,9 @@ per-order; Bumblebee does onboarding review) — our wedge is real-time
 transaction-stream "you are under attack" investigation with ₹ economics.
 
 ## Architecture (do not change without strong reason)
-- `src/sim/` — synthetic generator, 6 scenarios (card-testing, device farm, IP
+- `src/sim/` — synthetic generator. ALL entity IDs are opaque hashes via
+  `oid()` — never semantic (see failure-log 19). `generate_holdout()` builds a
+  second world for held-out agent eval only. 6 scenarios (card-testing, device farm, IP
   cluster, ATO, fraud ring, legitimate flash sale that must NEVER be flagged).
   Historical attacks in train period (days 6–18, own entity IDs), novel attacks
   in test period (days 24–29, fresh entity IDs + different merchants).
@@ -62,7 +64,10 @@ transaction-stream "you are under attack" investigation with ₹ economics.
   recommended_action always passes through validate_recommendation(); any
   failure → deterministic templated report → human REVIEW. `audit.py` = every
   tool call logged (tool, inputs hash, output hash, ts), degraded path too.
-  `eval.py` = 10 ground-truth cases → artifacts_out/agent_eval.csv.
+  `eval.py` = 10 fixed + 3 HELD-OUT ground-truth cases (new seed, unseen
+  merchants) → artifacts_out/agent_eval.csv + per-case transcripts.
+  `verify_evidence.py` = traceability checker: every number in evidence[] must
+  be findable in a tool output the agent actually received.
 - `src/serve/` — P3 dashboard. `state.py` = in-memory pipeline state (single
   writer = replay thread, RLock-guarded). `replay.py` = streams the test slice
   through the REAL fusion→policy path (not a canned animation); investigations
@@ -104,10 +109,13 @@ README — keep the retraction visible, it's the honest version.
 P1b fusion changes 0/13,987 decisions vs the old p*100 shortcut. Kept for
 architecture (auditability, reachable fail-safe, headroom for a weaker model),
 NOT for metrics. Say so plainly; do not re-frame it as a win.
-P2 agent eval: NO Anthropic credentials in this environment, so all 10 cases
-run the DETERMINISTIC FALLBACK. Scorecard measures the fail-safe, NOT model
-reasoning (correct_cause 0/10 is the fallback refusing to guess, not a model
-failure; policy_violations 0/10 is real). Never quote it as agent capability.
+P2 agent eval (LIVE Claude Haiku 4.5, DE-LABELLED data, run D = FINAL):
+8/13 correct cause (2/3 held-out), 100/100 evidence claims traceable,
+escalates-when-unsure 13/13, policy violations 0/13. Five-run progression
+A->B1->B->C->D preserved in artifacts_out/eval_runs/ — run A (9/10) is
+PRE-de-labelling and must always be labelled as such; most of that score was
+semantic-ID leakage. DESIGN IS FROZEN: no further tool/prompt/weighting
+changes without a new held-out set, or the number stops meaning anything.
 Run: `python -m src.models.select_model && python -m src.policy.threshold_sweep
 && python -m src.models.train && python -m src.models.ablation`
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
@@ -120,8 +128,8 @@ Tests: `python -m pytest tests/ -q` (46 pass, no network needed)
   and `artifacts_out/ablation_table.csv`.
 - ~~P1b — risk fusion~~ DONE: `src/policy/fusion.py`, wired into the
   economics loop, 10 new safety tests. Honest result: 0 decisions changed.
-- ~~P2 — LLM investigator~~ DONE: `src/agent/`, 15 agent tests. Eval runs but
-  is credential-blocked → fallback-only scorecard (see results section).
+- ~~P2 — LLM investigator~~ DONE: `src/agent/`, 7 read-only tools, 16 agent
+  tests, live eval on de-labelled data with a held-out set (see results).
 - **P2b — FastAPI serving**: POST /transactions, GET /merchants/{id}/risk,
   POST /merchants/{id}/investigate, GET /review-queue. Audit log table.
 - ~~P3 — React dashboard~~ DONE: `src/serve/` + `run_demo.py`, 13 serving tests.
@@ -209,16 +217,50 @@ Tests: `python -m pytest tests/ -q` (46 pass, no network needed)
    ATO does not share entities. The policy engine still restricted 68 txns and
    queued 8 for review on m2 because the LLM was never in the decision path —
    this is the architecture's central claim demonstrated, not asserted.
-   NOT FIXED: adding ATO-signal tools is a design change; do it deliberately,
-   not under submission pressure. Top of the post-submission list.
-   Also: agent output varies run to run — m2 came back `account_takeover` in
-   the eval and `legitimate_traffic` in the demo, same tools, same data.
+   CLOSED (run B): added 7th tool get_customer_anomalies exposing new-device /
+   geo-mismatch / amount-vs-own-average / account-age, with the non-flagged
+   population as comparison. m2 now diagnosed correctly and — more importantly —
+   quiet merchants use the SAME fields to RULE OUT ATO ("0% new device, 0% geo
+   mismatch"). Prompt unchanged (sha256-verified) — the fix was evidence, not
+   coaching. Residual: agent output still varies run to run.
 17. get_merchant_baseline splits at ts.quantile(0.75), so an attack that ENDS
    mid-window reads as "baseline 8.99% -> recent 0.35%", i.e. improving. The
    model then rationalises it ("flagged rate jumped from baseline 16.65% to
    recent 0.38% AFTER accounting for the farm burst" — describing a DECREASE
    as a jump). Contributed to the ATO miss and to ip_cluster being downgraded
-   to step_up. NOT FIXED — reframe the baseline window deliberately.
+   to step_up. CLOSED (run B): get_merchant_baseline now reports the spike
+   detector's OWN slow-EWMA baseline plus the PEAK 30-txn window and explicit
+   window bounds, so "attack that ended" is legible as such instead of reading
+   as "improving". Side effect worth knowing: the agent became temporally aware
+   and now de-escalates finished attacks (restrict -> review), which our
+   expected_action labels — written before the tool existed — score as wrong.
+
+18. EVAL-INTEGRITY, part 1 (our statistics bug). First version of
+   get_customer_anomalies reported shares over FLAGGED transactions with no
+   denominator and no comparison population: "80% spent 3x+ over own average"
+   on n=5. Three quiet merchants were promptly diagnosed account_takeover
+   (run B1, preserved in artifacts_out/eval_runs/). Fix: report the same
+   profile over NON-flagged transactions of the same merchant, with explicit n
+   and lift. Lesson: a rate over a selected subpopulation is not evidence
+   without its base rate — and we shipped that mistake INTO a safety tool.
+19. EVAL-INTEGRITY, part 2 (the dataset was whispering the answer). Simulator
+   entity IDs were self-labelling: pi_STOLEN_*, d_FARM_F, ip_CLUSTER_I,
+   d_RING_R3, d_ATO_*. Run B transcripts cite them verbatim as evidence
+   ("183 distinct stolen instruments (pi_STOLEN_*)"). Fix: hash EVERY id —
+   legitimate and attack alike — to an indistinguishable kind_<8hex> form via
+   oid(); ground truth lives only in `scenario`, which no tool exposes.
+   Correct-cause fell 10/10 -> 5/10. That gap IS the leakage measurement.
+   De-labelling asserted to be a pure relabelling: all 16 ML metrics
+   bit-identical (features count entity SETS, never parse ID strings).
+   Only ONE tool was added afterwards (instrument-novelty ratio, the one
+   signal a real analyst legitimately has), then the design was FROZEN and
+   run D scored once, with 3 held-out cases on a new seed. Final: 8/13.
+20. verify_evidence.py's entity-id regex was written through a bash heredoc,
+   which turned `` into a literal 0x08 BACKSPACE character. The compiled
+   pattern printed as correct in the terminal (control char invisible) but
+   could never match, so 11 evidence claims were reported UNTRACEABLE when
+   they were only quoting hashed entity ids. Fixed -> 100/100 traceable.
+   Lesson: when a regex "looks right but never matches", check the bytes.
 
 ## Style
 Plain, direct comments explaining WHY. Small modules. No cleverness that costs

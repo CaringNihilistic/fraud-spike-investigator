@@ -1,4 +1,4 @@
-"""LangGraph investigator: Claude Haiku + 6 read-only tools.
+"""LangGraph investigator: Claude Haiku + 7 read-only tools.
 
 Graph shape (deliberately small - a 3-node loop, not a sprawling DAG):
 

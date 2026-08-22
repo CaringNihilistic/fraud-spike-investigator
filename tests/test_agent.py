@@ -64,12 +64,16 @@ def ctx():
                      "p": 0.95 if i >= 10 else 0.01,
                      "amount": 500.0, "customer_id": f"c{i % 5}",
                      "device_id": "d_shared", "ip": "ip_shared",
-                     "instrument_id": f"pi{i % 3}"})
+                     "instrument_id": f"pi{i % 3}",
+                     "is_new_device_for_customer": 1.0, "geo_mismatch": 0.0,
+                     "amount_dev_ratio": 1.1, "customer_age_days": 400.0})
     for i in range(40):
         rows.append({"merchant_id": "m2", "ts": 1_000_000 + i * 60, "p": 0.01,
                      "amount": 300.0, "customer_id": f"q{i}",
                      "device_id": f"dq{i}", "ip": f"ipq{i}",
-                     "instrument_id": f"piq{i}"})
+                     "instrument_id": f"piq{i}",
+                     "is_new_device_for_customer": 0.0, "geo_mismatch": 0.0,
+                     "amount_dev_ratio": 1.0, "customer_age_days": 500.0})
     return InvestigationContext(pd.DataFrame(rows))
 
 
@@ -180,9 +184,22 @@ def test_tools_are_read_only(ctx):
     pd.testing.assert_frame_equal(before, ctx.df)
 
 
-def test_tool_surface_is_exactly_six_read_only_tools():
-    assert len(READ_ONLY_TOOLS) == 6
+def test_tool_surface_is_exactly_seven_read_only_tools():
+    assert len(READ_ONLY_TOOLS) == 7
     assert "write_investigation_report" in READ_ONLY_TOOLS
+    assert "get_customer_anomalies" in READ_ONLY_TOOLS
+
+
+def test_anomaly_tool_degrades_when_features_absent(ctx):
+    """A frame without the anomaly columns must return an error dict, not
+    raise - a missing feature cannot be allowed to kill an investigation."""
+    import pandas as _pd
+    from src.agent.tools import InvestigationContext, get_customer_anomalies
+    bare = InvestigationContext(_pd.DataFrame([{
+        "merchant_id": "m1", "ts": 1, "p": 0.9, "amount": 10.0,
+        "customer_id": "c", "device_id": "d", "ip": "i", "instrument_id": "pi"}]))
+    out = get_customer_anomalies(bare, "m1")
+    assert "error" in out
 
 
 def test_ground_truth_is_not_exposed_to_the_agent(ctx):

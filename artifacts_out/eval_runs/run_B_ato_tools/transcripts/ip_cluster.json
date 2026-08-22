@@ -1,0 +1,554 @@
+{
+  "case": "ip_cluster",
+  "merchant": "m7",
+  "ground_truth": {
+    "cause": "ip_cluster",
+    "expected_action": "restrict",
+    "low_signal": false
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "tool_calls": [
+    {
+      "tool": "get_merchant_baseline",
+      "input": {
+        "merchant_id": "m7"
+      },
+      "output": {
+        "merchant_id": "m7",
+        "window_start_ts": 1762075296,
+        "window_end_ts": 1762591846,
+        "total_txns": 1094,
+        "baseline_flagged_rate_ewma": 0.0097,
+        "peak_flagged_rate": 0.9333,
+        "peak_flagged_rate_window_ended_ts": 1762306832,
+        "peak_spike_z": 4.66,
+        "peak_vs_baseline_multiple": 96.05,
+        "current_flagged_rate_last_30_txns": 0.0,
+        "spike_detector_fired": true,
+        "spike_fired_at_ts": 1762298818,
+        "avg_amount_inr": 840.58,
+        "reading_note": "peak_flagged_rate is the WORST 30-transaction window in this merchant's history; current_flagged_rate_last_30_txns is only the state at the end of the window. A finished attack shows a high peak and a low current value - that is an attack that ENDED, not an absence of attack."
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_entity_network",
+      "input": {
+        "merchant_id": "m7"
+      },
+      "output": {
+        "merchant_id": "m7",
+        "flagged_count": 101,
+        "distinct_customers": 46,
+        "distinct_devices": 46,
+        "distinct_ips": 7,
+        "distinct_instruments": 46,
+        "top_devices_by_account_fanout": [
+          {
+            "entity": "d1666",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d1875",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d2240",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d2791",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "d3612",
+            "distinct_accounts": 1
+          }
+        ],
+        "top_ips_by_account_fanout": [
+          {
+            "entity": "ip_CLUSTER_I",
+            "distinct_accounts": 40
+          },
+          {
+            "entity": "ip1257",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip1002",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip134",
+            "distinct_accounts": 1
+          },
+          {
+            "entity": "ip1411",
+            "distinct_accounts": 1
+          }
+        ],
+        "instruments_per_customer": 1.0
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_velocity_summary",
+      "input": {
+        "merchant_id": "m7"
+      },
+      "output": {
+        "merchant_id": "m7",
+        "window_hours": 143.49,
+        "txns_per_hour_overall": 7.62,
+        "flagged_txns": 101,
+        "flagged_span_hours": 118.06,
+        "flagged_per_hour": 0.86,
+        "peak_hour_txns": 48
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_flagged_transactions",
+      "input": {
+        "merchant_id": "m7",
+        "limit": 15
+      },
+      "output": {
+        "merchant_id": "m7",
+        "flagged_count": 101,
+        "total_count": 1094,
+        "transactions": [
+          {
+            "ts": 1762136937,
+            "risk": 1.0,
+            "amount_inr": 3690.75,
+            "customer": "c1666",
+            "device": "d1666",
+            "ip": "ip1257",
+            "instrument": "pi1666"
+          },
+          {
+            "ts": 1762234697,
+            "risk": 1.0,
+            "amount_inr": 3947.6,
+            "customer": "c601",
+            "device": "d601",
+            "ip": "ip246",
+            "instrument": "pi601"
+          },
+          {
+            "ts": 1762292007,
+            "risk": 1.0,
+            "amount_inr": 1409.35,
+            "customer": "c2240",
+            "device": "d2240",
+            "ip": "ip1411",
+            "instrument": "pi2240"
+          },
+          {
+            "ts": 1762296978,
+            "risk": 1.0,
+            "amount_inr": 1015.42,
+            "customer": "cI1",
+            "device": "dI1",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI1"
+          },
+          {
+            "ts": 1762297245,
+            "risk": 1.0,
+            "amount_inr": 386.12,
+            "customer": "cI2",
+            "device": "dI2",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI2"
+          },
+          {
+            "ts": 1762297902,
+            "risk": 1.0,
+            "amount_inr": 525.52,
+            "customer": "cI7",
+            "device": "dI7",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI7"
+          },
+          {
+            "ts": 1762297916,
+            "risk": 1.0,
+            "amount_inr": 462.76,
+            "customer": "cI8",
+            "device": "dI8",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI8"
+          },
+          {
+            "ts": 1762297986,
+            "risk": 1.0,
+            "amount_inr": 897.21,
+            "customer": "cI9",
+            "device": "dI9",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI9"
+          },
+          {
+            "ts": 1762298344,
+            "risk": 1.0,
+            "amount_inr": 605.09,
+            "customer": "cI10",
+            "device": "dI10",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI10"
+          },
+          {
+            "ts": 1762298530,
+            "risk": 1.0,
+            "amount_inr": 96.29,
+            "customer": "cI11",
+            "device": "dI11",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI11"
+          },
+          {
+            "ts": 1762298818,
+            "risk": 1.0,
+            "amount_inr": 1560.06,
+            "customer": "cI12",
+            "device": "dI12",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI12"
+          },
+          {
+            "ts": 1762298855,
+            "risk": 1.0,
+            "amount_inr": 187.67,
+            "customer": "cI13",
+            "device": "dI13",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI13"
+          },
+          {
+            "ts": 1762299097,
+            "risk": 1.0,
+            "amount_inr": 500.06,
+            "customer": "cI14",
+            "device": "dI14",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI14"
+          },
+          {
+            "ts": 1762299151,
+            "risk": 1.0,
+            "amount_inr": 606.03,
+            "customer": "cI15",
+            "device": "dI15",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI15"
+          },
+          {
+            "ts": 1762299258,
+            "risk": 1.0,
+            "amount_inr": 465.45,
+            "customer": "cI16",
+            "device": "dI16",
+            "ip": "ip_CLUSTER_I",
+            "instrument": "piI16"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "get_customer_anomalies",
+      "input": {
+        "merchant_id": "m7",
+        "limit": 15
+      },
+      "output": {
+        "merchant_id": "m7",
+        "flagged_count": 101,
+        "total_txns": 1094,
+        "flagged_share_of_all_txns": 0.0923,
+        "flagged_profile": {
+          "n": 101,
+          "share_on_new_device_for_customer": 0.0,
+          "share_with_geo_mismatch": 0.564,
+          "median_amount_vs_customer_own_average": 1.0,
+          "share_spending_over_3x_own_average": 0.04,
+          "median_customer_age_days": 2.7,
+          "share_accounts_newer_than_30_days": 0.941
+        },
+        "non_flagged_profile_same_merchant": {
+          "n": 993,
+          "share_on_new_device_for_customer": 0.0,
+          "share_with_geo_mismatch": 0.0,
+          "median_amount_vs_customer_own_average": 1.0,
+          "share_spending_over_3x_own_average": 0.001,
+          "median_customer_age_days": 232.0,
+          "share_accounts_newer_than_30_days": 0.009
+        },
+        "flagged_vs_non_flagged_lift": {
+          "share_on_new_device_for_customer": 1.0,
+          "share_with_geo_mismatch": "no_baseline_occurrences",
+          "share_spending_over_3x_own_average": "no_baseline_occurrences",
+          "share_accounts_newer_than_30_days": 104.56
+        },
+        "interpretation_note": "Compare flagged_profile against non_flagged_profile_same_merchant and weigh by n. A share computed over a handful of transactions is weak evidence however extreme it looks; a modest share over hundreds is strong. Lift near 1.0 means the flagged transactions are indistinguishable from this merchant's ordinary traffic on that dimension.",
+        "transactions": [
+          {
+            "customer": "c1666",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 3.21,
+            "account_age_days": 125.7,
+            "amount_inr": 3690.75
+          },
+          {
+            "customer": "c601",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 3.86,
+            "account_age_days": 306.9,
+            "amount_inr": 3947.6
+          },
+          {
+            "customer": "c2240",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 3.86,
+            "account_age_days": 51.5,
+            "amount_inr": 1409.35
+          },
+          {
+            "customer": "cI1",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 3.6,
+            "amount_inr": 1015.42
+          },
+          {
+            "customer": "cI2",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 3.6,
+            "amount_inr": 386.12
+          },
+          {
+            "customer": "cI7",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 4.6,
+            "amount_inr": 525.52
+          },
+          {
+            "customer": "cI8",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 1.6,
+            "amount_inr": 462.76
+          },
+          {
+            "customer": "cI9",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 4.6,
+            "amount_inr": 897.21
+          },
+          {
+            "customer": "cI10",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 0.6,
+            "amount_inr": 605.09
+          },
+          {
+            "customer": "cI11",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 4.6,
+            "amount_inr": 96.29
+          },
+          {
+            "customer": "cI12",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 1.6,
+            "amount_inr": 1560.06
+          },
+          {
+            "customer": "cI13",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 3.6,
+            "amount_inr": 187.67
+          },
+          {
+            "customer": "cI14",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 1.6,
+            "amount_inr": 500.06
+          },
+          {
+            "customer": "cI15",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 4.6,
+            "amount_inr": 606.03
+          },
+          {
+            "customer": "cI16",
+            "on_new_device": false,
+            "geo_mismatch": false,
+            "amount_vs_own_avg": 1.0,
+            "account_age_days": 4.6,
+            "amount_inr": 465.45
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "tool": "calculate_exposure",
+      "input": {
+        "merchant_id": "m7"
+      },
+      "output": {
+        "merchant_id": "m7",
+        "flagged_txn_count": 101,
+        "exposure_at_risk_inr": 94244.05,
+        "probability_weighted_expected_loss_inr": 93452.15,
+        "recoverable_via_step_up_inr": 84106.94,
+        "review_cost_if_all_reviewed_inr": 5050.0,
+        "assumptions": {
+          "step_up_fraud_blocked": 0.9,
+          "review_cost_inr": 50.0,
+          "note": "computed in Python; the model does not do this arithmetic"
+        }
+      },
+      "ok": true
+    },
+    {
+      "tool": "write_investigation_report",
+      "input": {
+        "merchant_id": "m7",
+        "cause": "ip_cluster",
+        "confidence": 0.95,
+        "evidence": [
+          "Peak flagged rate of 93.33% in a 30-txn window (1762306832), a 96x spike above baseline of 0.97% (z-score 4.66)",
+          "Attack concentrated: 101 flagged transactions out of 1,094 total (9.2% flagged rate); 118-hour span of malicious activity out of 143-hour window",
+          "IP CLUSTER_I accounts for 40 of 46 flagged customers (87%), each with unique device and card, signaling coordinated account creation",
+          "Burst pattern: peak hour hit 48 transactions; attack flagged at 1762298818 and subsided by 1762306832 (concentrated temporal window)",
+          "94.1% of flagged accounts are <30 days old (median age 2.7 days) vs 0.9% in non-flagged traffic (104.5x lift); established customer base unaffected",
+          "Geo mismatch on 56.4% of flagged transactions vs 0% on non-flagged traffic (no baseline comparator but stark deviation)",
+          "Financial exposure: \u20b994,244.05 at risk; \u20b984,106.94 recoverable via step-up authentication"
+        ],
+        "exposure_inr": 94244.05,
+        "recommended_action": "restrict"
+      },
+      "output": {
+        "merchant_id": "m7",
+        "cause": "ip_cluster",
+        "evidence": [
+          "Peak flagged rate of 93.33% in a 30-txn window (1762306832), a 96x spike above baseline of 0.97% (z-score 4.66)",
+          "Attack concentrated: 101 flagged transactions out of 1,094 total (9.2% flagged rate); 118-hour span of malicious activity out of 143-hour window",
+          "IP CLUSTER_I accounts for 40 of 46 flagged customers (87%), each with unique device and card, signaling coordinated account creation",
+          "Burst pattern: peak hour hit 48 transactions; attack flagged at 1762298818 and subsided by 1762306832 (concentrated temporal window)",
+          "94.1% of flagged accounts are <30 days old (median age 2.7 days) vs 0.9% in non-flagged traffic (104.5x lift); established customer base unaffected",
+          "Geo mismatch on 56.4% of flagged transactions vs 0% on non-flagged traffic (no baseline comparator but stark deviation)",
+          "Financial exposure: \u20b994,244.05 at risk; \u20b984,106.94 recoverable via step-up authentication"
+        ],
+        "exposure_inr": 94244.05,
+        "recommended_action": "restrict",
+        "confidence": 0.95
+      },
+      "ok": true
+    }
+  ],
+  "audit": [
+    {
+      "ts": 0,
+      "tool": "get_merchant_baseline",
+      "inputs_hash": "4979cf34b15636ee",
+      "output_hash": "915d56a3cdfe7c8d",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 1,
+      "tool": "get_entity_network",
+      "inputs_hash": "4979cf34b15636ee",
+      "output_hash": "9e343515bff433ce",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 2,
+      "tool": "get_velocity_summary",
+      "inputs_hash": "4979cf34b15636ee",
+      "output_hash": "edfb6d536f5aabc6",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 3,
+      "tool": "get_flagged_transactions",
+      "inputs_hash": "895d77e2a1d1f083",
+      "output_hash": "93ec2c1fd8c81559",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 4,
+      "tool": "get_customer_anomalies",
+      "inputs_hash": "895d77e2a1d1f083",
+      "output_hash": "868a931e05260ad9",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 5,
+      "tool": "calculate_exposure",
+      "inputs_hash": "4979cf34b15636ee",
+      "output_hash": "4d37f12664ee90e1",
+      "ok": true,
+      "error": null
+    },
+    {
+      "ts": 6,
+      "tool": "write_investigation_report",
+      "inputs_hash": "b0252dc2499387b5",
+      "output_hash": "b0252dc2499387b5",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "final_report": {
+    "merchant_id": "m7",
+    "cause": "ip_cluster",
+    "evidence": [
+      "Peak flagged rate of 93.33% in a 30-txn window (1762306832), a 96x spike above baseline of 0.97% (z-score 4.66)",
+      "Attack concentrated: 101 flagged transactions out of 1,094 total (9.2% flagged rate); 118-hour span of malicious activity out of 143-hour window",
+      "IP CLUSTER_I accounts for 40 of 46 flagged customers (87%), each with unique device and card, signaling coordinated account creation",
+      "Burst pattern: peak hour hit 48 transactions; attack flagged at 1762298818 and subsided by 1762306832 (concentrated temporal window)",
+      "94.1% of flagged accounts are <30 days old (median age 2.7 days) vs 0.9% in non-flagged traffic (104.5x lift); established customer base unaffected",
+      "Geo mismatch on 56.4% of flagged transactions vs 0% on non-flagged traffic (no baseline comparator but stark deviation)",
+      "Financial exposure: \u20b994,244.05 at risk; \u20b984,106.94 recoverable via step-up authentication"
+    ],
+    "exposure_inr": 94244.05,
+    "recommended_action": "restrict",
+    "confidence": 0.95
+  },
+  "validated_action": "restrict"
+}

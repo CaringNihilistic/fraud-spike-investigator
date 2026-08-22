@@ -37,7 +37,7 @@ from src.features.builder import FEATURE_COLS, build_features  # noqa: E402
 from src.models.select_model import (build_gbdt, get_selected_model_name,  # noqa: E402
                                       pos_weight, temporal_split)
 from src.policy.engine import ALLOWLIST  # noqa: E402
-from src.sim.simulator import generate  # noqa: E402
+from src.sim.simulator import generate, generate_holdout  # noqa: E402
 
 OUT = Path("artifacts_out")
 OUT.mkdir(exist_ok=True)
@@ -114,16 +114,46 @@ CASES = [
 ]
 
 
-def build_context() -> InvestigationContext:
-    """Score the test slice exactly as train.py does, then expose it read-only."""
+# Three HELD-OUT cases on a different world (new seed, different merchants).
+# They influenced no design decision - added after the tool set was frozen,
+# and scored exactly once. The ten cases above were looked at while building
+# tools, so they can no longer measure generalisation.
+HOLDOUT_CASES = [
+    {"case": "holdout_device_farm", "merchant": "m0", "cause": "device_farm",
+     "expected_action": "restrict", "low_signal": False},
+    {"case": "holdout_fraud_ring", "merchant": "m4", "cause": "fraud_ring",
+     "expected_action": "restrict", "low_signal": False},
+    {"case": "holdout_quiet", "merchant": "m10", "cause": "legitimate_traffic",
+     "expected_action": "allow", "low_signal": True},
+]
+
+
+def _fit_scorer():
+    """Train on the ORIGINAL seed-7 train slice; return (model, iso, splits)."""
     df = build_features(generate(seed=7))
     train, cal, test = temporal_split(df)
     model = build_gbdt(get_selected_model_name(), pos_weight(train.is_fraud))
     model.fit(train[FEATURE_COLS], train.is_fraud)
     iso = IsotonicRegression(out_of_bounds="clip")
     iso.fit(model.predict_proba(cal[FEATURE_COLS])[:, 1], cal.is_fraud)
+    return model, iso, test
+
+
+def build_context() -> InvestigationContext:
+    """Score the test slice exactly as train.py does, then expose it read-only."""
+    model, iso, test = _fit_scorer()
     p = iso.predict(model.predict_proba(test[FEATURE_COLS])[:, 1])
     return InvestigationContext(test.assign(p=p))
+
+
+def build_holdout_context() -> InvestigationContext:
+    """Score a FRESH world with the same shipped model - genuinely held out:
+    new data the model never saw, scored by the model we actually ship."""
+    model, iso, _ = _fit_scorer()
+    hdf = build_features(generate_holdout(seed=99))
+    _tr, _cal, htest = temporal_split(hdf)
+    p = iso.predict(model.predict_proba(htest[FEATURE_COLS])[:, 1])
+    return InvestigationContext(htest.assign(p=p))
 
 
 def score_case(case: dict, result) -> dict:
@@ -165,11 +195,16 @@ def main():
     print("=== agent eval: 10 fixed cases ===")
     ctx = build_context()
 
+    print("--- building held-out context (new seed, unseen merchants) ---")
+    hctx = build_holdout_context()
+
     rows, audit_rows = [], []
-    for case in CASES:
+    for case in CASES + HOLDOUT_CASES:
+        use = hctx if case in HOLDOUT_CASES else ctx
         with ToolRecorder() as rec:
-            res = investigate(ctx, case["merchant"])
-        rows.append(score_case(case, res))
+            res = investigate(use, case["merchant"])
+        sc = score_case(case, res); sc["held_out"] = int(case in HOLDOUT_CASES)
+        rows.append(sc)
         for e in res.audit.to_records():
             audit_rows.append({"case": case["case"], **e})
 
@@ -183,6 +218,7 @@ def main():
                    "tool_calls": rec.calls,
                    "audit": res.audit.to_records(),
                    "final_report": res.report,
+                   "held_out": case in HOLDOUT_CASES,
                    "validated_action": res.validated_action.value},
                   open(TRANSCRIPTS / f"{case['case']}.json", "w"), indent=2, default=str)
 
