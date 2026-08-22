@@ -111,7 +111,11 @@ architecture (auditability, reachable fail-safe, headroom for a weaker model),
 NOT for metrics. Say so plainly; do not re-frame it as a win.
 P2 agent eval (LIVE Claude Haiku 4.5, DE-LABELLED data, run D = FINAL):
 8/13 correct cause (2/3 held-out), 100/100 evidence claims traceable,
-escalates-when-unsure 13/13, policy violations 0/13. Five-run progression
+escalates-when-unsure 13/13, policy violations 0/13, UNSAFE ACTIONS 0/13
+(no attack ever got `allow`; all de-escalations were on attacks whose current
+flagged rate was 0.0 = already ended). correct_action 6/13 partly measures
+LABEL DESIGN — expected_action predates peak-vs-current visibility. Do NOT
+"fix" it by editing expected_action labels. Five-run progression
 A->B1->B->C->D preserved in artifacts_out/eval_runs/ — run A (9/10) is
 PRE-de-labelling and must always be labelled as such; most of that score was
 semantic-ID leakage. DESIGN IS FROZEN: no further tool/prompt/weighting

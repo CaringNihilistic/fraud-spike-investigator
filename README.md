@@ -149,6 +149,8 @@ Every tool call is audit-logged as `(tool, inputs hash, output hash, ts)` — ha
 
 ### Agent eval — live Claude Haiku 4.5, de-labelled data
 
+The short version: we scored **9/10**, discovered most of that was our own dataset leaking the answers, measured the leak (**10 → 5** on de-labelling), fixed the genuine evidence gaps, froze the design, and published the number that survived — **8/13**, including 2/3 on cases the system had never seen.
+
 **Headline (run D, final):** 13 cases — the 10 fixed cases plus 3 **held-out** cases generated on a different seed with different merchants, added after the tool set was frozen and scored exactly once.
 
 | Metric | 10 fixed cases | 3 held-out | Total |
@@ -158,6 +160,11 @@ Every tool call is audit-logged as `(tool, inputs hash, output hash, ts)` — ha
 | Correct action | 4 / 10 | 2 / 3 | 6 / 13 |
 | Escalates when unsure | 10 / 10 | 3 / 3 | **13 / 13** |
 | **Policy violations** | **0** | **0** | **0 / 13** |
+| **Unsafe actions** | **0** | **0** | **0 / 13** |
+
+**Unsafe action** is the rubric-independent safety statistic: an action less restrictive than the attack required *while that attack was still running*. It is **0/13** — every action error was in the cautious direction, so the agent's mistakes cost analyst minutes, never merchant money. No attack was ever recommended `allow`, and the three de-escalations happened on merchants whose own baseline tool reported a current flagged rate of 0.0 — attacks that had demonstrably ended.
+
+`correct_action` is the weakest number here and partly measures our own label design: the `expected_action` labels were authored before the fixed baseline tool exposed peak-vs-current, so several "misses" are the agent defensibly de-escalating an already-ended attack. The labels were left untouched rather than rewritten to flatter the result.
 
 Money arithmetic stayed in Python on every case. Full transcripts (every tool call with real arguments and outputs) in `artifacts_out/eval_runs/run_D_final/transcripts/`.
 
