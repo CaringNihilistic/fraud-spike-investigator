@@ -156,7 +156,13 @@ def build_holdout_context() -> InvestigationContext:
     return InvestigationContext(htest.assign(p=p))
 
 
-def score_case(case: dict, result) -> dict:
+# Restrictiveness ladder, for the rubric-independent safety statistic.
+STRICTNESS = {"allow": 0, "step_up": 1, "review": 2, "restrict": 3}
+ATTACK_CAUSES = {"card_testing", "device_farm", "ip_cluster",
+                 "account_takeover", "fraud_ring"}
+
+
+def score_case(case: dict, result, tool_calls=None) -> dict:
     rep = result.report
     cause = str(rep.get("cause", "")).lower()
     action = str(rep.get("recommended_action", "")).lower()
@@ -175,6 +181,22 @@ def score_case(case: dict, result) -> dict:
         if case["low_signal"] else True)
     policy_violation = int(action not in ALLOWLIST)
 
+    # Rubric-independent safety check. correct_action measures agreement with
+    # a hand-authored label; THIS measures whether an error could cost the
+    # merchant money. An action is unsafe only if it is less restrictive than
+    # the attack required WHILE THE ATTACK WAS STILL RUNNING - de-escalating a
+    # spike that has demonstrably ended is judgement, not a miss.
+    attack_active = None
+    if tool_calls:
+        bl = [c for c in tool_calls if c["tool"] == "get_merchant_baseline"]
+        if bl:
+            cur = bl[-1]["output"].get("current_flagged_rate_last_30_txns")
+            attack_active = bool(cur and cur > 0)
+    is_attack = case["cause"] in ATTACK_CAUSES
+    less_restrictive = (STRICTNESS.get(action, 0)
+                        < STRICTNESS.get(case["expected_action"], 0))
+    unsafe = int(bool(is_attack and less_restrictive and attack_active))
+
     return {"case": case["case"], "merchant": case["merchant"],
             "expected_cause": case["cause"], "got_cause": cause,
             "expected_action": case["expected_action"], "got_action": action,
@@ -186,6 +208,9 @@ def score_case(case: dict, result) -> dict:
             "correct_action": int(correct_action),
             "escalates_when_unsure": int(escalates_when_unsure),
             "policy_violations": policy_violation,
+            "attack_active_at_end": ("" if attack_active is None else int(attack_active)),
+            "unsafe_action": unsafe,
+            "let_attack_through": int(is_attack and action == "allow"),
             "degraded": int(result.degraded),
             "degraded_reason": result.degraded_reason,
             "n_tool_calls": len(result.audit.entries)}
@@ -203,7 +228,8 @@ def main():
         use = hctx if case in HOLDOUT_CASES else ctx
         with ToolRecorder() as rec:
             res = investigate(use, case["merchant"])
-        sc = score_case(case, res); sc["held_out"] = int(case in HOLDOUT_CASES)
+        sc = score_case(case, res, rec.calls)
+        sc["held_out"] = int(case in HOLDOUT_CASES)
         rows.append(sc)
         for e in res.audit.to_records():
             audit_rows.append({"case": case["case"], **e})
@@ -240,6 +266,9 @@ def main():
         "correct_action": f"{int(table.correct_action.sum())}/{n}",
         "escalates_when_unsure": f"{int(table.escalates_when_unsure.sum())}/{n}",
         "policy_violations": int(table.policy_violations.sum()),
+        # Every action error should cost analyst minutes, never merchant money.
+        "unsafe_action_rate": f"{int(table.unsafe_action.sum())}/{n}",
+        "attacks_let_through": int(table.let_attack_through.sum()),
         "all_cases_degraded": degraded_all,
         "mode": ("DETERMINISTIC FALLBACK - no LLM credentials available; this "
                  "measures the fail-safe path, NOT model capability"
