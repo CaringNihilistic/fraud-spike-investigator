@@ -4,8 +4,13 @@
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 const html = htm.bind(React.createElement);
 
-const api = async (path, opts) => {
-  const r = await fetch(path, opts);
+// Write key, injected same-origin by GET / (see src/serve/api.py). Mutating
+// endpoints reject requests without it, so the board can act but a stray
+// caller on the network cannot override an analyst decision.
+const KEY = (document.querySelector('meta[name="fsi-key"]') || {}).content || '';
+
+const api = async (path, opts = {}) => {
+  const r = await fetch(path, { ...opts, headers: { 'X-API-Key': KEY, ...(opts.headers || {}) } });
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json();
 };
@@ -49,6 +54,15 @@ function usePoll(path, ms, deps = []) {
 /* ------------------------------------------------------------ header */
 function Header({ status, onSpeed, onPause }) {
   const s = status || {};
+  // local echo + debounce: the label tracks the thumb instantly, but the POST
+  // fires only when the user settles (a drag would otherwise fire dozens)
+  const [spd, setSpd] = useState(null);
+  const timer = useRef(null);
+  const onSlide = (v) => {
+    setSpd(v);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => { onSpeed(v); setTimeout(() => setSpd(null), 1500); }, 350);
+  };
   return html`
     <header>
       <div class="brand">
@@ -65,9 +79,9 @@ function Header({ status, onSpeed, onPause }) {
         ${s.review_pending ? html`${' · '}<span style=${{color:'var(--amber)'}}>${s.review_pending} awaiting review</span>` : ''}
       </span>
       <label class="sub">speed
-        <input type="range" min="50" max="4000" step="50" value=${s.speed_tps || 200}
-               onChange=${(e) => onSpeed(+e.target.value)} style=${{ width: '120px', marginLeft: '6px' }} />
-        <span class="mono"> ${Math.round(s.speed_tps || 0)}/s</span>
+        <input type="range" min="50" max="4000" step="50" value=${spd ?? (s.speed_tps || 200)}
+               onChange=${(e) => onSlide(+e.target.value)} style=${{ width: '120px', marginLeft: '6px' }} />
+        <span class="mono"> ${Math.round(spd ?? s.speed_tps ?? 0)}/s</span>
       </label>
       <button onClick=${() => onPause(!s.paused)}>${s.paused ? '▶ resume' : '⏸ pause'}</button>
     </header>`;
@@ -95,16 +109,16 @@ function MerchantCard({ m, selected, onSelect }) {
         <i class=${peakPct < 1 ? 'zero' : ''}
            style=${{ width: Math.min(100, peakPct) + '%', background: rateColor(m.peak_rate_ever) }}></i>
       </div>
-      <div class="stat hero"><span class="k">peak flagged rate</span>
+      <div class="stat hero"><span class="k" title="Worst 30-transaction window in this merchant's history: what share of them the ML scorer flagged as high risk. This is the number the spike detector watches.">peak flagged rate</span>
         <span class="v" style=${{ color: rateColor(m.peak_rate_ever) }}>
           ${(m.peak_rate_ever * 100).toFixed(0)}%</span></div>
-      <div class="stat"><span class="k">spike z-score</span>
+      <div class="stat"><span class="k" title="How many standard deviations the flagged rate rose above this merchant's own normal. The detector fires at z >= 4.">spike z-score</span>
         <span class=${'v ' + (m.peak_z_ever >= 4 ? 'delta up' : 'delta flat')}>
           ${m.peak_z_ever >= 4 ? `z=${m.peak_z_ever} · fired` : `z=${m.peak_z_ever} · below threshold`}</span></div>
-      <div class="stat"><span class="k">now / baseline</span>
+      <div class="stat"><span class="k" title="Flagged rate right now (last 30 txns) vs this merchant's long-run normal. High peak + low now = an attack that already ended.">now / baseline</span>
         <span class="v" style=${{ color: 'var(--dim)' }}>
           ${(d.current_rate * 100).toFixed(1)}% vs ${(d.baseline_rate * 100).toFixed(1)}%</span></div>
-      <div class="stat"><span class="k">₹ exposure</span><span class="v">${inr(m.exposure_inr)}</span></div>
+      <div class="stat"><span class="k" title="Total value of this merchant's flagged transactions - the money at stake if nothing is done.">₹ exposure</span><span class="v">${inr(m.exposure_inr)}</span></div>
       <div class="stat"><span class="k">txns at risk</span>
         <span class="v">${m.flagged_count} / ${m.txn_count}</span></div>
       ${m.top_cause ? html`<div class="stat"><span class="k">cause</span>
@@ -116,10 +130,21 @@ function MerchantCard({ m, selected, onSelect }) {
 /* Deliberately a tiny hand-rolled force layout rather than a graph library:
    ~30 lines, no dependency, and enough to show the shape that matters —
    a few entities fanning out across many accounts. */
-function EntityGraph({ merchantId }) {
+function EntityGraph({ merchantId, compact }) {
   const [graph] = usePoll(`/api/merchants/${merchantId}/entity-graph`, 3000, [merchantId]);
   const [pos, setPos] = useState([]);
+  const [hover, setHover] = useState(null);
   const raf = useRef(null);
+  // neighbours of the hovered node, so its part of the network lights up
+  const nb = useMemo(() => {
+    if (!hover || !graph) return null;
+    const set = new Set([hover]);
+    for (const l of graph.links) {
+      if (l.source === hover) set.add(l.target);
+      if (l.target === hover) set.add(l.source);
+    }
+    return set;
+  }, [hover, graph]);
 
   useEffect(() => {
     if (!graph || !graph.nodes.length) { setPos([]); return; }
@@ -177,7 +202,7 @@ function EntityGraph({ merchantId }) {
 
   if (!graph) return html`<div class="empty">loading…</div>`;
   if (!graph.nodes.length)
-    return html`<div class="empty">
+    return html`<div class=${'empty' + (compact ? ' empty-compact' : '')}>
       No shared entities among flagged transactions — every account uses its own
       device, IP and instrument. This is what legitimate traffic looks like.
     </div>`;
@@ -185,35 +210,43 @@ function EntityGraph({ merchantId }) {
   const idx = new Map(graph.nodes.map((n, i) => [n.id, i]));
   return html`
     <div>
-      <svg class="graph" viewBox="0 0 720 400" preserveAspectRatio="xMidYMid meet">
+      <svg class=${'graph' + (compact ? ' compact' : '')} viewBox="0 0 720 400" preserveAspectRatio="xMidYMid meet">
         ${graph.links.map((l, i) => {
           const a = pos[idx.get(l.source)], b = pos[idx.get(l.target)];
-          return a && b ? html`<line key=${i} x1=${a.x} y1=${a.y} x2=${b.x} y2=${b.y} />` : null;
+          if (!a || !b) return null;
+          const hot = hover && (l.source === hover || l.target === hover);
+          return html`<line key=${i} x1=${a.x} y1=${a.y} x2=${b.x} y2=${b.y}
+            stroke=${hot ? 'var(--rzp-blue)' : undefined}
+            stroke-width=${hot ? 1.8 : 1}
+            opacity=${hover && !hot ? 0.15 : 1} />`;
         })}
         ${pos.map((p, i) => {
           const hub = p.n.kind !== 'customer';
           const r = hub ? Math.min(17, 7 + p.n.size * 0.8) : 4;
+          const dim = nb && !nb.has(p.n.id);
           return html`
-          <g key=${i}>
+          <g key=${i} opacity=${dim ? 0.18 : 1}
+             onMouseEnter=${() => setHover(p.n.id)} onMouseLeave=${() => setHover(null)}
+             style=${{ cursor: 'pointer' }}>
             <circle class=${p.n.kind} cx=${p.x} cy=${p.y} r=${r}
-                    stroke=${hub ? 'rgba(255,255,255,.55)' : 'none'} stroke-width=${hub ? 1.5 : 0}>
-              <title>${p.n.kind}: ${p.n.label}${p.n.size > 1 ? ` — ${p.n.size} accounts` : ''}</title>
+                    stroke=${hub ? '#FFFFFF' : 'none'} stroke-width=${hub ? 2 : 0}>
+              <title>${p.n.kind}: ${p.n.label}${p.n.size > 1 ? ` — shared by ${p.n.size} accounts. Hover to highlight its network.` : ''}</title>
             </circle>
             ${hub ? html`
               <text x=${p.x} y=${p.y + r + 12} text-anchor="middle"
-                    style=${{ paintOrder: 'stroke', stroke: '#050933', strokeWidth: '3px' }}>
+                    style=${{ paintOrder: 'stroke', stroke: '#F8FAFD', strokeWidth: '3px' }}>
                 ${p.n.label.slice(0, 14)} · ${p.n.size}</text>` : ''}
           </g>`; })}
       </svg>
-      <div class="legend">
+      ${compact ? '' : html`<div class="legend">
         <span><i style=${{ background: 'var(--red)' }}></i>device</span>
         <span><i style=${{ background: 'var(--amber)' }}></i>IP</span>
-        <span><i style=${{ background: 'var(--purple)' }}></i>instrument</span>
+        <span><i style=${{ background: 'var(--violet)' }}></i>instrument</span>
         <span><i style=${{ background: '#4b5c6b' }}></i>account</span>
         <span style=${{ marginLeft: 'auto' }}>node size = accounts sharing it</span>
       </div>
       <div class="note">${graph.note}. A ring or farm shows as few large hubs with
-        many accounts attached; ordinary traffic shows as nothing at all.</div>
+        many accounts attached; ordinary traffic shows as nothing at all.</div>`}
     </div>`;
 }
 
@@ -293,9 +326,10 @@ function Investigation({ merchantId, inSpike }) {
 function ReviewQueue() {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(null);
+  const [pendingOnly, setPendingOnly] = useState(true);
   const load = useCallback(async () => {
-    try { setData(await api('/api/review-queue?pending_only=false')); } catch {}
-  }, []);
+    try { setData(await api(`/api/review-queue?pending_only=${pendingOnly}`)); } catch {}
+  }, [pendingOnly]);
   useEffect(() => { load(); const id = setInterval(load, 2500); return () => clearInterval(id); }, [load]);
 
   const act = async (id, action) => {
@@ -308,10 +342,16 @@ function ReviewQueue() {
   if (!cases.length) return html`<div class="empty">Review queue empty.</div>`;
   return html`
     <div>
-      <div class="note" style=${{ marginTop: 0, marginBottom: '10px' }}>
-        <b style=${{ color: 'var(--amber)' }}>${data.pending} pending</b>
-        ${` of ${data.total_cases ?? data.cases.length} total cases. `}
-        Every restrict and review requires a human — the system holds, it does not act alone.
+      <div style=${{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+        <div class="note" style=${{ marginTop: 0 }}>
+          <b style=${{ color: 'var(--amber)' }}>${data.pending} pending</b>
+          ${` of ${data.total_cases ?? data.cases.length} total cases. `}
+          Every restrict and review requires a human — the system holds, it does not act alone.
+        </div>
+        <button class=${'chip sm' + (pendingOnly ? ' active' : '')}
+                style=${{ marginLeft: 'auto' }}
+                onClick=${() => setPendingOnly(!pendingOnly)}>
+          ${pendingOnly ? 'showing pending' : 'showing all'}</button>
       </div>
       <div class="scroll">
         <table>
@@ -329,11 +369,18 @@ function ReviewQueue() {
                            ${c.overridden ? html`<span class="note" style=${{ display: 'inline' }}> override</span>` : ''}`
                     : html`<span class="note">pending</span>`}</td>
               <td>${c.analyst_action ? '' : html`
-                <div style=${{ display: 'flex', gap: '4px' }}>
+                <div style=${{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                   <button class="sm ok" disabled=${busy === c.case_id}
+                          title=${'confirm the system action: ' + c.system_action}
                           onClick=${() => act(c.case_id, c.system_action)}>approve</button>
-                  <button class="sm" disabled=${busy === c.case_id}
-                          onClick=${() => act(c.case_id, 'allow')}>override→allow</button>
+                  <select class="sm-select" disabled=${busy === c.case_id} value=""
+                          title="override with any allowlisted action - the server rejects anything else"
+                          onChange=${(e) => { const v = e.target.value; if (v) act(c.case_id, v); }}>
+                    <option value="" disabled>override…</option>
+                    ${['allow', 'step_up', 'review', 'restrict']
+                       .filter((a) => a !== c.system_action)
+                       .map((a) => html`<option key=${a} value=${a}>${a.replace('_', ' ')}</option>`)}
+                  </select>
                 </div>`}</td>
             </tr>`)}</tbody>
         </table>
@@ -353,6 +400,56 @@ function Feed({ events }) {
           <span class=${'kind ' + e.kind}>${e.kind}</span>
           <span>${e.message}</span>
         </div>`)}
+    </div>`;
+}
+
+/* --------------------------------------------- the closing argument
+   Two merchants, the SAME volume spike shape, opposite entity structure,
+   opposite decision. This is the whole thesis in one frame: the detector
+   fires on fraud-score RATE, not traffic, so a 6x legitimate sale and a
+   device farm are told apart by what is behind the transactions - not by
+   how many there are. Rendered from live state, not hardcoded. */
+function ContrastSide({ m, tone, headline, sub }) {
+  if (!m) return html`<div class="empty">waiting…</div>`;
+  const restricts = (m.action_mix || {}).restrict || 0;
+  return html`
+    <div class=${'side ' + tone}>
+      <div class="side-top">
+        <span class="side-id">${m.merchant_id}</span>
+        <span class=${'badge ' + (tone === 'bad' ? 'spike' : 'legit')}>${headline}</span>
+      </div>
+      <div class="side-sub">${sub}</div>
+      <div class="stat"><span class="k">transactions</span><span class="v">${(m.txn_count || 0).toLocaleString()}</span></div>
+      <div class="stat"><span class="k">peak flagged rate</span>
+        <span class="v" style=${{ color: tone === 'bad' ? 'var(--red)' : 'var(--green)' }}>
+          ${((m.peak_rate_ever || 0) * 100).toFixed(0)}%</span></div>
+      <div class="stat"><span class="k">peak spike z</span><span class="v">${(m.peak_z_ever ?? 0).toFixed(2)}</span></div>
+      <div class="stat"><span class="k">transactions restricted</span>
+        <span class="v" style=${{ color: restricts ? 'var(--red)' : 'var(--green)' }}>${restricts}</span></div>
+      <div class="side-graph"><${EntityGraph} merchantId=${m.merchant_id} compact=${true} /></div>
+    </div>`;
+}
+
+function Contrast({ merchants }) {
+  const farm = merchants.find((m) => m.merchant_id === 'm5');
+  const sale = merchants.find((m) => m.merchant_id === 'm11');
+  if (!farm || !sale) return '';
+  return html`
+    <div class="panel contrast-panel">
+      <h2>same spike, opposite verdict — why volume is not evidence</h2>
+      <div class="note" style=${{ marginTop: 0, marginBottom: '14px' }}>
+        Both merchants show a large jump in transaction volume — and the${' '}
+        <b>legitimate</b>${' '}one is the busier of the two. A volume-threshold detector
+        flags both. Ours flags one, because it fires on the fraud-score${' '}
+        <b>rate</b>${' '}and then asks${' '}<b>who is behind the transactions</b>.
+      </div>
+      <div class="contrast">
+        <${ContrastSide} m=${farm} tone="bad" headline="attack · restricted"
+          sub="Device farm — a handful of devices driving dozens of accounts." />
+        <div class="vs">vs</div>
+        <${ContrastSide} m=${sale} tone="good" headline="legitimate · untouched"
+          sub="Flash sale — 6× traffic, every account its own device and IP." />
+      </div>
     </div>`;
 }
 
@@ -380,6 +477,17 @@ function App() {
   const setSpeed = (v) => post(`/api/replay/speed?speed=${v}`).catch(() => {});
   const setPause = (p) => post(`/api/replay/pause?paused=${p}`).catch(() => {});
 
+  // status filter for the merchant grid + click-to-inspect scrolls to detail
+  const [filter, setFilter] = useState('all');
+  const nAttack = merchants.filter((m) => m.in_spike).length;
+  const shown = merchants.filter((m) =>
+    filter === 'attack' ? m.in_spike : filter === 'clear' ? !m.in_spike : true);
+  const inspect = (id) => {
+    setSel(id);
+    const el = document.getElementById('detail');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return html`
     <div>
       <${Header} status=${status} onSpeed=${setSpeed} onPause=${setPause} />
@@ -390,15 +498,27 @@ function App() {
             <span class="why">— volume spiked 6×, the fraud-score rate did not.
               The detector fires on risk, not traffic.</span>
           </div>` : ''}
+        ${finale ? html`<${Contrast} merchants=${merchants} />` : ''}
         <div class="panel" style=${{ marginBottom: '14px' }}>
           <h2>merchants</h2>
+          <div class="chips">
+            <button class=${'chip' + (filter === 'all' ? ' active' : '')}
+                    onClick=${() => setFilter('all')}>All ${' '}<span class="n">${merchants.length}</span></button>
+            <button class=${'chip' + (filter === 'attack' ? ' active' : '')}
+                    onClick=${() => setFilter('attack')}>Under attack ${' '}<span class="n">${nAttack}</span></button>
+            <button class=${'chip' + (filter === 'clear' ? ' active' : '')}
+                    onClick=${() => setFilter('clear')}>Clear ${' '}<span class="n">${merchants.length - nAttack}</span></button>
+            <span class="note" style=${{ marginTop: '6px', marginLeft: 'auto' }}>
+              click a merchant to inspect · hover any dotted label for what it means
+            </span>
+          </div>
           <div class="grid cols-3">
-            ${merchants.map((m) => html`
+            ${shown.map((m) => html`
               <${MerchantCard} key=${m.merchant_id} m=${m}
-                selected=${sel === m.merchant_id} onSelect=${setSel} />`)}
+                selected=${sel === m.merchant_id} onSelect=${inspect} />`)}
           </div>
         </div>
-        <div class="grid cols-2">
+        <div class="grid cols-2" id="detail">
           <div class="panel">
             <h2>entity network ${sel ? `— ${sel}` : ''}</h2>
             <div class="note" style=${{ marginTop: 0, marginBottom: '10px' }}>
