@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.policy.engine import ALLOWLIST, Action
-from src.serve.api import app
+from src.serve.api import API_KEY, app
 from src.serve.state import STATE, PipelineState
 
 
@@ -29,6 +29,13 @@ def clean_state(monkeypatch):
 
 @pytest.fixture
 def client():
+    """Authenticated client. Mutating routes require the write key - the
+    unauthenticated case is asserted explicitly below, not by accident."""
+    return TestClient(app, headers={"X-API-Key": API_KEY})
+
+
+@pytest.fixture
+def anon():
     return TestClient(app)
 
 
@@ -166,3 +173,42 @@ def test_entity_graph_surfaces_a_shared_hub(client):
 def test_investigation_404_before_one_exists(client):
     _seed_txn("m1")
     assert client.get("/api/merchants/m1/investigation").status_code == 404
+
+
+# ---------------------------------------------------------------- auth gate
+def test_write_endpoints_reject_an_unauthenticated_caller(anon):
+    """Anything that moves money-affecting state needs the key. A caller who
+    can reach the port must not be able to override an analyst."""
+    _seed_txn()
+    case_id = 1
+    writes = [
+        ("/api/replay/pause", None),
+        ("/api/replay/speed?speed=500", None),
+        ("/api/merchants/m1/investigate", None),
+        (f"/api/review-queue/{case_id}/decision", {"action": "allow"}),
+        ("/api/transactions", {"merchant_id": "m1", "customer_id": "c", "device_id": "d",
+                               "ip": "i", "instrument_id": "pi", "amount": 100.0,
+                               "ts": 1_760_000_000, "p_fraud": 0.9}),
+    ]
+    for path, body in writes:
+        r = anon.post(path, json=body)
+        assert r.status_code == 401, f"{path} answered {r.status_code}, expected 401"
+
+
+def test_a_wrong_key_is_rejected(anon):
+    r = anon.post("/api/replay/pause", headers={"X-API-Key": "not-the-key"})
+    assert r.status_code == 401
+
+
+def test_read_endpoints_stay_open(anon):
+    """Views are deliberately unauthenticated - a judge can curl the state."""
+    _seed_txn()
+    for path in ("/api/health", "/api/status", "/api/merchants",
+                 "/api/review-queue", "/api/audit-log"):
+        assert anon.get(path).status_code == 200, path
+
+
+def test_index_hands_the_write_key_to_the_page(anon):
+    """The SPA gets the key same-origin so the demo needs no setup step."""
+    body = anon.get("/").text
+    assert 'name="fsi-key"' in body and API_KEY in body
