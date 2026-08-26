@@ -21,6 +21,14 @@ per-transaction PR-AUC. A classifier can score every fraud txn well and a
 merchant can still be attacked for hours before anyone notices - stage 4 is
 what closes that gap.
 
+IMPORTANT - read the stage-2 -> stage-3 jump with care. Two of the ten
+features in the ENTITY_GRAPH bucket (customer_age_days, amount_dev_ratio) are
+per-customer PROFILE features, not entity-correlation features, and our own
+simulator makes them near-label proxies. `python -m src.models.leakage_probe`
+measures this: those two features alone score 0.9328 against the full
+pipeline's 0.9344. The DIAGNOSTIC rows below are printed with the ladder so
+nobody can read the table without also reading the caveat.
+
 Run: python -m src.models.ablation
 """
 from __future__ import annotations
@@ -55,6 +63,19 @@ STAGES = [
     ("1_basics", BASICS),
     ("2_plus_velocity", BASICS + VELOCITY),
     ("3_plus_entity_graph", BASICS + VELOCITY + ENTITY_GRAPH),  # = full 22-feature set
+]
+
+# Not part of the ladder - these decompose stage 3 to show WHERE its lift comes
+# from. Kept in this file (rather than only in leakage_probe.py) so that
+# ablation_table.csv, which is what the README quotes, cannot be read without
+# them. See failure-log 21.
+LABEL_PROXY_SUSPECTS = ["customer_age_days", "amount_dev_ratio"]
+ENTITY_SHARING = ["device_account_count", "ip_account_count",
+                  "instrument_customer_count", "component_size"]
+DIAGNOSTICS = [
+    ("D1_profile_proxies_only", LABEL_PROXY_SUSPECTS),
+    ("D2_entity_sharing_only", ENTITY_SHARING),
+    ("D3_full_minus_proxies", None),  # filled in main(): all 22 minus the two proxies
 ]
 
 ATTACK_MERCHANTS = {"s1_fraud_spike": "m3", "s2_device_farm": "m5", "s3_ip_cluster": "m7",
@@ -134,6 +155,20 @@ def main():
     stage4.update(stage="4_full_system", n_features=rows[-1]["n_features"], pr_auc=rows[-1]["pr_auc"])
     rows.append(stage4)
     print(json.dumps(stage4, indent=2))
+
+    # --- diagnostics: decompose stage 3. See module docstring + failure-log 21. ---
+    print()
+    print("--- diagnostics (NOT ladder stages): where does stage 3 lift come from? ---")
+    for label, cols in DIAGNOSTICS:
+        if cols is None:  # D3
+            cols = [c for c in STAGES[-1][1] if c not in LABEL_PROXY_SUSPECTS]
+        metrics, _ = _fit_eval(cols, train, cal, test, model_name)
+        metrics["stage"] = label
+        rows.append(metrics)
+        print(f"  {label:<26} n={metrics['n_features']:<3} pr_auc={metrics['pr_auc']}")
+    print("  -> two PROFILE features reproduce the 22-feature headline; entity SHARING")
+    print("     alone is real but adds little on top of them. Full audit:")
+    print("     python -m src.models.leakage_probe")
 
     table = pd.DataFrame(rows)
     col_order = ["stage", "n_features", "pr_auc", "precision", "recall",
