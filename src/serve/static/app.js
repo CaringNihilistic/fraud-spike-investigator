@@ -23,6 +23,10 @@ const inr = (n) => {
   return '₹' + n.toFixed(0);
 };
 const riskColor = (r) => (r >= 85 ? 'var(--red)' : r >= 25 ? 'var(--amber)' : 'var(--green)');
+/* Colour by merchant-level flagged RATE (0-1), which is the signal the spike
+   detector actually fires on — not a single transaction's score. */
+const rateColor = (rate) => (rate >= 0.4 ? 'var(--red)'
+  : rate >= 0.15 ? 'var(--amber)' : 'var(--green)');
 
 /* poll a JSON endpoint on an interval; pauses when the tab is hidden */
 function usePoll(path, ms, deps = []) {
@@ -47,13 +51,18 @@ function Header({ status, onSpeed, onPause }) {
   const s = status || {};
   return html`
     <header>
-      <h1>Fraud Spike Investigator</h1>
-      <span class="sub">merchant-level detection · entity correlation · policy-gated investigation</span>
+      <div class="brand">
+        <div class="mark">R</div>
+        <div>
+          <h1>Fraud Spike Investigator</h1>
+          <div class="sub">merchant-level detection · entity correlation · policy-gated investigation</div>
+        </div>
+      </div>
       <span class="spacer"></span>
-      <span class="sub mono">
-        ${(s.processed || 0).toLocaleString()} / ${(s.total || 0).toLocaleString()} txns
-        · ${(s.pct || 0).toFixed(1)}%
-        ${s.merchants_in_spike ? html`· <b style=${{ color: 'var(--red)' }}>${s.merchants_in_spike} spiking</b>` : ''}
+      <span class="counter mono">
+        ${`${(s.processed || 0).toLocaleString()} / ${(s.total || 0).toLocaleString()} txns · ${(s.pct || 0).toFixed(0)}%`}
+        ${s.merchants_in_spike ? html`${' · '}<b>${s.merchants_in_spike} under attack</b>` : ''}
+        ${s.review_pending ? html`${' · '}<span style=${{color:'var(--amber)'}}>${s.review_pending} awaiting review</span>` : ''}
       </span>
       <label class="sub">speed
         <input type="range" min="50" max="4000" step="50" value=${s.speed_tps || 200}
@@ -67,36 +76,39 @@ function Header({ status, onSpeed, onPause }) {
 /* ------------------------------------------------------------ merchants */
 function MerchantCard({ m, selected, onSelect }) {
   const d = m.fraud_rate || {};
-  const isFlash = m.merchant_id === 'm11';
-  const cls = ['mcard', m.in_spike ? 'spiking' : '', selected ? 'selected' : ''].join(' ');
+  const isFlash = m.merchant_id === 'm11' && m.txn_count > 300;
+  const peakPct = (m.peak_rate_ever || 0) * 100;
+  const cls = ['mcard', m.in_spike ? 'spiking' : '',
+               isFlash && !m.in_spike ? 'flash' : '',
+               selected ? 'selected' : ''].join(' ');
   return html`
     <div class=${cls} onClick=${() => onSelect(m.merchant_id)}>
       <div class="top">
         <span class="mid">${m.merchant_id}</span>
         ${m.in_spike
           ? html`<span class="badge spike">under attack</span>`
-          : isFlash && m.txn_count > 300
-            ? html`<span class="badge legit">flash sale · clear</span>`
+          : isFlash
+            ? html`<span class="badge legit">6× flash sale · not flagged</span>`
             : html`<span class="badge clear">normal</span>`}
       </div>
       <div class="gauge">
-        <i style=${{ width: Math.min(100, m.risk_score) + '%', background: riskColor(m.risk_score) }}></i>
+        <i class=${peakPct < 1 ? 'zero' : ''}
+           style=${{ width: Math.min(100, peakPct) + '%', background: rateColor(m.peak_rate_ever) }}></i>
       </div>
-      <div class="stat"><span class="k">risk (now)</span>
-        <span class="v" style=${{ color: riskColor(m.risk_score) }}>${m.risk_score.toFixed(0)}/100</span></div>
-      <div class="stat"><span class="k">flagged rate</span>
-        <span class=${'v delta ' + (d.current_rate > d.baseline_rate * 1.5 ? 'up' : 'flat')}>
-          ${(d.baseline_rate * 100).toFixed(1)}% → ${(d.current_rate * 100).toFixed(1)}%
-          ${d.delta_multiple ? ` (${d.delta_multiple}×)` : ''}
-        </span></div>
-      <div class="stat"><span class="k">peak flagged rate</span>
-        <span class="v" style=${{ color: m.peak_rate_ever > 0.5 ? 'var(--red)' : 'var(--faint)' }}>
-          ${(m.peak_rate_ever * 100).toFixed(0)}%${m.peak_z_ever > 2 ? ` · z=${m.peak_z_ever}` : ''}</span></div>
+      <div class="stat hero"><span class="k">peak flagged rate</span>
+        <span class="v" style=${{ color: rateColor(m.peak_rate_ever) }}>
+          ${(m.peak_rate_ever * 100).toFixed(0)}%</span></div>
+      <div class="stat"><span class="k">spike z-score</span>
+        <span class=${'v ' + (m.peak_z_ever >= 4 ? 'delta up' : 'delta flat')}>
+          ${m.peak_z_ever >= 4 ? `z=${m.peak_z_ever} · fired` : `z=${m.peak_z_ever} · below threshold`}</span></div>
+      <div class="stat"><span class="k">now / baseline</span>
+        <span class="v" style=${{ color: 'var(--dim)' }}>
+          ${(d.current_rate * 100).toFixed(1)}% vs ${(d.baseline_rate * 100).toFixed(1)}%</span></div>
       <div class="stat"><span class="k">₹ exposure</span><span class="v">${inr(m.exposure_inr)}</span></div>
       <div class="stat"><span class="k">txns at risk</span>
         <span class="v">${m.flagged_count} / ${m.txn_count}</span></div>
       ${m.top_cause ? html`<div class="stat"><span class="k">cause</span>
-        <span class="v mono" style=${{ color: 'var(--purple)' }}>${m.top_cause}</span></div>` : ''}
+        <span class="v mono" style=${{ color: 'var(--violet)' }}>${m.top_cause}</span></div>` : ''}
     </div>`;
 }
 
@@ -111,13 +123,17 @@ function EntityGraph({ merchantId }) {
 
   useEffect(() => {
     if (!graph || !graph.nodes.length) { setPos([]); return; }
-    const W = 600, H = 340;
+    const W = 720, H = 400;
     const idx = new Map(graph.nodes.map((n, i) => [n.id, i]));
-    // seed: hubs near centre, accounts on a ring — converges much faster
+    // Seed hubs on a WIDE inner ring (not a point) so they never start on top
+    // of each other, accounts on an outer ring - converges fast and spread out.
+    const hubs = graph.nodes.filter((n) => n.kind !== 'customer').length || 1;
+    let hi = 0;
     let P = graph.nodes.map((n, i) => {
       const hub = n.kind !== 'customer';
-      const a = (i / graph.nodes.length) * Math.PI * 2;
-      const r = hub ? 40 : 130;
+      const a = hub ? (hi++ / hubs) * Math.PI * 2
+                    : (i / graph.nodes.length) * Math.PI * 2;
+      const r = hub ? 95 : 165;
       return { x: W / 2 + Math.cos(a) * r, y: H / 2 + Math.sin(a) * r, vx: 0, vy: 0, n };
     });
     const links = graph.links.map((l) => [idx.get(l.source), idx.get(l.target)])
@@ -130,23 +146,26 @@ function EntityGraph({ merchantId }) {
           for (let j = i + 1; j < P.length; j++) {
             let dx = P[j].x - P[i].x, dy = P[j].y - P[i].y;
             let d2 = dx * dx + dy * dy || 0.01;
-            if (d2 > 40000) continue;
-            const f = 260 / d2, d = Math.sqrt(d2);
+            if (d2 > 90000) continue;
+            // hubs repel each other much harder: they carry the labels, and
+            // two overlapping hubs make the whole picture unreadable on video
+            const bothHubs = P[i].n.kind !== 'customer' && P[j].n.kind !== 'customer';
+            const f = (bothHubs ? 2600 : 420) / d2, d = Math.sqrt(d2);
             const ux = (dx / d) * f, uy = (dy / d) * f;
             P[i].vx -= ux; P[i].vy -= uy; P[j].vx += ux; P[j].vy += uy;
           }
         }
         for (const [a, b] of links) {                  // spring
           const dx = P[b].x - P[a].x, dy = P[b].y - P[a].y;
-          const d = Math.hypot(dx, dy) || 0.01, f = (d - 55) * 0.006;
+          const d = Math.hypot(dx, dy) || 0.01, f = (d - 78) * 0.005;
           const ux = (dx / d) * f, uy = (dy / d) * f;
           P[a].vx += ux; P[a].vy += uy; P[b].vx -= ux; P[b].vy -= uy;
         }
         for (const p of P) {                            // integrate + centre
-          p.vx += (W / 2 - p.x) * 0.002; p.vy += (H / 2 - p.y) * 0.002;
+          p.vx += (W / 2 - p.x) * 0.0012; p.vy += (H / 2 - p.y) * 0.0012;
           p.x += (p.vx *= 0.82); p.y += (p.vy *= 0.82);
-          p.x = Math.max(14, Math.min(W - 14, p.x));
-          p.y = Math.max(14, Math.min(H - 14, p.y));
+          p.x = Math.max(18, Math.min(W - 18, p.x));
+          p.y = Math.max(18, Math.min(H - 18, p.y));
         }
       }
       setPos(P.map((p) => ({ ...p })));
@@ -166,20 +185,25 @@ function EntityGraph({ merchantId }) {
   const idx = new Map(graph.nodes.map((n, i) => [n.id, i]));
   return html`
     <div>
-      <svg class="graph" viewBox="0 0 600 340" preserveAspectRatio="xMidYMid meet">
+      <svg class="graph" viewBox="0 0 720 400" preserveAspectRatio="xMidYMid meet">
         ${graph.links.map((l, i) => {
           const a = pos[idx.get(l.source)], b = pos[idx.get(l.target)];
           return a && b ? html`<line key=${i} x1=${a.x} y1=${a.y} x2=${b.x} y2=${b.y} />` : null;
         })}
-        ${pos.map((p, i) => html`
+        ${pos.map((p, i) => {
+          const hub = p.n.kind !== 'customer';
+          const r = hub ? Math.min(17, 7 + p.n.size * 0.8) : 4;
+          return html`
           <g key=${i}>
-            <circle class=${p.n.kind} cx=${p.x} cy=${p.y}
-                    r=${p.n.kind === 'customer' ? 3.5 : Math.min(13, 5 + p.n.size * 0.7)}>
+            <circle class=${p.n.kind} cx=${p.x} cy=${p.y} r=${r}
+                    stroke=${hub ? 'rgba(255,255,255,.55)' : 'none'} stroke-width=${hub ? 1.5 : 0}>
               <title>${p.n.kind}: ${p.n.label}${p.n.size > 1 ? ` — ${p.n.size} accounts` : ''}</title>
             </circle>
-            ${p.n.kind !== 'customer'
-              ? html`<text x=${p.x + 11} y=${p.y + 3}>${p.n.label.slice(0, 18)}</text>` : ''}
-          </g>`)}
+            ${hub ? html`
+              <text x=${p.x} y=${p.y + r + 12} text-anchor="middle"
+                    style=${{ paintOrder: 'stroke', stroke: '#050933', strokeWidth: '3px' }}>
+                ${p.n.label.slice(0, 14)} · ${p.n.size}</text>` : ''}
+          </g>`; })}
       </svg>
       <div class="legend">
         <span><i style=${{ background: 'var(--red)' }}></i>device</span>
@@ -194,7 +218,7 @@ function EntityGraph({ merchantId }) {
 }
 
 /* ------------------------------------------------------------ investigation */
-function Investigation({ merchantId }) {
+function Investigation({ merchantId, inSpike }) {
   const [rep, setRep] = useState(null);
   const [state, setState] = useState('idle');
   const [showAudit, setShowAudit] = useState(false);
@@ -215,8 +239,11 @@ function Investigation({ merchantId }) {
   if (state === 'running') return html`<div class="empty">investigating…</div>`;
   if (!rep) return html`
     <div>
-      <div class="empty">No investigation yet — these fire automatically when the
-        spike detector trips.</div>
+      <div class="empty">
+        ${inSpike === false
+          ? 'No spike -> no investigation. The agent only runs when the detector fires, so quiet merchants cost zero analyst time and zero tokens.'
+          : 'No investigation yet — these fire automatically when the spike detector trips.'}
+      </div>
       <button class="sm" onClick=${run}>run investigation now</button>
     </div>`;
 
@@ -281,9 +308,10 @@ function ReviewQueue() {
   if (!cases.length) return html`<div class="empty">Review queue empty.</div>`;
   return html`
     <div>
-      <div class="note" style=${{ marginTop: 0, marginBottom: '8px' }}>
-        ${data.pending} pending of ${data.cases.length}. Every restrict and review
-        requires a human — the system holds, it does not act alone.
+      <div class="note" style=${{ marginTop: 0, marginBottom: '10px' }}>
+        <b style=${{ color: 'var(--amber)' }}>${data.pending} pending</b>
+        ${` of ${data.total_cases ?? data.cases.length} total cases. `}
+        Every restrict and review requires a human — the system holds, it does not act alone.
       </div>
       <div class="scroll">
         <table>
@@ -335,14 +363,17 @@ function App() {
   const [sel, setSel] = useState(null);
 
   const merchants = mdata?.merchants || [];
-  // auto-focus the first merchant that goes under attack — during a live demo
-  // you should not have to hunt for the interesting one
+  // Auto-focus the most DEMONSTRATIVE merchant, not merely the first spiking
+  // one. Account takeover spikes hard but has no shared entities by
+  // construction, so auto-selecting it opens the demo on an empty graph —
+  // technically correct and a terrible first frame. Prefer a spiking merchant
+  // whose entity network actually has something to draw.
   useEffect(() => {
-    if (!sel) {
-      const spiking = merchants.find((m) => m.in_spike);
-      if (spiking) setSel(spiking.merchant_id);
-      else if (merchants.length) setSel(merchants[0].merchant_id);
-    }
+    if (sel || !merchants.length) return;
+    const spiking = merchants.filter((m) => m.in_spike);
+    const withEntities = spiking.find((m) => m.top_cause &&
+      ['device_farm', 'fraud_ring', 'ip_cluster', 'card_testing'].includes(m.top_cause));
+    setSel((withEntities || spiking[0] || merchants[0]).merchant_id);
   }, [merchants, sel]);
 
   const finale = (status?.events || []).find((e) => e.kind === 'finale');
@@ -353,7 +384,12 @@ function App() {
     <div>
       <${Header} status=${status} onSpeed=${setSpeed} onPause=${setPause} />
       <main>
-        ${finale ? html`<div class="finale-banner">✓ ${finale.message}</div>` : ''}
+        ${finale ? html`
+          <div class="finale-banner">
+            <span>✓ ${finale.message}</span>
+            <span class="why">— volume spiked 6×, the fraud-score rate did not.
+              The detector fires on risk, not traffic.</span>
+          </div>` : ''}
         <div class="panel" style=${{ marginBottom: '14px' }}>
           <h2>merchants</h2>
           <div class="grid cols-3">
@@ -365,11 +401,17 @@ function App() {
         <div class="grid cols-2">
           <div class="panel">
             <h2>entity network ${sel ? `— ${sel}` : ''}</h2>
+            <div class="note" style=${{ marginTop: 0, marginBottom: '10px' }}>
+              Who is behind the flagged transactions. Hubs are entities shared by
+              multiple accounts; legitimate traffic has none.
+            </div>
             ${sel ? html`<${EntityGraph} merchantId=${sel} />` : html`<div class="empty">select a merchant</div>`}
           </div>
           <div class="panel">
             <h2>investigation ${sel ? `— ${sel}` : ''}</h2>
-            ${sel ? html`<${Investigation} merchantId=${sel} />` : html`<div class="empty">select a merchant</div>`}
+            ${sel ? html`<${Investigation} merchantId=${sel}
+                inSpike=${(merchants.find((m) => m.merchant_id === sel) || {}).in_spike} />`
+              : html`<div class="empty">select a merchant</div>`}
           </div>
         </div>
         <div class="grid cols-2" style=${{ marginTop: '14px' }}>

@@ -133,7 +133,11 @@ def run_investigation(merchant_id: str):
 @app.get("/api/review-queue")
 def review_queue(pending_only: bool = False):
     q = STATE.snapshot_queue(pending_only=pending_only)
-    return {"cases": q, "pending": sum(1 for c in q if c["analyst_action"] is None)}
+    # `pending` keeps its original meaning (true pending count) but is now
+    # computed over the FULL queue, not the 200-row wire cap - the header and
+    # this panel must never quote different numbers.
+    return {"cases": q["cases"], "pending": q["pending_total"],
+            "total_cases": q["total_cases"]}
 
 
 @app.post("/api/review-queue/{case_id}/decision")

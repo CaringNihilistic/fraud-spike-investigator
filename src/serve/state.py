@@ -246,12 +246,17 @@ class PipelineState:
                     "note": f"entities shared by >={min_accounts} accounts among "
                             f"flagged transactions"}
 
-    def snapshot_queue(self, pending_only: bool = False) -> list[dict]:
+    def snapshot_queue(self, pending_only: bool = False) -> dict:
+        """Recent cases plus TRUE totals. The row list is capped for the wire,
+        but the counts must come from the full queue — the header and the
+        queue panel quoting two different numbers reads as a bug on screen."""
         with self._lock:
             q = [c.to_dict() for c in self.review_queue]
+            pending_total = sum(1 for c in q if c["analyst_action"] is None)
             if pending_only:
                 q = [c for c in q if c["analyst_action"] is None]
-            return q[-200:]
+            return {"cases": q[-200:], "total_cases": len(self.review_queue),
+                    "pending_total": pending_total}
 
     def status(self) -> dict:
         with self._lock:
