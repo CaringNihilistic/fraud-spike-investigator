@@ -37,6 +37,12 @@ transaction-stream "you are under attack" investigation with ₹ economics.
   select_model.py, NO SMOTE — distorts temporal distribution), isotonic
   calibration, cost-optimal ₹ threshold, net-protected-value economics
   (step 7), time-to-detect comparison (step 8).
+- `src/models/leakage_probe.py` — P0, ADVERSARIAL SELF-AUDIT. Attacks our own
+  evaluation the way a hostile judge would: single-feature PR-AUC for all 22,
+  feature-SET comparisons, and suspect-feature distributions BY SCENARIO.
+  Reuses ablation._fit_eval so there is exactly ONE definition of "the same
+  measurement" (failure-log 14's lesson). It found failure-log 21. Re-run it
+  after ANY simulator change.
 - `src/models/ablation.py` — P1a, feature-group ablation (basics → +velocity
   → +entity/graph) plus a stage-4 merchant-level replay through the spike
   detector + policy engine, using the select_model.py winner. Output:
@@ -73,6 +79,10 @@ transaction-stream "you are under attack" investigation with ₹ economics.
   through the REAL fusion→policy path (not a canned animation); investigations
   fire on SPIKE, off the hot path. `api.py` = FastAPI + static SPA.
   `static/` = React via vendored UMD + htm — NO build step, NO CDN, NO npm.
+  Every MUTATING route requires an `X-API-Key` (`FSI_API_KEY`, else an
+  ephemeral key minted at startup and injected into the page same-origin, so
+  the demo stays one command). Reads stay open on purpose. Single-tenant gate,
+  NOT identity — an analyst override carries no attributable actor.
   `run_demo.py` = one command: train → serve → replay.
 - `tests/test_safety.py`, `tests/test_agent.py`, `tests/test_serving.py` — safety invariants. Keep
   green, extend when touching policy/detector/agent. Agent tests use a
@@ -95,6 +105,15 @@ on temporal validation (src/models/select_model.py). All 3 GBDTs within the
 0.02 tie margin (LGBM .9308 / Cat .9265 / XGB .9249) → won on the PRE-DECLARED
 speed tie-break (0.27s vs 1.64s vs 7.94s), NOT on raw PR-AUC.
 PR-AUC 0.934 | P 0.994 / R 0.886 @ cost-optimal threshold | P@100/@500 = 1.00
+CALIBRATION: Brier 0.00533 (raw 0.00647), ECE 0.0033 - isotonic measurably
+helps, but the reliability curve is near-bimodal (13,288 txns in [0,.1], 615 in
+[.9,1]), so the low ECE is dominated by the extremes. Report both.
+REVIEW LOAD: 44.1 cases per 1,000 txns (4.41%) - staffing question, not just
+cost. Do not quote INR/case without it.
+!! HEADLINE CAVEAT (failure-log 21): customer_age_days + amount_dev_ratio ALONE
+score 0.9328 vs the full 22-feature 0.9344. The simulator writes the answer key.
+NEVER quote 0.934 without the caveat. The README ablation claim about
+entity/graph carrying the lift is RETRACTED and corrected in place.
 Policy cutoffs (85, 25) — step_up cost-optimized on validation (+8.28% val NPV,
 +3.7% on test); restrict unidentified on validation, left at 85.
 ₹10.93L prevented, ₹10.57L net protected value (~31x), 617 review cases
@@ -102,8 +121,11 @@ Policy cutoffs (85, 25) — step_up cost-optimized on validation (+8.28% val NPV
 TTD beats flag-counter 4/5 (fraud ring 70m vs 101m); LOSES on IP cluster
 (31m vs 26m) — report it, don't smooth it.
 Ablation: basics 0.661 → +velocity 0.631 (mildly negative) → +entity/graph
-0.934. Entity/graph is where the system comes from (+0.30 PR-AUC, recall
-.58→.89). NOTE: an earlier dramatic "velocity collapses to 0.23" finding was
+0.934. The "entity/graph is where the system comes from" reading is WRONG and
+RETRACTED — see failure-log 21. Diagnostics (printed by ablation.py itself):
+profile pair alone 0.9328 (n=2) | entity SHARING alone 0.8286 (n=4) | full
+minus the pair 0.8777 (n=20). What entity features DO buy, and the only
+defensible claim: legit INR wrongly blocked 68,319 (2-feature) → 5,901 (full). NOTE: an earlier dramatic "velocity collapses to 0.23" finding was
 an artifact of an attack-free calibration slice and has been RETRACTED in the
 README — keep the retraction visible, it's the honest version.
 P1b fusion changes 0/13,987 decisions vs the old p*100 shortcut. Kept for
@@ -122,8 +144,9 @@ semantic-ID leakage. DESIGN IS FROZEN: no further tool/prompt/weighting
 changes without a new held-out set, or the number stops meaning anything.
 Run: `python -m src.models.select_model && python -m src.policy.threshold_sweep
 && python -m src.models.train && python -m src.models.ablation`
+Self-audit: `python -m src.models.leakage_probe` (adversarial eval integrity)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (46 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (51 pass, no network needed)
 
 ## Roadmap (in priority order)
 - ~~P1a-0 — empirical model selection~~ DONE: `src/models/select_model.py`,
@@ -265,6 +288,40 @@ Tests: `python -m pytest tests/ -q` (46 pass, no network needed)
    could never match, so 11 evidence claims were reported UNTRACEABLE when
    they were only quoting hashed entity ids. Fixed -> 100/100 traceable.
    Lesson: when a regex "looks right but never matches", check the bytes.
+
+21. WE BROKE OUR OWN HEADLINE. Ran an adversarial audit against the ML eval
+   (`src/models/leakage_probe.py`) — the same attack that found the semantic-ID
+   leakage at the agent layer (entry 19), aimed one layer down. Result:
+   `customer_age_days` + `amount_dev_ratio` ALONE score PR-AUC 0.9328 vs the
+   full 22-feature 0.9344 — a gap of 0.0016. Cause is the GENERATOR, not the
+   model: attack generators set customer_created_day to the attack day, so
+   median account age is 0.98 (card testing) / 1.61 (device farm) / 2.64 (ip
+   cluster) / 5.65 (fraud ring) days against a legitimate baseline of 215.76;
+   and ambient fraud is `legit_amount * uniform(1.5, 4.0)`, making
+   amount_dev_ratio a second proxy (2.07 ambient / 5.44 ATO vs 1.00 legit).
+   Between them the two features partition the label space — which is why two
+   columns match twenty-two.
+   CONSEQUENCE: the README's central ablation claim ("entity/graph is where the
+   system comes from, +0.30 PR-AUC") was MIS-ATTRIBUTED — both proxies sit
+   inside the ENTITY_GRAPH bucket. Entity SHARING alone is 0.8286 and adds only
+   +0.004 on top of the pair. Claim RETRACTED and corrected in place; the
+   diagnostic rows now print from ablation.py itself so the table cannot be
+   read without them.
+   NOT INVALIDATED (each checked, not assumed): pipeline leakage hygiene
+   (features still strictly incremental, day-boundary splits, calibration on
+   d21-23 only) — this is DATA CONSTRUCTION, not train/test contamination; the
+   de-labelling assertion (all 16 ML metrics bit-identical); and every
+   merchant-level result, since flash-sale customers are OLDER than baseline
+   (230.65 vs 215.76), so 5/5-attacks / 0-false-alarms / flash-sale-not-flagged
+   cannot be explained by account age.
+   DELIBERATELY NOT FIXED: regenerating attack accounts with realistic ages
+   (real fraudsters buy AGED accounts — the case we never generate) changes
+   every number in the README. Published as a measured limitation instead of
+   rushed under deadline. Listed first under Honest limitations.
+   LESSON: we found this by attacking our own eval a SECOND time, after
+   believing we had already done that. "We audited for leakage" is not a state
+   you reach once — entry 19 fixed the agent's evidence and we never
+   re-pointed the same test at the model.
 
 ## Style
 Plain, direct comments explaining WHY. Small modules. No cleverness that costs
