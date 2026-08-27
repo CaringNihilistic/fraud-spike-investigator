@@ -28,9 +28,9 @@ python -m pytest tests/ -q           # safety invariants (51 tests)
 
 1. **Merchants light up in attack order** — card testing (m3), device farm (m5), IP cluster (m7), account takeover (m2), fraud ring (m9). Each card shows peak flagged *rate* and spike *z*, not a single transaction's score.
 2. **Click any merchant** to see its entity network. Hover a hub to light up its slice of the graph — one device across 50 accounts is the shape that matters. Account takeover (m2) is deliberately instructive here: it spikes hard and its graph is **empty**, because ATO doesn't share entities.
-3. **Investigations fire automatically on spike**, off the hot path. The report shows cause, evidence, ₹ exposure and a recommended action — plus the action the policy engine actually authorized, which is the one that counts.
-4. **The review queue accepts analyst overrides** — and rejects an invented action with HTTP 400. The allowlist binds humans exactly as it binds the LLM.
-5. **The closing frame: "same spike, opposite verdict."** When the replay ends, a panel puts the device farm (m5) and the flash sale (m11) side by side. The flash sale is the **busier** merchant of the two — 2,284 transactions against 1,041 — and receives **0 restrictions** against 124, because its entity graph is empty while the farm's is one device shared by 50 accounts. Same volume story, opposite structure, opposite decision, rendered from live state.
+4. **Investigations fire automatically on spike**, off the hot path. The report shows cause, evidence, ₹ exposure and a recommended action — plus the action the policy engine actually authorized, which is the one that counts.
+5. **The review queue accepts analyst overrides** — and rejects an invented action with HTTP 400. The allowlist binds humans exactly as it binds the LLM.
+6. **The closing frame: "same spike, opposite verdict."** When the replay ends, a panel puts the device farm (m5) and the flash sale (m11) side by side. The flash sale is the **busier** merchant of the two — 2,284 transactions against 1,041 — and receives **0 restrictions** against 124, because its entity graph is empty while the farm's is one device shared by 50 accounts. Same volume story, opposite structure, opposite decision, rendered from live state.
 
 Flags: `--speed N` (replay rate), `--no-agent` (skip LLM investigations, no API key needed), `--no-browser`, `--port N`.
 
@@ -226,7 +226,10 @@ Reproduce: `python -m src.models.seed_stability` → writes `artifacts_out/seed_
 
 ## Real-data check — our recipe, someone else's data
 
-Everything above is measured on data we generated, and [Leakage self-audit](#leakage-self-audit-we-broke-our-own-headline) showed what that can hide. So we ran the **same recipe, unchanged**, against a real public fraud dataset: ULB `creditcardfraud` — 284,807 real card transactions, **0.173% fraud**, which is 30x more imbalanced than our synthetic 5.1% and therefore a far harder test of class weighting and calibration than our own data provides.
+Everything above is measured on data we generated, and [Leakage self-audit](#leakage-self-audit-we-broke-our-own-headline) showed what that can hide. So we ran the **same recipe, unchanged**, against **two** real public fraud datasets:
+
+- **ULB `creditcardfraud`** — 284,807 real card transactions, **0.173% fraud**, 30x more imbalanced than our synthetic 5.1% and therefore a far harder test of class weighting and calibration than our own data provides. No entity columns.
+- **IEEE-CIS (Vesta)** — 590,540 real e-commerce transactions, **3.5% fraud**, *with* card/address/device columns, so it can test the entity claim directly.
 
 `cost_optimal_threshold` and `calibration_report` are **imported from `train.py`**, not reimplemented, so there is exactly one definition of each measurement.
 
@@ -235,22 +238,47 @@ Everything above is measured on data we generated, and [Leakage self-audit](#lea
 | Amount + time only | 4 | 0.0027 | 0.663 | 0.00132 |
 | **+ the dataset's PCA components** | **32** | **0.7310** | **0.974** | **0.00042** |
 
-**PR-AUC 0.731 against a random baseline of 0.0017 — a 423x lift.** Our simulator scores 0.934 on the identical recipe. *The gap between those two numbers is the honest measure of how much our own data was helping.* The methodology transfers; the headline number does not.
+**PR-AUC 0.731 against a random baseline of 0.0017 — a 423x lift**, with ROC-AUC 0.974. Our simulator scores 0.934 on the identical recipe. *The gap between those numbers is the honest measure of how much our own data was helping.* The methodology transfers; the headline number does not.
 
-Scope, stated plainly: this exercises the **transaction-level** pipeline only. ULB has no merchant column, so the spike detector, entity graph and policy engine — the actual product — are **not** tested here. IEEE-CIS (which has real entity columns) is the next step and is wired up in the same module; it needs its competition rules accepted before the API will serve it.
+Scope, stated plainly: both datasets exercise the **transaction-level** pipeline only. Neither has a merchant column, so the spike detector, the merchant-level policy layer and the whole "you are under attack" product **remain validated on synthetic data alone**.
 
 ### It found two things our own data structurally could not
 
-**1. Our simulator's amount model is backwards.**
+**1. Our simulator's amount model is wrong for one fraud type — and we initially over-claimed how wrong.**
 
 | | median fraud | median legit | ratio |
 |---|---|---|---|
 | Our simulator | ₹874.52 | ₹639.55 | **1.37x** |
-| ULB (real) | $9.25 | $22.00 | **0.42x** |
+| ULB (real, card) | $9.25 | $22.00 | **0.42x** |
+| IEEE-CIS (real, e-commerce) | $75.00 | $68.50 | **1.10x** |
 
-We generate fraud as a legitimate amount multiplied by `uniform(1.5, 4.0)`, so fraud comes out *larger* than ordinary traffic. Real card fraud is **less than half the size** of a normal transaction — card testing uses tiny amounts precisely to avoid attention. This is an independent, real-world confirmation of failure-log 21: `amount_dev_ratio`, one of the two label proxies, **points the wrong way on real data**.
+We generate fraud as a legitimate amount multiplied by `uniform(1.5, 4.0)`, so fraud comes out *larger* than ordinary traffic. On ULB it is **less than half** the size of a normal transaction — card testing uses tiny amounts precisely to avoid attention.
+
+*Correction, made before publishing.* On ULB alone we wrote this up as "our amount model is backwards." Adding IEEE-CIS shows that is **too strong**: e-commerce fraud there runs slightly *above* normal (1.10x), which is much closer to our 1.37x than to ULB's 0.42x. The honest statement is narrower: **fraud amount is fraud-type-dependent, our simulator models only the "fraud is expensive" case, and the ULB card-testing case inverts it.** `amount_dev_ratio` is still a simulator artifact per failure-log 21 — it just is not universally backwards. Two datasets caught an over-claim that one dataset produced, which is the same lesson as failure-log 6.
 
 **2. A latent bug in our cost-optimal threshold — see [failure-log 23](#failure-recovery-log).** The threshold grid was built from `quantile(p, ...)`, so its maximum was `max(p)`, and `p >= max(p)` still blocks the top-scoring rows. **"Block nothing" was unreachable.** On our data that never mattered, because fraud is expensive there by construction and blocking always pays. On ULB, abstaining is **3.8x cheaper** than the threshold the function picked ($7,729 vs $29,577), and it could not choose it. Fixed by making abstention reachable; every synthetic number in this README is **bit-identical** after the fix, which is exactly what "latent" means.
+
+### IEEE-CIS: the direct test of our central claim, and it comes back negative
+
+ULB has no entities, so we also ran IEEE-CIS (Vesta) — 590,540 real e-commerce transactions, 3.5% fraud — which does. We built shared-entity fan-out features on it the **same way `src/features/builder.py` does**: strictly incremental, emitted from prior rows only, state updated after emission, using the repo's own `UnionFind`.
+
+| Tier | Features | PR-AUC | ROC-AUC | Precision | Recall |
+|---|---|---|---|---|---|
+| 1. basics | 7 | 0.0636 | 0.648 | — | — |
+| 2. + Vesta's counting features (C1–C14) | 21 | 0.4157 | 0.833 | 0.843 | 0.228 |
+| 3. + identity / card / addr / device | 48 | **0.4604** | 0.888 | 0.751 | 0.330 |
+| 4. **+ our shared-entity fan-out** | 54 | 0.4551 | 0.884 | 0.850 | 0.262 |
+| D. our fan-out features **alone** | 6 | 0.0400 | 0.548 | — | — |
+
+**Our entity features add −0.0053 PR-AUC. Alone they score 0.040 against a 0.035 random baseline — essentially nothing.** On this dataset, the structural signal our product is built on does not appear.
+
+Two things are true about that, and we are reporting both.
+
+**The honest confound: `DeviceInfo` is not a device.** It is a device *type* string — `"Windows"` alone is **40.2%** of all rows, `"iOS Device"` another 16.7%. Our simulator's `device_id` is a fingerprint (its top three values are 0.53% of rows combined). So `device_card_count` on IEEE-CIS is measuring "how many cards have ever used Windows," which is not the quantity the product reasons about. IEEE-CIS also has **no account identifier** at all, so "one device across fifty accounts" — the exact shape the entity graph exists to find — is not expressible. We used `card1` as an account proxy, which is crude.
+
+**The part that does survive, and it matters:** tier 2 is the single biggest jump in the whole table, **+0.352 PR-AUC**. Vesta's C1–C14 are *themselves* entity-counting features — their published description is "counting, such as how many addresses are found to be associated with the payment card." So **entity fan-out counting, done with real entity resolution, is the largest contributor to real-data performance.** The concept is validated on real data. Our *implementation of it on this dataset's available proxies* is what adds nothing.
+
+We are not treating that as a rescue. The fair summary: **entity/graph correlation remains unproven at our own hands on real data.** It is validated in principle by Vesta's version of the same idea, and it is genuinely untestable here for the merchant-level product, because IEEE-CIS has neither merchants nor accounts nor device fingerprints. Closing this properly needs data with real entity resolution — which, for this problem, essentially means a PSP's own data.
 
 ### The uncomfortable result, reported as-is
 
@@ -427,12 +455,13 @@ tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
 Ordered by how much they should discount the results.
 
 1. **Our simulator encodes the label into two features, so the headline PR-AUC overstates real detection ability.** `customer_age_days` + `amount_dev_ratio` alone reach 0.9328 vs the full model's 0.9344. The fix is to regenerate attack accounts with realistic ages (fraudsters buy aged accounts — precisely the case we never generate) and to stop deriving ambient fraud amounts as a multiple of legitimate ones. That changes every number in this README, which is why it is documented rather than rushed. See [Leakage self-audit](#leakage-self-audit-we-broke-our-own-headline).
-2. **Public-dataset validation covers the transaction layer only.** The recipe now runs on real data (ULB `creditcardfraud`, PR-AUC 0.731 — see [Real-data check](#real-data-check--our-recipe-someone-elses-data)), and that exercise found two defects our own data could not. But ULB has no merchant column, so **the merchant-level system — spike detector, entity graph, policy engine — is still validated only on synthetic data.** IEEE-CIS has the entity columns needed to close that gap and is already wired into the same module; it was not run. So "would the *product* generalize?" remains open, even though "does the *methodology*?" now has a real answer.
-3. **Data is synthetic throughout** (simulator parameters like "0.7%→5% fraud" are design choices, not Razorpay statistics). The simulator explicitly wires shared entities across accounts — fraud rings only exist in a graph if you construct them.
-4. **One legitimate-spike scenario.** The flash sale is the only benign volume event tested. Festival sales, product launches and marketing campaigns are untested, and the EWMA baseline has no day-of-week or hour-of-day seasonality term.
-5. **The review queue may not be staffable.** 44.1 cases per 1,000 transactions is 4.41% of the stream. We price analyst time at ₹50/case but never ask whether the analysts exist; at PSP volume that is a headcount question, and the honest answer is that the restrict/review cutoffs would have to be re-swept against a capacity constraint, not only against cost.
-6. **Headline metrics now carry a range, but a narrow one.** PR-AUC is 0.945 ± 0.007 over five worlds ([stability](#stability-across-worlds-is-this-a-result-or-one-lucky-seed)); differences below roughly ±0.02 should not be treated as real — which is also why we do not claim the 2-feature and 22-feature models are distinguishable on ranking alone. Five worlds is still a small sample, and they share one generative process, so this measures *sampling* variance, not *model-family* or *real-world* variance.
-7. **The agent gets the cause right 8/13 times** and on quiet merchants has twice contradicted its own evidence (asserting account takeover while citing zero new-device and zero geo-mismatch rates). It is advisory only and cannot act — that separation is tested — but the reasoning quality is the weakest part of the system. **If you run the demo yourself you will probably see this live on m3:** it reads "all 183 flagged txns use distinct payment methods" and concludes "no testing pattern", when a fresh instrument on every transaction *is* the card-testing signature. The `flagged_distinct_instruments_per_txn` field is directionally ambiguous — ~0.08 means reuse, ~1.0 means novelty, and the tool never says which way means what. Logged as failure-log 22 and deliberately left unfixed: the design is frozen after run D, coaching the prompt is against our own standing rule, and changing the tool would invalidate the eval it is measured by.
-8. **Risk fusion changes 0 of 13,987 decisions.** Retained for architecture (auditability, a reachable fail-safe path, headroom for a weaker model), not for metrics.
-9. **The account-takeover scenario is diffuse by nature**; it is caught primarily at transaction level (p≈0.97 per txn) and only weakly at merchant-spike level.
-10. **Not production hardened.** Single process, no persistence (state is lost on restart), no idempotency on repeated transactions. The serving layer has a shared-key gate on every mutating endpoint, but that is a single-tenant gate, not identity — an analyst override carries no attributable actor, which a real deployment would need.
+2. **Our entity/graph thesis does not reproduce on real data, and we could not fully test it.** On IEEE-CIS our shared-entity features move PR-AUC by **−0.0053** and score 0.040 alone against a 0.035 baseline ([Real-data check](#real-data-check--our-recipe-someone-elses-data)). Part of that is a genuine confound — IEEE-CIS `DeviceInfo` is a device *type* ("Windows" is 40.2% of rows), not a fingerprint, and the dataset has no account id, so the exact shape our graph looks for is inexpressible. Part of it is validation of the *concept* rather than our code: Vesta's own entity-counting features are the single largest contributor (+0.352). But the honest position is that **entity/graph correlation is unproven at our hands on real data**, and closing that needs data with real entity resolution.
+3. **The merchant-level system — the actual product — is validated only on synthetic data.** Neither public dataset has a merchant column, so the spike detector, the "you are under attack" framing, the entity graph in the dashboard and the policy layer have never met real traffic. Methodology transfers (ULB PR-AUC 0.731, IEEE-CIS 0.460, both with zero tuning); the product claim does not yet.
+4. **Data is synthetic throughout** (simulator parameters like "0.7%→5% fraud" are design choices, not Razorpay statistics). The simulator explicitly wires shared entities across accounts — fraud rings only exist in a graph if you construct them.
+5. **One legitimate-spike scenario.** The flash sale is the only benign volume event tested. Festival sales, product launches and marketing campaigns are untested, and the EWMA baseline has no day-of-week or hour-of-day seasonality term.
+6. **The review queue may not be staffable.** 44.1 cases per 1,000 transactions is 4.41% of the stream. We price analyst time at ₹50/case but never ask whether the analysts exist; at PSP volume that is a headcount question, and the honest answer is that the restrict/review cutoffs would have to be re-swept against a capacity constraint, not only against cost.
+7. **Headline metrics now carry a range, but a narrow one.** PR-AUC is 0.945 ± 0.007 over five worlds ([stability](#stability-across-worlds-is-this-a-result-or-one-lucky-seed)); differences below roughly ±0.02 should not be treated as real — which is also why we do not claim the 2-feature and 22-feature models are distinguishable on ranking alone. Five worlds is still a small sample, and they share one generative process, so this measures *sampling* variance, not *model-family* or *real-world* variance.
+8. **The agent gets the cause right 8/13 times** and on quiet merchants has twice contradicted its own evidence (asserting account takeover while citing zero new-device and zero geo-mismatch rates). It is advisory only and cannot act — that separation is tested — but the reasoning quality is the weakest part of the system. **If you run the demo yourself you will probably see this live on m3:** it reads "all 183 flagged txns use distinct payment methods" and concludes "no testing pattern", when a fresh instrument on every transaction *is* the card-testing signature. The `flagged_distinct_instruments_per_txn` field is directionally ambiguous — ~0.08 means reuse, ~1.0 means novelty, and the tool never says which way means what. Logged as failure-log 22 and deliberately left unfixed: the design is frozen after run D, coaching the prompt is against our own standing rule, and changing the tool would invalidate the eval it is measured by.
+9. **Risk fusion changes 0 of 13,987 decisions.** Retained for architecture (auditability, a reachable fail-safe path, headroom for a weaker model), not for metrics.
+10. **The account-takeover scenario is diffuse by nature**; it is caught primarily at transaction level (p≈0.97 per txn) and only weakly at merchant-spike level.
+11. **Not production hardened.** Single process, no persistence (state is lost on restart), no idempotency on repeated transactions. The serving layer has a shared-key gate on every mutating endpoint, but that is a single-tenant gate, not identity — an analyst override carries no attributable actor, which a real deployment would need.

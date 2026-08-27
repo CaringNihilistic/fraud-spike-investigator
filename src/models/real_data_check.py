@@ -59,6 +59,7 @@ from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.features.builder import UnionFind  # noqa: E402
 from src.models.select_model import build_gbdt, get_selected_model_name, pos_weight  # noqa: E402
 from src.models.train import calibration_report, cost_optimal_threshold  # noqa: E402
 
@@ -205,6 +206,76 @@ def run_ulb(model_name):
 
 
 # ------------------------------------------------------------------ IEEE-CIS
+OUR_ENTITY = ["card_txn_hist_n", "device_card_count", "addr_card_count",
+              "card_device_count", "card_addr_count", "component_size"]
+
+
+def build_entity_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Shared-entity fan-out on IEEE-CIS, built the SAME way as src/features/builder.py.
+
+    This is the point of using IEEE-CIS rather than ULB: it is the only public
+    set here with real entity columns, so it is the only way to test the claim
+    the whole product rests on - that shared-entity STRUCTURE ("one device
+    across fifty accounts") carries signal. Our own leakage audit showed entity
+    sharing adds only +0.004 on top of two simulator-planted label proxies, and
+    left open whether that was a property of fraud or a property of our
+    generator.
+
+    Entity mapping, stated so it can be argued with: card1 is the account proxy
+    (a card belongs to a person), DeviceInfo is the device, addr1 is the
+    billing location. IEEE-CIS has no user id, and the usual Kaggle trick of
+    synthesising a UID from card1+addr1+D1 is folklore we are not going to lean
+    on for a correctness claim.
+
+    STRICTLY INCREMENTAL, exactly as in the feature builder: every value is
+    emitted from state built out of PRIOR rows only, and state is updated after
+    emission. Rows are processed in TransactionDT order. No future row can
+    influence an earlier one.
+    """
+    df = df.sort_values("TransactionDT", kind="mergesort").reset_index(drop=True)
+    card = df.card1.fillna(-1).astype(np.int64).to_numpy()
+    dev = df.DeviceInfo.fillna("__na__").astype(str).to_numpy() if "DeviceInfo" in df else np.full(len(df), "__na__")
+    addr = df.addr1.fillna(-1).astype(np.int64).to_numpy()
+
+    card_n = {}                      # card -> txns seen
+    dev_cards, addr_cards = {}, {}   # entity -> set of cards
+    card_devs, card_addrs = {}, {}   # card -> set of entities
+    uf = UnionFind()
+
+    out = np.zeros((len(df), 6), dtype=np.float32)
+    for i in range(len(df)):
+        c, d, a = card[i], dev[i], addr[i]
+        has_d, has_a = d != "__na__", a != -1
+
+        # ---- EMIT from prior state (never this row) ----
+        ck, dk, ak = ("c", c), ("d", d), ("a", a)
+        comp = 1
+        for key, present in ((ck, True), (dk, has_d), (ak, has_a)):
+            if present and key in uf.parent:
+                comp = max(comp, uf.comp_size(key))
+        out[i] = (card_n.get(c, 0),
+                  len(dev_cards.get(d, ())) if has_d else 0,
+                  len(addr_cards.get(a, ())) if has_a else 0,
+                  len(card_devs.get(c, ())),
+                  len(card_addrs.get(c, ())),
+                  comp)
+
+        # ---- THEN update ----
+        card_n[c] = card_n.get(c, 0) + 1
+        if has_d:
+            dev_cards.setdefault(d, set()).add(c)
+            card_devs.setdefault(c, set()).add(d)
+            uf.union(ck, dk)
+        if has_a:
+            addr_cards.setdefault(a, set()).add(c)
+            card_addrs.setdefault(c, set()).add(a)
+            uf.union(ck, ak)
+
+    for j, name in enumerate(OUR_ENTITY):
+        df[name] = out[:, j]
+    return df
+
+
 IEEE_BASICS = ["TransactionAmt", "log_amount", "hour", "is_night", "ProductCD",
                "card4", "card6"]
 IEEE_COUNTING = [f"C{i}" for i in range(1, 15)]
@@ -238,6 +309,8 @@ def run_ieee(model_name):
     tx["hour"] = ((tx.TransactionDT // 3600) % 24).astype(int)
     tx["is_night"] = ((tx.hour < 6) | (tx.hour >= 22)).astype(int)
     tx["log_amount"] = np.log1p(tx.TransactionAmt)
+    print("  building shared-entity features (incremental, in TransactionDT order)...")
+    tx = build_entity_features(tx)
     prev = float(tx.isFraud.mean())
     print(f"  {len(tx):,} transactions | fraud {prev:.4%} "
           f"(random-baseline PR-AUC = {prev:.6f}) | {tx.day.nunique()} days")
@@ -245,19 +318,29 @@ def run_ieee(model_name):
     print(f"  test slice: {len(te):,} rows, {int(te.isFraud.sum())} frauds "
           f"({te.isFraud.mean():.4%})")
     print("--- tiers (mirroring our own ablation ladder) ---")
+    full = IEEE_BASICS + IEEE_COUNTING + IEEE_IDENTITY
     rows = [
         evaluate("1_basics", IEEE_BASICS, tr, ca, te, "isFraud", "TransactionAmt", model_name),
         evaluate("2_plus_counting", IEEE_BASICS + IEEE_COUNTING, tr, ca, te,
                  "isFraud", "TransactionAmt", model_name),
-        evaluate("3_plus_identity", IEEE_BASICS + IEEE_COUNTING + IEEE_IDENTITY, tr, ca, te,
+        evaluate("3_plus_identity", full, tr, ca, te, "isFraud", "TransactionAmt", model_name),
+        evaluate("4_plus_our_entity", full + OUR_ENTITY, tr, ca, te,
                  "isFraud", "TransactionAmt", model_name),
     ]
+    print("--- diagnostic: do OUR entity features carry signal on their own? ---")
+    rows.append(evaluate("D_our_entity_only", OUR_ENTITY, tr, ca, te,
+                         "isFraud", "TransactionAmt", model_name))
+    marginal = rows[3]["pr_auc"] - rows[2]["pr_auc"]
+    print(f"  marginal lift of shared-entity structure on REAL data: "
+          f"{marginal:+.4f} PR-AUC "
+          f"({rows[2]['pr_auc']:.4f} -> {rows[3]['pr_auc']:.4f})")
     prof = amount_profile(tx, "isFraud", "TransactionAmt")
     print(f"  amount profile: median fraud {prof['median_fraud_amount']} vs median legit "
           f"{prof['median_legit_amount']} = {prof['fraud_to_legit_median_ratio']}x")
     return {"dataset": "IEEE-CIS Fraud Detection (Vesta)", "n_transactions": int(len(tx)),
             "fraud_prevalence": round(prev, 6), "random_baseline_pr_auc": round(prev, 6),
             "amount_profile": prof,
+            "entity_marginal_pr_auc": round(marginal, 4),
             "tiers": rows, "best_pr_auc": max(r["pr_auc"] for r in rows)}
 
 

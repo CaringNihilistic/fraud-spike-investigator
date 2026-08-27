@@ -149,9 +149,13 @@ Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
 Tests: `python -m pytest tests/ -q` (57 pass, no network needed)
-REAL-DATA (ULB creditcardfraud, same recipe): PR-AUC 0.731 vs 0.0017 random
-baseline. Methodology transfers, the 0.934 does NOT. Merchant-level layer is
-UNVALIDATED on real data - say so whenever the product claim comes up.
+REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
+random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
+Methodology transfers; the 0.934 does NOT. NEGATIVE RESULT (entry 24): our
+entity fan-out features move IEEE-CIS -0.0053 and score 0.040 alone. Entity/
+graph is UNPROVEN at our hands on real data. Never claim otherwise. The
+merchant-level layer is wholly UNVALIDATED on real data - neither set has
+merchants.
 
 ## Roadmap (in priority order)
 - ~~P1a-0 — empirical model selection~~ DONE: `src/models/select_model.py`,
@@ -395,6 +399,43 @@ UNVALIDATED on real data - say so whenever the product claim comes up.
    LESSON: we spent the whole project auditing our own evaluation and still
    could not see this one from the inside. Some bugs are only visible from
    outside your own data.
+
+24. THE CENTRAL CLAIM CAME BACK NEGATIVE ON REAL DATA. IEEE-CIS (Vesta,
+   590,540 real e-commerce txns, 3.5% fraud) is the one public set here WITH
+   entity columns, so it is the direct test of the thing the product is built
+   on. Built shared-entity fan-out on it the same way builder.py does -
+   strictly incremental, emitted from prior rows only, repo's own UnionFind.
+   RESULT: adding our entity features moves PR-AUC 0.4604 -> 0.4551. That is
+   MINUS 0.0053. Alone they score 0.0400 against a 0.0350 random baseline -
+   essentially nothing. Entity/graph correlation, as WE compute it, does not
+   show up on this real dataset.
+   THE HONEST CONFOUND (state it, do not hide behind it): IEEE-CIS DeviceInfo
+   is a device TYPE, not a fingerprint - "Windows" alone is 40.2% of rows,
+   "iOS Device" another 16.7%. Our simulator's device_id is a real fingerprint
+   (top 3 values = 0.53% of rows). So device_card_count there means "how many
+   cards ever used Windows", which is not the quantity we reason about. IEEE
+   also has NO account id, so "one device across fifty accounts" is literally
+   inexpressible; we used card1 as an account proxy, which is crude.
+   THE PART THAT SURVIVES: tier 2 is the biggest jump in the table, +0.352
+   PR-AUC, and Vesta's C1-C14 ARE entity-counting features - their own
+   description is "counting, such as how many addresses are found to be
+   associated with the payment card". So entity fan-out counting WITH REAL
+   ENTITY RESOLUTION is the single largest contributor to real-data
+   performance. The concept is validated. Our implementation on this dataset's
+   proxies is what adds nothing.
+   DO NOT SPIN THIS. The defensible summary is: entity/graph remains UNPROVEN
+   at our own hands on real data, validated in principle by someone else's
+   version of the same idea, and untestable for the merchant-level product
+   because IEEE-CIS has no merchants, no accounts and no device fingerprints.
+   Closing it properly needs data with real entity resolution - realistically,
+   a PSP's own.
+   ALSO: this run CORRECTED an over-claim we had made one commit earlier. On
+   ULB alone we wrote "our amount model is backwards" (fraud 0.42x legit vs our
+   1.37x). IEEE-CIS e-commerce fraud is 1.10x - much closer to ours. The true
+   statement is narrower: fraud amount is FRAUD-TYPE dependent, we model only
+   the expensive case, and ULB's card-testing case inverts it. Two datasets
+   caught an over-claim that one dataset produced. Same lesson as entry 6, and
+   we nearly published it again.
 
 ## Style
 Plain, direct comments explaining WHY. Small modules. No cleverness that costs
