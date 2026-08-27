@@ -323,6 +323,37 @@ Tests: `python -m pytest tests/ -q` (51 pass, no network needed)
    you reach once — entry 19 fixed the agent's evidence and we never
    re-pointed the same test at the model.
 
+22. THE AGENT READ A NUMBER BACKWARDS. Observed during a pre-recording DEMO
+   rehearsal, NOT an eval run: agent_eval.csv and run D are untouched and the
+   headline stays 8/13. On the demo slice the agent got 4/5 causes right,
+   including m2 (the account-takeover that failed catastrophically in run A),
+   and missed m3: card-testing diagnosed as `fraud_ring` at 0.92 confidence.
+   Its own evidence line is the tell: "Unique instrument per transaction: all
+   183 flagged txns use distinct payment methods; NO INSTRUMENT REUSE OR
+   TESTING PATTERN". It has the correct number and draws the inverted
+   conclusion — a distinct instrument on every transaction IS the
+   card-testing signature (a fraudster burning through stolen cards), not
+   evidence against it.
+   ROOT CAUSE is the tool, not the model. `flagged_distinct_instruments_per_txn`
+   (added in run D) is DIRECTIONALLY AMBIGUOUS: ~0.08 means reuse (farm/ring),
+   ~1.0 means novelty (card testing), and nothing in the tool output says which
+   direction means what. The agent read m5's 0.076 correctly as a farm and
+   m3's ~1.0 as "no pattern". Same field, opposite ends, only one of them
+   legible.
+   NOT FIXED, deliberately. The design was FROZEN after run D. The two
+   available fixes are both disqualified right now: coaching the prompt is
+   forbidden (the standing rule is that the fix must be evidence, never hints
+   — see entry 16), and changing the tool invalidates the frozen eval, so the
+   number would stop meaning anything. The honest move is to log it and let a
+   NEW held-out set measure the fix, not to patch it under deadline and
+   re-report the same 13 cases.
+   CONTAINED: recommended action was `review`, not `allow` — the error was in
+   the cautious direction, and the policy engine restricted m3 transactions on
+   its own regardless, because the LLM is not in the decision path.
+   LESSON: a number is not evidence until its DIRECTION is stated. Entry 18 was
+   a rate without its base rate; this is a ratio without its polarity. Both
+   shipped inside a tool we had already reviewed for exactly this.
+
 ## Style
 Plain, direct comments explaining WHY. Small modules. No cleverness that costs
 explainability — every component must be defensible to a judge in one sentence.
