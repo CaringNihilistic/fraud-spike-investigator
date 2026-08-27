@@ -145,8 +145,13 @@ changes without a new held-out set, or the number stops meaning anything.
 Run: `python -m src.models.select_model && python -m src.policy.threshold_sweep
 && python -m src.models.train && python -m src.models.ablation`
 Self-audit: `python -m src.models.leakage_probe` (adversarial eval integrity)
+Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
+gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (51 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (57 pass, no network needed)
+REAL-DATA (ULB creditcardfraud, same recipe): PR-AUC 0.731 vs 0.0017 random
+baseline. Methodology transfers, the 0.934 does NOT. Merchant-level layer is
+UNVALIDATED on real data - say so whenever the product claim comes up.
 
 ## Roadmap (in priority order)
 - ~~P1a-0 — empirical model selection~~ DONE: `src/models/select_model.py`,
@@ -353,6 +358,43 @@ Tests: `python -m pytest tests/ -q` (51 pass, no network needed)
    LESSON: a number is not evidence until its DIRECTION is stated. Entry 18 was
    a rate without its base rate; this is a ratio without its polarity. Both
    shipped inside a tool we had already reviewed for exactly this.
+
+23. REAL DATA FOUND A BUG OUR OWN DATA COULD NOT. Ran the unchanged recipe
+   against ULB creditcardfraud (284,807 real card txns, 0.173% fraud) via
+   `src/models/real_data_check.py`. PR-AUC 0.731 vs a 0.0017 random baseline
+   (423x lift); our simulator scores 0.934 on the same recipe, and that gap is
+   the honest measure of how much our own data was helping. Two findings, both
+   structurally impossible to surface on synthetic data:
+   (a) OUR AMOUNT MODEL IS BACKWARDS. We generate fraud as
+   `legit_amount * uniform(1.5, 4.0)`, so fraud is 1.37x the median legit
+   amount. Real card fraud is 0.42x (median $9.25 vs $22.00) - card testing
+   uses TINY amounts on purpose. So amount_dev_ratio, one of the two label
+   proxies from entry 21, points the WRONG WAY on real data. Independent
+   real-world confirmation of entry 21.
+   (b) BUG in cost_optimal_threshold: the grid was
+   `quantile(p, linspace(0,1,200))`, whose max is max(p), and `p >= max(p)`
+   still blocks the top-scoring rows - so ABSTAIN ("block nothing") was
+   UNREACHABLE. Our data hid this completely because fraud is expensive there
+   by construction, so blocking always pays and the optimum is always interior.
+   On ULB, abstaining is 3.8x cheaper than the threshold the function chose
+   ($7,729 vs $29,577). FIXED by appending np.inf to the grid. Every synthetic
+   number is BIT-IDENTICAL after the fix (PR-AUC 0.9344, threshold 0.8333, NPV
+   1,057,319.68, all six ablation rows) - which is what "latent" means, and is
+   how we know the fix is safe.
+   FOLLOW-ON, reported as-is: with abstain reachable, the cost-optimal action
+   on ULB is to BLOCK NOTHING. The model ranks fine (ROC-AUC 0.974) and the
+   economics still say do not act. That is a limit of OUR cost model, which
+   prices a false negative at exactly the fraud amount and nothing else - real
+   issuers also carry chargeback fees, dispute handling, regulatory exposure
+   and churn. Add a fixed per-fraud penalty and the optimum leaves abstention
+   at once. Do NOT let this get quoted as "fraud detection is not worth it".
+   SCOPE: transaction level ONLY. ULB has no merchant column, so the spike
+   detector, entity graph and policy engine are NOT exercised. IEEE-CIS has the
+   entity columns to close that gap and is already wired into the same module;
+   it needs its competition rules accepted (the API 403s otherwise).
+   LESSON: we spent the whole project auditing our own evaluation and still
+   could not see this one from the inside. Some bugs are only visible from
+   outside your own data.
 
 ## Style
 Plain, direct comments explaining WHY. Small modules. No cleverness that costs

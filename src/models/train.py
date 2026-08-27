@@ -58,6 +58,14 @@ def temporal_split(df: pd.DataFrame):
 
 def cost_optimal_threshold(y, p, amounts):
     grid = np.unique(np.round(np.quantile(p, np.linspace(0, 1, 200)), 4))
+    # ABSTAIN must be reachable. The grid tops out at max(p), and `p >= max(p)`
+    # still blocks the top-scoring rows, so "block nothing" - sometimes the
+    # genuinely cheapest action - was unreachable. Our own data could never
+    # expose this: the simulator builds fraud as a MULTIPLE of a legitimate
+    # amount, so blocking always pays. Real card fraud is smaller than ordinary
+    # traffic (ULB: 0.42x the median legit amount), and there abstaining beat
+    # this function's choice by 3.8x. See failure-log 23.
+    grid = np.append(grid, np.inf)
     best_t, best_cost, rows = 0.5, np.inf, []
     for t in grid:
         pred = p >= t

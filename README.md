@@ -16,6 +16,7 @@ python -m src.models.train           # simulate → features → train → metri
 python -m src.models.ablation        # feature-group ablation table + leakage diagnostics
 python -m src.models.leakage_probe   # adversarial self-audit of our own eval (see below)
 python -m src.models.seed_stability  # re-run the pipeline across 5 worlds (~6 min)
+python -m src.models.real_data_check # same recipe on REAL data (needs a Kaggle download)
 python -m src.agent.eval             # 13-case agent eval, 3 held-out (needs ANTHROPIC_API_KEY)
 python run_demo.py                   # dashboard + live replay -> http://127.0.0.1:8000
 python -m pytest tests/ -q           # safety invariants (51 tests)
@@ -223,6 +224,42 @@ Every headline number above comes from seed 7 — a single simulated world, n=1.
 
 Reproduce: `python -m src.models.seed_stability` → writes `artifacts_out/seed_stability.csv` and `seed_stability.json`. (Seed 7 reproducing 0.9344 exactly also serves as a determinism check on the whole pipeline.)
 
+## Real-data check — our recipe, someone else's data
+
+Everything above is measured on data we generated, and [Leakage self-audit](#leakage-self-audit-we-broke-our-own-headline) showed what that can hide. So we ran the **same recipe, unchanged**, against a real public fraud dataset: ULB `creditcardfraud` — 284,807 real card transactions, **0.173% fraud**, which is 30x more imbalanced than our synthetic 5.1% and therefore a far harder test of class weighting and calibration than our own data provides.
+
+`cost_optimal_threshold` and `calibration_report` are **imported from `train.py`**, not reimplemented, so there is exactly one definition of each measurement.
+
+| Tier | Features | PR-AUC | ROC-AUC | Brier |
+|---|---|---|---|---|
+| Amount + time only | 4 | 0.0027 | 0.663 | 0.00132 |
+| **+ the dataset's PCA components** | **32** | **0.7310** | **0.974** | **0.00042** |
+
+**PR-AUC 0.731 against a random baseline of 0.0017 — a 423x lift.** Our simulator scores 0.934 on the identical recipe. *The gap between those two numbers is the honest measure of how much our own data was helping.* The methodology transfers; the headline number does not.
+
+Scope, stated plainly: this exercises the **transaction-level** pipeline only. ULB has no merchant column, so the spike detector, entity graph and policy engine — the actual product — are **not** tested here. IEEE-CIS (which has real entity columns) is the next step and is wired up in the same module; it needs its competition rules accepted before the API will serve it.
+
+### It found two things our own data structurally could not
+
+**1. Our simulator's amount model is backwards.**
+
+| | median fraud | median legit | ratio |
+|---|---|---|---|
+| Our simulator | ₹874.52 | ₹639.55 | **1.37x** |
+| ULB (real) | $9.25 | $22.00 | **0.42x** |
+
+We generate fraud as a legitimate amount multiplied by `uniform(1.5, 4.0)`, so fraud comes out *larger* than ordinary traffic. Real card fraud is **less than half the size** of a normal transaction — card testing uses tiny amounts precisely to avoid attention. This is an independent, real-world confirmation of failure-log 21: `amount_dev_ratio`, one of the two label proxies, **points the wrong way on real data**.
+
+**2. A latent bug in our cost-optimal threshold — see [failure-log 23](#failure-recovery-log).** The threshold grid was built from `quantile(p, ...)`, so its maximum was `max(p)`, and `p >= max(p)` still blocks the top-scoring rows. **"Block nothing" was unreachable.** On our data that never mattered, because fraud is expensive there by construction and blocking always pays. On ULB, abstaining is **3.8x cheaper** than the threshold the function picked ($7,729 vs $29,577), and it could not choose it. Fixed by making abstention reachable; every synthetic number in this README is **bit-identical** after the fix, which is exactly what "latent" means.
+
+### The uncomfortable result, reported as-is
+
+With the bug fixed, the cost-optimal action on ULB is **to block nothing at all**. The model ranks well (ROC-AUC 0.974) and the economics still say don't act — because when the median fraud is $9.25 and the legitimate orders you would wrongly block are worth $22 and up, intervention costs more than the losses it prevents.
+
+**Do not read that as "fraud detection isn't worth it."** Read it as the limit of *our cost model*, which prices a false negative at exactly the fraud amount and nothing else. Real issuers also carry chargeback fees, dispute-handling cost, regulatory exposure and customer churn per fraud incident — none of which we model. Add a fixed per-fraud penalty and the optimum moves off abstention immediately. What the result honestly demonstrates is the thing this track actually asks about: **a good ranker does not imply a profitable intervention**, and the two have to be measured separately.
+
+Reproduce: `python -m src.models.real_data_check` → writes `artifacts_out/real_data_check.csv` and `real_data_check.json`. Data is **not** redistributable and is never committed; `data/` is gitignored.
+
 ## Policy thresholds — cost-optimized on validation
 
 The 85/60 restrict/step-up cutoffs were hand-set against the old `p*100` scale and never re-derived. `src/policy/threshold_sweep.py` sweeps both on the **validation slice only** (days 21–23) under the same net-protected-value framework and ₹ assumptions used for the reported test economics. Adoption rule fixed in advance: a cutoff moves only if it beats the incumbent by >2% validation NPV.
@@ -368,7 +405,7 @@ src/features/   incremental leakage-safe feature builder (~22 features)
 src/models/     empirical model selection, temporal-split training, isotonic
                 calibration + reliability curve, cost-optimal threshold,
                 feature-group ablation, adversarial leakage self-audit,
-                multi-world seed stability
+                multi-world seed stability, real-data (Kaggle) check
 src/spike/      merchant-level EWMA + z-score change-point detector
 src/policy/     deterministic policy engine + frozen allowlist; risk fusion
                 (ML floor + spike/graph/rule lift -> risk_score + confidence);
@@ -390,7 +427,7 @@ tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
 Ordered by how much they should discount the results.
 
 1. **Our simulator encodes the label into two features, so the headline PR-AUC overstates real detection ability.** `customer_age_days` + `amount_dev_ratio` alone reach 0.9328 vs the full model's 0.9344. The fix is to regenerate attack accounts with realistic ages (fraudsters buy aged accounts — precisely the case we never generate) and to stop deriving ambient fraud amounts as a multiple of legitimate ones. That changes every number in this README, which is why it is documented rather than rushed. See [Leakage self-audit](#leakage-self-audit-we-broke-our-own-headline).
-2. **No public-dataset validation.** Nothing here has touched real transactions. The feature builder and temporal harness would run against IEEE-CIS or a similar public set with modest plumbing; we did not get to it. Until then, "would this generalize?" is genuinely unanswered.
+2. **Public-dataset validation covers the transaction layer only.** The recipe now runs on real data (ULB `creditcardfraud`, PR-AUC 0.731 — see [Real-data check](#real-data-check--our-recipe-someone-elses-data)), and that exercise found two defects our own data could not. But ULB has no merchant column, so **the merchant-level system — spike detector, entity graph, policy engine — is still validated only on synthetic data.** IEEE-CIS has the entity columns needed to close that gap and is already wired into the same module; it was not run. So "would the *product* generalize?" remains open, even though "does the *methodology*?" now has a real answer.
 3. **Data is synthetic throughout** (simulator parameters like "0.7%→5% fraud" are design choices, not Razorpay statistics). The simulator explicitly wires shared entities across accounts — fraud rings only exist in a graph if you construct them.
 4. **One legitimate-spike scenario.** The flash sale is the only benign volume event tested. Festival sales, product launches and marketing campaigns are untested, and the EWMA baseline has no day-of-week or hour-of-day seasonality term.
 5. **The review queue may not be staffable.** 44.1 cases per 1,000 transactions is 4.41% of the stream. We price analyst time at ₹50/case but never ask whether the analysts exist; at PSP volume that is a headcount question, and the honest answer is that the restrict/review cutoffs would have to be re-swept against a capacity constraint, not only against cost.
