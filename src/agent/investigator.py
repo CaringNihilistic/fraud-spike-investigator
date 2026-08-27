@@ -30,6 +30,7 @@ from typing import TypedDict
 from langgraph.graph import END, StateGraph
 
 from src.agent.audit import AuditLog
+from src.envfile import load_env
 from src.agent.tools import TOOL_FNS, TOOL_SCHEMAS, InvestigationContext
 from src.policy.engine import Action, validate_recommendation
 
@@ -158,6 +159,7 @@ def _anthropic_client():
         import anthropic
     except ImportError:
         return None
+    load_env()  # a key in .env counts as credentials; a real env var wins
     if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
         # The SDK can also resolve an `ant auth login` profile; try constructing
         # and let a missing credential surface as an auth error at call time.

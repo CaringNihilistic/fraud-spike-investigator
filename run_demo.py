@@ -19,6 +19,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from src.envfile import load_env  # noqa: E402
+
+load_env()  # picks up ANTHROPIC_API_KEY from .env if present
+
 import uvicorn  # noqa: E402
 
 from src.serve import api as api_mod  # noqa: E402
