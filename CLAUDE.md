@@ -400,7 +400,8 @@ merchants.
    could not see this one from the inside. Some bugs are only visible from
    outside your own data.
 
-24. THE CENTRAL CLAIM CAME BACK NEGATIVE ON REAL DATA. IEEE-CIS (Vesta,
+24. AN INVALID TEST OF THE CENTRAL CLAIM - AND WHY WE DO NOT REPORT IT AS
+   EVIDENCE EITHER WAY. IEEE-CIS (Vesta,
    590,540 real e-commerce txns, 3.5% fraud) is the one public set here WITH
    entity columns, so it is the direct test of the thing the product is built
    on. Built shared-entity fan-out on it the same way builder.py does -
@@ -423,12 +424,21 @@ merchants.
    ENTITY RESOLUTION is the single largest contributor to real-data
    performance. The concept is validated. Our implementation on this dataset's
    proxies is what adds nothing.
-   DO NOT SPIN THIS. The defensible summary is: entity/graph remains UNPROVEN
-   at our own hands on real data, validated in principle by someone else's
-   version of the same idea, and untestable for the merchant-level product
-   because IEEE-CIS has no merchants, no accounts and no device fingerprints.
-   Closing it properly needs data with real entity resolution - realistically,
-   a PSP's own.
+   VERDICT (revised after outside review - the first version of this entry
+   over-stated it). Reporting a null from a test that provably cannot measure
+   the thing is NOT honesty; it is presenting invalid evidence in the
+   pessimistic direction. We do not claim IEEE-CIS validates the graph, and we
+   do not claim it refutes it. We publish the rows and the caveat together -
+   real_data_check.py prints both - and we say plainly that the merchant-level
+   layer is evaluated on controlled scenarios because no public dataset
+   reproduces the persistent account/device/IP relationships it needs.
+   The earlier framing ("our central claim came back negative") is RETRACTED as
+   over-stated. It was written under an explicit instruction not to protect the
+   author's ego and overshot in the other direction - which is its own kind of
+   inaccuracy. Symmetry rule going forward: we would not accept a POSITIVE
+   result from this experiment either.
+   Do NOT put IEEE-CIS in the demo video. Zero seconds. It tests the
+   transaction model, not the product.
    ALSO: this run CORRECTED an over-claim we had made one commit earlier. On
    ULB alone we wrote "our amount model is backwards" (fraud 0.42x legit vs our
    1.37x). IEEE-CIS e-commerce fraud is 1.10x - much closer to ours. The true

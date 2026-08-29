@@ -21,6 +21,13 @@ NOT claimed: that our 22 features transfer, or that the merchant-level layer
 does. Neither dataset has a merchant column, so the spike detector, entity
 graph and policy engine are out of scope here and are NOT exercised.
 
+NOT claimed in EITHER direction: anything about our entity-graph hypothesis.
+The IEEE-CIS tiers include our own shared-entity features, but that dataset
+cannot express the relationship they encode (no account id; DeviceInfo is a
+device type, not a fingerprint), so the result is reported for inspection and
+is not treated as evidence. A positive result there would be refused on the
+same grounds. See failure-log 24.
+
 Expect a much lower number than the synthetic 0.934. That drop is the finding.
 A real-data result that came out equally high would mean the benchmark was as
 compromised as the simulator.
@@ -221,6 +228,14 @@ def build_entity_features(df: pd.DataFrame) -> pd.DataFrame:
     left open whether that was a property of fraud or a property of our
     generator.
 
+    READ THIS BEFORE QUOTING THE RESULT. The experiment is built correctly and
+    is still NOT a valid test of our entity thesis, because IEEE-CIS cannot
+    express the relationship: DeviceInfo is a device TYPE ("Windows" is ~40% of
+    rows), not a persistent fingerprint, and there is no account identifier at
+    all, so "one device across fifty accounts" is inexpressible. We report the
+    rows for inspection and draw no conclusion in either direction - and we
+    would refuse a POSITIVE result from it on the same grounds.
+
     Entity mapping, stated so it can be argued with: card1 is the account proxy
     (a card belongs to a person), DeviceInfo is the device, addr1 is the
     billing location. IEEE-CIS has no user id, and the usual Kaggle trick of
@@ -327,13 +342,27 @@ def run_ieee(model_name):
         evaluate("4_plus_our_entity", full + OUR_ENTITY, tr, ca, te,
                  "isFraud", "TransactionAmt", model_name),
     ]
-    print("--- diagnostic: do OUR entity features carry signal on their own? ---")
+    print("--- diagnostic: our own shared-entity features (SEE CAVEAT BELOW) ---")
     rows.append(evaluate("D_our_entity_only", OUR_ENTITY, tr, ca, te,
                          "isFraud", "TransactionAmt", model_name))
     marginal = rows[3]["pr_auc"] - rows[2]["pr_auc"]
-    print(f"  marginal lift of shared-entity structure on REAL data: "
-          f"{marginal:+.4f} PR-AUC "
+    print()
+    print(f"  measured marginal: {marginal:+.4f} PR-AUC "
           f"({rows[2]['pr_auc']:.4f} -> {rows[3]['pr_auc']:.4f})")
+    print()
+    print("  !! THIS NUMBER IS NOT EVIDENCE ABOUT OUR ENTITY GRAPH, IN EITHER")
+    print("     DIRECTION. IEEE-CIS cannot express the relationship the feature")
+    print("     encodes:")
+    print("       - DeviceInfo is a device TYPE, not a fingerprint. 'Windows'")
+    print("         alone is ~40% of rows, 'iOS Device' ~17%. A fan-out count")
+    print("         over it means 'how many cards ever used Windows'.")
+    print("       - There is NO account identifier, so 'one device across fifty")
+    print("         accounts' - the shape the graph exists to find - cannot be")
+    print("         represented. card1 stands in as a crude account proxy.")
+    print("     We would not accept a POSITIVE result from this experiment")
+    print("     either. Reported for inspection, not as a finding. See the")
+    print("     README section 'Why we do not claim this dataset validates or")
+    print("     refutes our entity graph', and failure-log 24.")
     prof = amount_profile(tx, "isFraud", "TransactionAmt")
     print(f"  amount profile: median fraud {prof['median_fraud_amount']} vs median legit "
           f"{prof['median_legit_amount']} = {prof['fraud_to_legit_median_ratio']}x")
