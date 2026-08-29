@@ -28,6 +28,10 @@ device type, not a fingerprint), so the result is reported for inspection and
 is not treated as evidence. A positive result there would be refused on the
 same grounds. See failure-log 24.
 
+Scope this precisely: the claim is that the two datasets we EVALUATED do not
+expose the persistent entity relationships needed to test the hypothesis. It
+is NOT a claim that no public dataset could - we did not survey the field.
+
 Expect a much lower number than the synthetic 0.934. That drop is the finding.
 A real-data result that came out equally high would mean the benchmark was as
 compromised as the simulator.

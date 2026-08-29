@@ -430,8 +430,11 @@ merchants.
    pessimistic direction. We do not claim IEEE-CIS validates the graph, and we
    do not claim it refutes it. We publish the rows and the caveat together -
    real_data_check.py prints both - and we say plainly that the merchant-level
-   layer is evaluated on controlled scenarios because no public dataset
-   reproduces the persistent account/device/IP relationships it needs.
+   layer is evaluated on controlled scenarios because the two public datasets
+   we EVALUATED (ULB, IEEE-CIS) do not expose the persistent entity
+   relationships needed to test it directly. Scope that claim to the datasets
+   we actually ran - we did not survey the field, and "no public dataset can"
+   is an unbounded claim we cannot support.
    The earlier framing ("our central claim came back negative") is RETRACTED as
    over-stated. It was written under an explicit instruction not to protect the
    author's ego and overshot in the other direction - which is its own kind of
