@@ -311,3 +311,36 @@ svg.graph.compact { height: 210px; }
   .views { margin-left: 0; order: 3; width: 100%; }
   .hero-inr { align-items: flex-start; }
 }
+
+/* ---------- cost curve + capacity ---------- */
+.curve { display: flex; flex-direction: column; gap: 3px; margin: 4px 0 10px; }
+.crow {
+  display: grid; grid-template-columns: 96px minmax(0,1fr) 78px 104px 108px;
+  gap: 12px; align-items: center; padding: 5px 8px; border-radius: 7px;
+  font-size: 12.5px;
+}
+.crow.on { background: #EEF6FF; box-shadow: inset 0 0 0 1px rgba(51,149,255,.4); }
+.crow.old { background: #FAFBFD; }
+.crow .cc { color: var(--dim); font-variant-numeric: tabular-nums; }
+.crow .cbar { height: 9px; background: #ECF0F5; border-radius: 5px; overflow: hidden; }
+.crow .cbar > i { display: block; height: 100%; background: #9FC7F5; border-radius: 5px; }
+.crow.on .cbar > i { background: var(--rzp-blue); }
+.crow .cn { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.crow .cl { color: var(--amber); font-variant-numeric: tabular-nums; text-align: right; font-size: 12px; }
+.crow .ct { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; color: var(--rzp-blue-deep); }
+.crow.old .ct { color: var(--faint); }
+.legend2 { display: flex; gap: 20px; font-size: 11.5px; color: var(--faint); margin: 0 0 14px 8px; }
+
+.tscroll2 { overflow-x: auto; margin: 4px 0 14px; }
+table.cap { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 460px; }
+table.cap th {
+  text-align: right; font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--faint); font-weight: 800; padding: 8px 12px; border-bottom: 1px solid var(--line);
+}
+table.cap th:first-child, table.cap td:first-child { text-align: left; }
+table.cap td { padding: 9px 12px; border-bottom: 1px solid var(--line-soft); text-align: right; }
+table.cap td.bad { color: var(--red); font-weight: 700; }
+@media (max-width: 720px) {
+  .crow { grid-template-columns: 78px minmax(0,1fr) 70px; }
+  .crow .cl, .crow .ct { display: none; }
+}

@@ -468,6 +468,110 @@ function Contrast({ merchants }) {
    The strongest material in this project lives in README.md, where a judge
    has to go looking for it. This puts it one click from the demo. Every
    number here is reproduced from artifacts_out/ by a command in the README. */
+/* ---------------------------------------- cost / capacity panels
+   Reproduced from `python -m src.policy.threshold_sweep`, which writes
+   artifacts_out/threshold_sweep.csv. Hardcoded here because artifacts_out is
+   gitignored, so a fresh deployment has no CSV to read - same convention the
+   metric tiles above already use. Values are the validation slice. */
+const SWEEP = [
+  { cut: 20, npv: 125639, legit: 2514 },
+  { cut: 25, npv: 125840, legit: 2313 },
+  { cut: 30, npv: 121284, legit: 1597 },
+  { cut: 35, npv: 116034, legit: 408 },
+  { cut: 40, npv: 116216, legit: 226 },
+  { cut: 50, npv: 116216, legit: 226 },
+  { cut: 60, npv: 116216, legit: 226 },
+  { cut: 70, npv: 116216, legit: 226 },
+  { cut: 80, npv: 116216, legit: 226 },
+];
+
+function CostCurve() {
+  const max = Math.max(...SWEEP.map((d) => d.npv));
+  const min = Math.min(...SWEEP.map((d) => d.npv)) * 0.985;
+  return html`
+    <div class="panel">
+      <h2>the false-positive tradeoff, and where we set the dial</h2>
+      <p class="note" style=${{ marginTop: 0 }}>
+        Blocking harder always prevents more fraud. It also destroys more good
+        revenue. Every cutoff below was scored on the <b>validation</b> slice
+        only — the test slice was read once, at the end — and the pair we adopted
+        was fixed by a rule written down in advance.
+      </p>
+      <div class="curve">
+        ${SWEEP.map((d) => {
+          const w = 100 * (d.npv - min) / (max - min);
+          const on = d.cut === 25, old = d.cut === 60;
+          return html`
+          <div class=${'crow' + (on ? ' on' : '') + (old ? ' old' : '')} key=${d.cut}>
+            <div class="cc">step-up ≥ ${d.cut}</div>
+            <div class="cbar"><i style=${{ width: Math.max(2, w) + '%' }}></i></div>
+            <div class="cn">${inr(d.npv)}</div>
+            <div class="cl">${inr(d.legit)}${' '}blocked</div>
+            <div class="ct">${on ? 'adopted' : old ? 'previous default' : ''}</div>
+          </div>`;
+        })}
+      </div>
+      <div class="legend2">
+        <span>bar = net protected value</span>
+        <span>right column = legitimate ₹ wrongly impacted</span>
+      </div>
+      <p>Moving the step-up cutoff from 60 to 25 is worth <b>+8.28%</b> net
+        protected value — and costs <b>10× more</b> legitimate revenue
+        (₹226 → ₹2,313). We took that trade because step-up is friction, not a
+        block: a real customer completes an OTP. We would not take it for the${' '}
+        <i>restrict</i> cutoff, and we didn't.</p>
+      <p class="note"><b>What the flat run above 40 actually means.</b> Net
+        protected value is <i>identical</i> from 40 to 80 because no validation
+        transaction scores in that band. Our pre-declared "adopt the best pair"
+        rule would have picked an arbitrary point inside that dead zone on a
+        +0.53% difference. We caught it, refined the rule to a per-parameter
+        margin, and left restrict at 85 — documented as a post-hoc refinement
+        rather than presented as foresight. That's failure-log 10.</p>
+    </div>`;
+}
+
+function Capacity() {
+  const perK = 44.1, perAnalystHour = 30;
+  const rows = [10e3, 100e3, 1e6].map((v) => {
+    const cases = v / 1000 * perK;
+    const hours = cases / perAnalystHour;
+    return { v, cases, hours, fte: hours / 8 };
+  });
+  const f = (n) => n >= 1e5 ? (n / 1e5).toFixed(1) + 'L' : Math.round(n).toLocaleString();
+  return html`
+    <div class="panel">
+      <h2>would the queue actually be staffable?</h2>
+      <p class="note" style=${{ marginTop: 0 }}>
+        We price an analyst review at ₹50 but never checked whether the analysts
+        exist. This is that check. Assumption stated so it can be argued with:${' '}
+        <b>30 cases per analyst-hour</b> (two minutes each), 8-hour shifts.
+      </p>
+      <div class="tscroll2">
+        <table class="cap">
+          <tr><th>transactions / day</th><th>review cases / day</th><th>analyst-hours / day</th><th>full-time analysts</th></tr>
+          ${rows.map((r) => html`<tr key=${r.v}>
+            <td class="mono">${r.v.toLocaleString()}</td>
+            <td class="mono">${f(r.cases)}</td>
+            <td class="mono">${Math.round(r.hours).toLocaleString()}</td>
+            <td class=${'mono ' + (r.fte > 50 ? 'bad' : '')}>${Math.round(r.fte).toLocaleString()}</td>
+          </tr>`)}
+        </table>
+      </div>
+      <p><b>At PSP scale this does not staff.</b> 184 full-time analysts to
+        clear one million transactions a day is not a rounding error, it is a
+        department. Our 4.41% review rate is tuned for net rupees, and nothing
+        in the objective function knows that analyst capacity is finite.</p>
+      <p class="note">The honest fix is not a better model — it is a second
+        constraint. The restrict and review cutoffs would have to be re-swept
+        against a capacity ceiling (<i>maximise net protected value subject to
+        ≤ N cases/day</i>), which trades recall for a queue an ops team can
+        actually clear. We know the lever and we have the sweep harness to move
+        it; what we do not have is the one number only an ops team can give us —
+        how many cases a day they can absorb. Reported as an open question
+        rather than a solved one.</p>
+    </div>`;
+}
+
 function Metric({ k, v, note }) {
   return html`<div class="met">
     <div class="mk">${k}</div><div class="mv">${v}</div>
@@ -532,6 +636,9 @@ function Pitch() {
         <${Metric} k="LLM policy violations" v="0 / 13" note="0/13 unsafe actions too" />
       </div>
     </div>
+
+    <${CostCurve} />
+    <${Capacity} />
 
     <div class="panel">
       <h2>we attacked our own evaluation three times</h2>
