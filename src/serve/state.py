@@ -15,6 +15,8 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
+from src.models.train import (REVIEW_COST_INR, STEP_UP_ABANDON,  # noqa: E402
+                              STEP_UP_FRAUD_BLOCKED)
 from src.policy.engine import Action
 
 HIGH_RISK_CUT = 0.5
@@ -130,6 +132,14 @@ class PipelineState:
         self.paused = False
         self.finished = False
         self._next_case_id = 1
+        # Running economics, costed with the SAME constants train.py uses -
+        # imported, not re-declared, so the live board and the offline report
+        # cannot drift apart (failure-log 14's lesson). This needs ground
+        # truth, which we only have because the demo replays a LABELLED test
+        # slice; it is a replay of a measured result, not a live prediction.
+        self.prevented_inr = 0.0
+        self.impacted_inr = 0.0
+        self.review_cases = 0
 
     # ---------------------------------------------------------- writes
     def merchant(self, mid: str) -> MerchantState:
@@ -163,6 +173,21 @@ class PipelineState:
                 m.in_spike, m.spike_started_ts = True, spike_ts
                 self.log_event("spike", f"{m.merchant_id} entered spike state",
                                merchant_id=m.merchant_id, ts=int(row["ts"]))
+            # --- economics of the DECISION, streamed ---
+            fraud = row.get("is_fraud")
+            if fraud is not None:
+                amt, is_f = float(row["amount"]), bool(fraud)
+                if action is Action.RESTRICT:
+                    self.prevented_inr += amt if is_f else 0.0
+                    self.impacted_inr += 0.0 if is_f else amt
+                elif action is Action.REVIEW:
+                    self.prevented_inr += amt if is_f else 0.0
+                elif action is Action.STEP_UP:
+                    self.prevented_inr += amt * STEP_UP_FRAUD_BLOCKED if is_f else 0.0
+                    self.impacted_inr += 0.0 if is_f else amt * STEP_UP_ABANDON
+                if action in (Action.REVIEW, Action.RESTRICT):
+                    self.review_cases += 1
+
             if action in (Action.REVIEW, Action.RESTRICT):
                 self.review_queue.append(ReviewCase(
                     case_id=self._next_case_id, merchant_id=row["merchant_id"],
@@ -258,10 +283,21 @@ class PipelineState:
             return {"cases": q[-200:], "total_cases": len(self.review_queue),
                     "pending_total": pending_total}
 
+    def economics(self) -> dict:
+        """Net protected value so far. Same formula as train.py step 7."""
+        review_cost = self.review_cases * REVIEW_COST_INR
+        net = self.prevented_inr - self.impacted_inr - review_cost
+        return {"prevented_inr": round(self.prevented_inr, 2),
+                "impacted_inr": round(self.impacted_inr, 2),
+                "review_cases": self.review_cases,
+                "review_cost_inr": round(review_cost, 2),
+                "net_protected_inr": round(net, 2)}
+
     def status(self) -> dict:
         with self._lock:
             elapsed = (time.time() - self.started_at) if self.started_at else 0.0
             return {"processed": self.processed, "total": self.total,
+                    "economics": self.economics(),
                     "pct": round(100.0 * self.processed / max(1, self.total), 2),
                     "speed_tps": self.speed, "paused": self.paused,
                     "finished": self.finished, "elapsed_s": round(elapsed, 1),

@@ -58,9 +58,14 @@ def run(scored, ctx, investigate_enabled: bool = True):
     STATE.total = len(scored)
     STATE.started_at = time.time()
 
+    # is_fraud is carried ONLY to cost the decisions after the fact - it is
+    # never an input to fusion or to the policy engine. The demo replays a
+    # labelled held-out slice, so the running INR figure is a replay of a
+    # measured result rather than a live prediction.
     cols = ["merchant_id", "ts", "p", "amount", "customer_id", "device_id",
             "ip", "instrument_id", "component_size", "device_account_count",
-            "ip_account_count", "instrument_customer_count", "cust_txn_5m"]
+            "ip_account_count", "instrument_customer_count", "cust_txn_5m",
+            "is_fraud"]
     records = scored[cols].to_dict("records")
 
     batch_sleep, since_sleep = 0.0, 0

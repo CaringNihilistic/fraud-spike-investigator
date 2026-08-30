@@ -52,7 +52,7 @@ function usePoll(path, ms, deps = []) {
 }
 
 /* ------------------------------------------------------------ header */
-function Header({ status, onSpeed, onPause }) {
+function Header({ status, onSpeed, onPause, view, setView }) {
   const s = status || {};
   // local echo + debounce: the label tracks the thumb instantly, but the POST
   // fires only when the user settles (a drag would otherwise fire dozens)
@@ -72,7 +72,18 @@ function Header({ status, onSpeed, onPause }) {
           <div class="sub">merchant-level detection · entity correlation · policy-gated investigation</div>
         </div>
       </div>
+      <nav class="views">
+        <button class=${'vtab' + (view === 'console' ? ' on' : '')}
+                onClick=${() => setView('console')}>Live console</button>
+        <button class=${'vtab' + (view === 'pitch' ? ' on' : '')}
+                onClick=${() => setView('pitch')}>Pitch & architecture</button>
+      </nav>
       <span class="spacer"></span>
+      ${/* The biggest number on screen is money, not throughput. */''}
+      <div class="hero-inr" title="Fraud prevented minus legitimate revenue impacted minus analyst review cost, costed live with the same constants as the offline report (₹50/review, 7% step-up abandon, 90% of fraud fails step-up).">
+        <span class="hv">${inr((s.economics || {}).net_protected_inr)}</span>
+        <span class="hl">net protected</span>
+      </div>
       <span class="counter mono">
         ${`${(s.processed || 0).toLocaleString()} / ${(s.total || 0).toLocaleString()} txns · ${(s.pct || 0).toFixed(0)}%`}
         ${s.merchants_in_spike ? html`${' · '}<b>${s.merchants_in_spike} under attack</b>` : ''}
@@ -453,11 +464,141 @@ function Contrast({ merchants }) {
     </div>`;
 }
 
+/* ------------------------------------------------- pitch & architecture
+   The strongest material in this project lives in README.md, where a judge
+   has to go looking for it. This puts it one click from the demo. Every
+   number here is reproduced from artifacts_out/ by a command in the README. */
+function Metric({ k, v, note }) {
+  return html`<div class="met">
+    <div class="mk">${k}</div><div class="mv">${v}</div>
+    ${note ? html`<div class="mn">${note}</div>` : ''}</div>`;
+}
+
+function Pitch() {
+  return html`
+  <div class="pitch">
+    <div class="panel">
+      <h2>the problem</h2>
+      <p class="big">Merchants don't lose money one transaction at a time.${' '}
+        <b>They lose it in bursts.</b></p>
+      <p>Card-testing waves, device farms, IP clusters, account takeovers, fraud rings.
+        Per-order scoring catches individual bad orders. Nobody tells a merchant${' '}
+        <i>"you are under attack right now, here's who's behind it, here's your ₹ exposure,
+        here's the bounded action."</i></p>
+      <p>This sits <b>one level above per-order scoring</b>. It consumes per-order risk as an
+        input and answers the question that layer can't: is this merchant under attack, and
+        what should a human do in the next ten minutes?</p>
+      <p class="note">The hard part isn't catching attacks — it's not crying wolf. A 6×
+        legitimate flash sale must never be blocked. That's a first-class scenario here,
+        and it's the finale of the demo.</p>
+    </div>
+
+    <div class="panel">
+      <h2>architecture</h2>
+      <div class="flow">
+        <div class="fstep"><b>transaction stream</b><span>replayed test slice, in ts order</span></div>
+        <div class="farr">↓</div>
+        <div class="fstep"><b>22 incremental features</b><span>every feature from prior events only — state updated after emission</span></div>
+        <div class="farr">↓</div>
+        <div class="fstep"><b>XGBoost + isotonic calibration</b><span>chosen empirically over 3 alternatives on validation; no SMOTE</span></div>
+        <div class="farr">↓</div>
+        <div class="fstep"><b>merchant spike detector</b><span>EWMA + z-score on fraud-score RATE, not volume — ~50 lines</span></div>
+        <div class="farr">↓</div>
+        <div class="fstep"><b>risk fusion</b><span>calibrated probability is the floor; spike / graph / rules escalate into the headroom</span></div>
+        <div class="farr">↓</div>
+        <div class="fstep hot"><b>policy engine — the only component that authorises anything</b>
+          <span>frozen allowlist: allow · step_up · review · restrict</span></div>
+        <div class="farr">↓</div>
+        <div class="fstep"><b>human review queue</b><span>analyst override, bound by the same allowlist</span></div>
+      </div>
+      <p class="note" style=${{ marginTop: '14px' }}>
+        The LLM investigator hangs <b>off</b> this path. It fires on spike, reads six
+        read-only tools, and writes a report. If it recommends anything outside the
+        allowlist it is degraded to <b>human review</b> — never escalated. Disabling it
+        changes no decision, and that is pytest-enforced.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2>results — temporal held-out test slice, synthetic data</h2>
+      <div class="mets">
+        <${Metric} k="attacks detected" v="25 / 25" note="across 5 independent worlds" />
+        <${Metric} k="false alarms" v="0" note="in every world" />
+        <${Metric} k="flash sale flagged" v="0 / 5" note="the legitimate 6× spike" />
+        <${Metric} k="net protected value" v="₹10.57L" note="after 617 reviews × ₹50" />
+        <${Metric} k="precision / recall" v="0.994 / 0.886" note="at the cost-optimal threshold" />
+        <${Metric} k="legitimate ₹ impacted" v="₹4,814" note="the false-positive cost" />
+        <${Metric} k="calibration (Brier / ECE)" v="0.0053 / 0.0033" note="measured, not assumed" />
+        <${Metric} k="LLM policy violations" v="0 / 13" note="0/13 unsafe actions too" />
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>we attacked our own evaluation three times</h2>
+      <p class="note" style=${{ marginTop: 0 }}>Each audit lowered a number we had already
+        written down. We published the lower number every time. All three reproduce from
+        the repo.</p>
+      <div class="audits">
+        <div class="aud">
+          <div class="an">01</div>
+          <div>
+            <h3>Was the agent reading our answer key?</h3>
+            <p>It scored <b>9/10</b> on cause. Then we noticed our simulator's entity IDs were
+              self-labelling — <span class="mono">pi_STOLEN_*</span>,${' '}
+              <span class="mono">d_FARM_F</span> — and transcripts were citing them verbatim
+              as evidence. We hashed every ID. The score fell to <b>5/10</b>. That gap is
+              exactly how much was the dataset whispering.</p>
+          </div>
+        </div>
+        <div class="aud">
+          <div class="an">02</div>
+          <div>
+            <h3>Was the <i>model</i> reading our answer key?</h3>
+            <p>Same attack, one layer down. <b>Two features reproduce the entire 22-feature
+              model</b> — because our generator creates attack accounts on the attack day.
+              This forced us to retract our own headline claim that entity/graph features
+              were the source of the lift.</p>
+          </div>
+        </div>
+        <div class="aud">
+          <div class="an">03</div>
+          <div>
+            <h3>Does any of it survive real data?</h3>
+            <p>The unchanged recipe scores <b>0.731</b> on ULB (284k real transactions) and${' '}
+              <b>0.460</b> on IEEE-CIS, with zero tuning. It also exposed a latent bug ours
+              could never surface: the cost threshold couldn't express "block nothing", which
+              on real data was <b>3.8× cheaper</b> than what it chose.</p>
+          </div>
+        </div>
+      </div>
+      <p class="note"><b>24 failures</b> are logged with root causes in the repo. Every one was
+        caught by measuring a claim, not by re-reading code.</p>
+    </div>
+
+    <div class="panel">
+      <h2>what we're not claiming</h2>
+      <ul class="lims">
+        <li>Data is <b>synthetic</b> and labelled as such everywhere. Simulator parameters are
+          design choices, not Razorpay statistics. <b>Nothing here is Razorpay data.</b></li>
+        <li>Our simulator encodes the label into two features, so the headline PR-AUC
+          overstates real detection ability. Audit 02, published rather than hidden.</li>
+        <li>The <b>merchant-level</b> layer is validated on controlled scenarios only —
+          neither public dataset we evaluated has a merchant column.</li>
+        <li>The agent gets the cause right <b>8/13</b> times. It is advisory and cannot act.
+          That separation is the point, and it's tested.</li>
+        <li>44 review cases per 1,000 transactions is priced at ₹50 but never checked
+          against whether the analysts exist.</li>
+      </ul>
+    </div>
+  </div>`;
+}
+
 /* ------------------------------------------------------------ app */
 function App() {
   const [status] = usePoll('/api/status', 1000);
   const [mdata] = usePoll('/api/merchants', 1500);
   const [sel, setSel] = useState(null);
+  const [view, setView] = useState('console');
 
   const merchants = mdata?.merchants || [];
   // Auto-focus the most DEMONSTRATIVE merchant, not merely the first spiking
@@ -490,8 +631,10 @@ function App() {
 
   return html`
     <div>
-      <${Header} status=${status} onSpeed=${setSpeed} onPause=${setPause} />
+      <${Header} status=${status} onSpeed=${setSpeed} onPause=${setPause}
+                 view=${view} setView=${setView} />
       <main>
+        ${view === 'pitch' ? html`<${Pitch} />` : html`<div>
         ${finale ? html`
           <div class="finale-banner">
             <span>✓ ${finale.message}</span>
@@ -500,7 +643,12 @@ function App() {
           </div>` : ''}
         ${finale ? html`<${Contrast} merchants=${merchants} />` : ''}
         <div class="panel" style=${{ marginBottom: '14px' }}>
-          <h2>merchants</h2>
+          <h2>merchants ${' '}<span class="sandbox">judge sandbox</span></h2>
+          <div class="note" style=${{ marginTop: '-4px', marginBottom: '12px' }}>
+            Live replay of a held-out test slice through the real pipeline — not a canned
+            animation. <b>Click any merchant</b> to see who is behind its flagged
+            transactions, or run an investigation on demand. Attack merchants sort to the top.
+          </div>
           <div class="chips">
             <button class=${'chip' + (filter === 'all' ? ' active' : '')}
                     onClick=${() => setFilter('all')}>All ${' '}<span class="n">${merchants.length}</span></button>
@@ -538,6 +686,7 @@ function App() {
           <div class="panel"><h2>review queue</h2><${ReviewQueue} /></div>
           <div class="panel"><h2>pipeline events</h2><${Feed} events=${status?.events} /></div>
         </div>
+        </div>`}
       </main>
     </div>`;
 }

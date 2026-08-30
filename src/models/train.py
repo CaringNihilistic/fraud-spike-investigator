@@ -47,6 +47,9 @@ OUT.mkdir(exist_ok=True)
 # --- economics (documented simulator assumptions, not Razorpay data) ---
 FP_COST_FRACTION = 1.0   # blocking a good order forfeits its full amount
 FN_COST_FRACTION = 1.0   # missing fraud loses its full amount
+REVIEW_COST_INR = 50.0        # analyst cost per human review case
+STEP_UP_ABANDON = 0.07        # 7% of legit customers abandon at OTP/3DS
+STEP_UP_FRAUD_BLOCKED = 0.90  # 90% of fraud fails step-up verification
 
 
 def temporal_split(df: pd.DataFrame):
@@ -214,10 +217,8 @@ def main():
 
     # ================================================================
     # 7. NET PROTECTED VALUE - economics of the DECISIONS, not the model
-    # Assumptions (documented, simulator-level, not Razorpay data):
-    REVIEW_COST_INR = 50.0        # analyst cost per human review case
-    STEP_UP_ABANDON = 0.07        # 7% of legit customers abandon at OTP/3DS
-    STEP_UP_FRAUD_BLOCKED = 0.90  # 90% of fraud fails step-up verification
+    # Constants live at module level (see top of file) so the live dashboard
+    # and this report cannot drift apart - one definition per measurement.
     # ================================================================
     print("\n=== 7. net protected value (policy-engine decisions, P1b risk fusion) ===")
     stream = StreamingSpikeDetector()
