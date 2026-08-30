@@ -169,31 +169,54 @@ def main():
     # moving it alone clears the margin. Where it does not, the conservative
     # default stands. This refinement was made after seeing the surface, and
     # is recorded here rather than quietly folded into the result.
+    # The grid requires step_up < restrict, so a one-at-a-time move is not
+    # always a POINT ON THE GRID: moving restrict down to 55 while step_up
+    # stays at the baseline 60 is not a valid policy at all. That pair used
+    # to raise IndexError and kill the run. A move we cannot evaluate in
+    # isolation is not evidence FOR making it, so it returns None and the
+    # conservative default stands - the same direction the margin already
+    # points. Never silently substitute a nearby cell.
     def npv_at(rc, sc):
         row = table[(table.restrict_cut == rc) & (table.step_up_cut == sc)]
-        return float(row.iloc[0].net_protected_value_inr)
+        return None if row.empty else float(row.iloc[0].net_protected_value_inr)
+
+    def lift_of(rc, sc, base):
+        v = npv_at(rc, sc)
+        return None if v is None else 100.0 * (v - base) / abs(base)
 
     base_npv = npv_at(*BASELINE)
     step_only = float(best.step_up_cut)
     restrict_only = float(best.restrict_cut)
-    step_lift = 100.0 * (npv_at(BASELINE[0], step_only) - base_npv) / abs(base_npv)
-    restrict_lift = 100.0 * (npv_at(restrict_only, BASELINE[1]) - base_npv) / abs(base_npv)
+    step_lift = lift_of(BASELINE[0], step_only, base_npv)
+    restrict_lift = lift_of(restrict_only, BASELINE[1], base_npv)
 
-    adopted_restrict = restrict_only if restrict_lift > ADOPT_MARGIN_PCT else BASELINE[0]
-    adopted_step_up = step_only if step_lift > ADOPT_MARGIN_PCT else BASELINE[1]
+    def clears(lift):
+        return lift is not None and lift > ADOPT_MARGIN_PCT
+
+    adopted_restrict = restrict_only if clears(restrict_lift) else BASELINE[0]
+    adopted_step_up = step_only if clears(step_lift) else BASELINE[1]
     adopted = (adopted_restrict, adopted_step_up)
 
+    def verdict_for(lift, keep):
+        if lift is None:
+            return ("NOT INDEPENDENTLY EVALUABLE (step_up must stay below "
+                    f"restrict) -> KEEP {int(keep)}")
+        return (f"{lift:+.3f}%  -> "
+                f"{'ADOPT' if lift > ADOPT_MARGIN_PCT else 'KEEP ' + str(int(keep))}")
+
     print(f"\nper-parameter lift (each moved alone, other held at baseline):")
-    print(f"  restrict {BASELINE[0]:.0f} -> {restrict_only:.0f}: {restrict_lift:+.3f}%  "
-          f"-> {'ADOPT' if restrict_lift > ADOPT_MARGIN_PCT else 'KEEP ' + str(int(BASELINE[0]))}")
-    print(f"  step_up  {BASELINE[1]:.0f} -> {step_only:.0f}: {step_lift:+.3f}%  "
-          f"-> {'ADOPT' if step_lift > ADOPT_MARGIN_PCT else 'KEEP ' + str(int(BASELINE[1]))}")
+    print(f"  restrict {BASELINE[0]:.0f} -> {restrict_only:.0f}: "
+          f"{verdict_for(restrict_lift, BASELINE[0])}")
+    print(f"  step_up  {BASELINE[1]:.0f} -> {step_only:.0f}: "
+          f"{verdict_for(step_lift, BASELINE[1])}")
+
+    def _say(lift):
+        return "not independently evaluable" if lift is None else f"{lift:+.2f}%"
 
     verdict = (f"ADOPTED ({adopted[0]:.0f}, {adopted[1]:.0f}). "
-               f"step_up {BASELINE[1]:.0f}->{adopted[1]:.0f} clears the {ADOPT_MARGIN_PCT}% margin "
-               f"({step_lift:+.2f}%); restrict stays at {adopted[0]:.0f} because moving it alone "
-               f"is worth only {restrict_lift:+.2f}% and its NPV surface is flat across a 9-wide "
-               f"tie (40-80), i.e. unidentified on this validation slice.")
+               f"step_up {BASELINE[1]:.0f}->{adopted[1]:.0f}: {_say(step_lift)}; "
+               f"restrict {BASELINE[0]:.0f}->{adopted[0]:.0f}: {_say(restrict_lift)}. "
+               f"(adopt margin {ADOPT_MARGIN_PCT}%, applied per parameter)")
     if adopted == tuple(BASELINE):
         verdict = (f"KEPT (85, 60) - no single cutoff clears the {ADOPT_MARGIN_PCT}% margin on a "
                    f"slice with {n_fraud} positives. The sweep VALIDATED the existing policy.")

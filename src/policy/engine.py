@@ -29,11 +29,14 @@ ALLOWLIST = frozenset(a.value for a in Action)
 # the VALIDATION slice under the net-protected-value framework. They are
 # parameters of decide() so the sweep can vary them without monkey-patching,
 # but the defaults are what production uses.
-RESTRICT_CUT = 85.0   # unchanged: validation NPV is flat across 40-80, so the
-#                       sweep could not identify a better value; keep the
-#                       conservative hand-set cut rather than pick a dead-zone point.
-STEP_UP_CUT = 25.0    # was 60.0, hand-set against the old p*100 scale.
-#                       Cost-optimized on validation (days 21-23): +8.28% net
+RESTRICT_CUT = 85.0   # unchanged. The sweep's best PAIR wants 55, but moving
+#                       restrict alone to 55 while step_up sits at the baseline
+#                       60 is not a valid policy (step_up must stay the lower
+#                       bar), so that move is NOT INDEPENDENTLY EVALUABLE under
+#                       the per-parameter rule. A move we cannot measure alone is
+#                       not evidence for making it: the conservative cut stands.
+STEP_UP_CUT = 20.0    # was 60.0, hand-set against the old p*100 scale.
+#                       Cost-optimized on validation (days 21-23): +15.82% net
 #                       protected value. Catches fraud the 60 cut allowed through.
 LOW_CONFIDENCE_CUT = 0.4
 

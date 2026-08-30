@@ -116,9 +116,48 @@ def gen_baseline(w: World, rng) -> list[dict]:
                 if rng.random() < 0.007:  # ambient ~0.7% fraud
                     r["is_fraud"] = 1
                     r["scenario"] = "baseline_fraud"
-                    r["amount"] = round(r["amount"] * float(rng.uniform(1.5, 4.0)), 2)
+                    # Fraud amount is FRAUD-TYPE dependent, and we used to model
+                    # only the expensive case (uniform 1.5-4.0x), which made
+                    # amount_dev_ratio the second label proxy. Real card testing
+                    # uses TINY amounts on purpose - ULB's real fraud runs 0.42x
+                    # the median legitimate amount, while IEEE-CIS e-commerce
+                    # fraud runs 1.10x (failure-log 23/24). Generate both, so the
+                    # ratio is no longer monotonic in the label.
+                    mult = (float(rng.uniform(0.08, 0.6)) if rng.random() < 0.4
+                            else float(rng.uniform(1.2, 3.5)))
+                    r["amount"] = round(max(1.0, r["amount"] * mult), 2)
                 rows.append(r)
     return rows
+
+
+# ------------------------------------------------- attack account ageing
+# Real fraudsters BUY AGED ACCOUNTS. Our first generator created every attack
+# account on the attack day itself, which made customer_age_days a near-perfect
+# label proxy: median attack age 0.98-5.65 days against a legitimate 215.76, so
+# TWO features scored what all twenty-two did (failure-log 21).
+#
+# The fix is not to make attackers look old - it is to stop making them
+# uniformly young. Draw from a MIXTURE: `aged_share` of attack accounts are
+# aged exactly like the legitimate population (bought, farmed or compromised
+# long before the attack), and the rest are genuinely new, because throwaway
+# guest checkout is also real.
+#
+# The shares below were fixed on this rationale BEFORE measuring, and are not
+# tuned afterwards: rings buy aged accounts and are the most patient (0.8);
+# farms and IP clusters mix bought with fresh (0.6); card testing runs largely
+# on disposable guest checkouts, so it stays the youngest (0.5).
+AGED_SHARE_RING = 0.8
+AGED_SHARE_FARM = 0.6
+AGED_SHARE_CLUSTER = 0.6
+AGED_SHARE_CARD_TESTING = 0.5
+
+
+def _attack_created_day(rng, day: int, aged_share: float) -> int:
+    """created_day for one attack account. Same draw as a real customer with
+    probability `aged_share`, otherwise genuinely recent."""
+    if float(rng.random()) < aged_share:
+        return int(rng.integers(-400, 0))      # indistinguishable from legit
+    return int(day - rng.integers(0, 12))      # genuinely new
 
 
 # ---------------------------------------------------------------- scenarios
@@ -137,7 +176,8 @@ def s1_fraud_spike(w, rng, merchant=3, day=24, tag="s1_fraud_spike", n=180, pfx=
                  device_id=str(rng.choice(atk_devices)),
                  ip=str(rng.choice(atk_ips)),
                  instrument_id=oid("pi", f"stolen{pfx}{i}"),    # a NEW stolen card each time
-                 customer_created_day=int(day),
+                 customer_created_day=_attack_created_day(
+                     rng, day, AGED_SHARE_CARD_TESTING),
                  payment_method="card",
                  amount=round(float(rng.choice([10, 25, 49, 99]) * rng.uniform(1, 30)), 2))
         rows.append(r)
@@ -154,7 +194,7 @@ def s2_device_farm(w, rng, merchant=5, day=25, tag="s2_device_farm", pfx="F", n=
         r = {**_base_txn(w, rng, t, merchant),
              "customer_id": acct, "device_id": farm_device, "ip": farm_ip,
              "instrument_id": str(rng.choice(instruments)),
-             "customer_created_day": int(day - rng.integers(0, 3)),  # brand-new accounts
+             "customer_created_day": _attack_created_day(rng, day, AGED_SHARE_FARM),
              "is_fraud": 1, "scenario": tag}
         rows.append(r)
     return rows
@@ -169,7 +209,7 @@ def s3_ip_cluster(w, rng, merchant=7, day=26, tag="s3_ip_cluster", pfx="I", n=10
              "customer_id": acct, "device_id": oid("d", f"clu{pfx}{i % 40}"),
              "ip": oid("ip", f"clu{pfx}"),
              "instrument_id": oid("pi", f"clu{pfx}{i % 40}"),
-             "customer_created_day": int(day - rng.integers(0, 5)),
+             "customer_created_day": _attack_created_day(rng, day, AGED_SHARE_CLUSTER),
              "is_fraud": 1, "scenario": tag}
         rows.append(r)
     return rows
@@ -205,7 +245,7 @@ def s5_fraud_ring(w, rng, merchant=9, day=28, tag="s5_fraud_ring", pfx="R", n=12
              "device_id": str(rng.choice(devices)),
              "ip": str(rng.choice(ips)),
              "instrument_id": str(rng.choice(instruments)),
-             "customer_created_day": int(day - rng.integers(0, 10)),
+             "customer_created_day": _attack_created_day(rng, day, AGED_SHARE_RING),
              "is_fraud": 1, "scenario": tag}
         rows.append(r)
     return rows
