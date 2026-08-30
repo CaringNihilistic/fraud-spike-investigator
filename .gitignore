@@ -13,6 +13,11 @@ data/
 !artifacts_out/
 artifacts_out/*
 !artifacts_out/eval_runs/
+# The model-selection DECISION is a record, not scratch output: it is what
+# train.py, ablation.py and run_demo.py read to know the winner is XGBoost.
+# Without it a clean clone silently falls back to a different library and
+# stops matching the README - which is exactly what broke the first deploy.
+!artifacts_out/model_selection_decision.json
 # CatBoost writes training telemetry to CWD during model selection.
 catboost_info/
 

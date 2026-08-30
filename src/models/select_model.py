@@ -62,18 +62,40 @@ def build_gbdt(name: str, weight: float, n_estimators: int = 400,
     (used by train.py / ablation.py for the real run). Kept separate from
     the default-hyperparameter estimators below, which exist only to make
     the selection comparison fair (no per-model tuning)."""
+    # A missing library fails LOUDLY and says what to do. It must never
+    # silently substitute a different family: the whole point of P1a-0 is that
+    # the model was chosen empirically, and quietly training a different one
+    # would invalidate every number downstream while looking like it worked.
+    def _need(pkg: str, err: Exception):
+        raise ModuleNotFoundError(
+            f"build_gbdt('{name}') needs '{pkg}', which is not installed.\n"
+            f"  If you are deploying: requirements-serve.txt is deliberately slim and\n"
+            f"  only carries the SELECTED family. Ship\n"
+            f"  artifacts_out/model_selection_decision.json so the winner is known,\n"
+            f"  or install the full requirements.txt.\n"
+            f"  Original error: {err}") from err
+
     if name == "LightGBM":
-        import lightgbm as lgb
+        try:
+            import lightgbm as lgb
+        except ImportError as e:
+            _need("lightgbm", e)
         return lgb.LGBMClassifier(n_estimators=n_estimators, learning_rate=learning_rate,
                                    num_leaves=63, scale_pos_weight=weight,
                                    random_state=random_state, verbose=-1)
     if name == "XGBoost":
-        from xgboost import XGBClassifier
+        try:
+            from xgboost import XGBClassifier
+        except ImportError as e:
+            _need("xgboost", e)
         return XGBClassifier(n_estimators=n_estimators, learning_rate=learning_rate,
                               max_depth=6, scale_pos_weight=weight,
                               random_state=random_state, eval_metric="aucpr", verbosity=0)
     if name == "CatBoost":
-        from catboost import CatBoostClassifier
+        try:
+            from catboost import CatBoostClassifier
+        except ImportError as e:
+            _need("catboost", e)
         return CatBoostClassifier(iterations=n_estimators, learning_rate=learning_rate,
                                    depth=6, scale_pos_weight=weight,
                                    random_state=random_state, verbose=False)
