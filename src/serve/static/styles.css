@@ -344,3 +344,60 @@ table.cap td.bad { color: var(--red); font-weight: 700; }
   .crow { grid-template-columns: 78px minmax(0,1fr) 70px; }
   .crow .cl, .crow .ct { display: none; }
 }
+
+/* ---------- conclusion-first merchant card ----------
+   The card used to be five metric rows and no sentence, so a reader had to
+   assemble "a 5.5L account takeover hit 79 transactions and we blocked it"
+   out of the numbers themselves. Verdict, then the evidence that supports
+   it, then what the system actually DID, then the supporting metrics. */
+.verdict {
+  font-size: 14px; line-height: 1.5; color: var(--text);
+  margin: 2px 0 6px; letter-spacing: -.005em;
+}
+.verdict b { font-weight: 700; }
+.mcard.spiking .verdict b { color: var(--red); }
+.mcard.flash .verdict b { color: var(--green); }
+/* The signature is COUNTED, never inferred - "3 devices shared by 41
+   accounts", never "this is a device farm". Styled as evidence, not verdict. */
+.sig {
+  font-size: 12.5px; color: var(--dim); cursor: help;
+  padding: 5px 8px; margin-bottom: 9px;
+  background: #F7F9FC; border-left: 2px solid var(--line);
+  border-radius: 0 4px 4px 0;
+}
+.mcard.spiking .sig { background: #FFF7F6; border-left-color: #F7B4AE; }
+.acts {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+  margin-bottom: 10px; padding-bottom: 9px; border-bottom: 1px solid var(--line-soft);
+}
+.acts .al {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--faint); font-weight: 700; margin-right: 2px;
+}
+.act {
+  font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.act.r { background: var(--red-soft); color: #B42318; }
+.act.s { background: var(--amber-soft); color: var(--amber); }
+.act.v { background: #EDE9FE; color: var(--violet); }
+.act.n { background: var(--green-soft); color: var(--green); }
+
+/* ---------- orientation line ----------
+   One sentence stating the entire claim, above everything else, so a judge
+   who reads nothing else still leaves with the point. */
+.watching {
+  background: var(--card); border: 1px solid var(--line);
+  border-left: 4px solid var(--rzp-blue);
+  border-radius: 10px; padding: 13px 18px; margin-bottom: 14px;
+  font-size: 14.5px; line-height: 1.6; color: var(--text);
+}
+.watching b { font-weight: 700; }
+.watching b.bad { color: var(--red); }
+
+/* Keep the label on one line and let the value wrap under itself, so a row
+   like "0.0% vs 1.5% · burst has passed" does not shove its own label into a
+   second line and leave the card looking ragged. */
+.stat .k { white-space: nowrap; padding-right: 10px; }
+.stat .v { text-align: right; }
+.acts { row-gap: 4px; }

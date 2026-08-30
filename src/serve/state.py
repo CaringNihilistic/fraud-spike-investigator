@@ -74,6 +74,66 @@ class MerchantState:
         watching a live board expects."""
         return max(self.recent_risk) if self.recent_risk else 0.0
 
+    def signature(self) -> dict:
+        """A plain-language description of the SHAPE of this merchant's flagged
+        traffic, produced by COUNTING what is already in self.entities.
+
+        It is deliberately NOT a diagnosis and NOT the scenario label - no
+        serving component may read ground truth. It says "3 devices are shared
+        by 41 accounts", never "this is a device farm".
+
+        It exists because top_cause comes from the LLM, and the hosted demo
+        runs with --no-agent: five cards said "under attack" and nothing on
+        screen said what the attack looked like. This is the part an analyst
+        can always see, with or without a model behind it.
+        """
+        if not self.flagged_count:
+            return {"kind": "quiet", "hubs": 0, "accounts": 0,
+                    "text": "no flagged transactions"}
+        # Widest fan-out wins: one entity touching many accounts is the shape
+        # that separates coordinated abuse from ordinary traffic.
+        best_kind, best_hubs, best_accts = None, 0, 0
+        for kind in ("device", "ip", "instrument"):
+            hubs = [a for a in self.entities[kind].values() if len(a) >= 2]
+            if not hubs:
+                continue
+            accts = len(set().union(*hubs))
+            if accts > best_accts:
+                best_kind, best_hubs, best_accts = kind, len(hubs), accts
+
+        # Card novelty is a SEPARATE fact and points the other way from
+        # sharing: a fresh card on nearly every flagged transaction is someone
+        # burning through stolen instruments. Failure-log 22 is exactly this
+        # number shown without its direction, so the direction is spelled out
+        # in words here rather than left as a ratio to interpret.
+        cards = len(self.entities["instrument"])
+        burn = cards >= 20 and cards >= 0.9 * self.flagged_count
+        burn_txt = f"{cards} different cards, none used twice"
+
+        if best_kind:
+            noun = {"device": "device", "ip": "IP address",
+                    "instrument": "card"}[best_kind]
+            txt = (f"{best_hubs} {noun}{'s' if best_hubs != 1 else ''} "
+                   f"shared by {best_accts} accounts")
+            return {"kind": "shared_" + best_kind, "hubs": best_hubs,
+                    "accounts": best_accts,
+                    "text": txt + (f" · {burn_txt}" if burn else "")}
+        if burn:
+            return {"kind": "no_reuse", "hubs": 0, "accounts": 0, "text": burn_txt}
+        # Nothing shared at all. For a merchant the detector has FIRED on,
+        # that absence is itself the finding, and it must not read the same as
+        # a quiet merchant: the abuse is inside established accounts rather
+        # than between them - the one shape entity correlation cannot see.
+        # This is failure-log 16, where the agent called a real 5.5L takeover
+        # "legitimate" on exactly this evidence.
+        if self.in_spike:
+            return {"kind": "no_sharing_but_spiking", "hubs": 0, "accounts": 0,
+                    "text": "no shared entities - every flagged account has its "
+                            "own device, IP and card. The abuse is inside the "
+                            "accounts, not between them."}
+        return {"kind": "no_sharing", "hubs": 0, "accounts": 0,
+                "text": "no shared devices, IPs or cards between accounts"}
+
     def to_summary(self) -> dict:
         d = self.fraud_rate_delta()
         return {"merchant_id": self.merchant_id, "txn_count": self.txn_count,
@@ -88,6 +148,7 @@ class MerchantState:
                 "last_ts": self.last_ts, "fraud_rate": d,
                 "action_mix": dict(self.action_mix),
                 "top_cause": (self.investigation or {}).get("cause"),
+                "signature": self.signature(),
                 "has_investigation": self.investigation is not None}
 
 

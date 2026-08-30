@@ -75,7 +75,11 @@ transaction-stream "you are under attack" investigation with ₹ economics.
   `verify_evidence.py` = traceability checker: every number in evidence[] must
   be findable in a tool output the agent actually received.
 - `src/serve/` — P3 dashboard. `state.py` = in-memory pipeline state (single
-  writer = replay thread, RLock-guarded). `replay.py` = streams the test slice
+  writer = replay thread, RLock-guarded). `MerchantState.signature()` describes
+  the SHAPE of a merchant's flagged traffic by COUNTING entities ("3 devices
+  shared by 60 accounts"), never by inferring and never from `scenario` — it is
+  what the card shows when no LLM is running, and it is test-locked against
+  leaking the answer key. `replay.py` = streams the test slice
   through the REAL fusion→policy path (not a canned animation); investigations
   fire on SPIKE, off the hot path. `api.py` = FastAPI + static SPA.
   `static/` = React via vendored UMD + htm — NO build step, NO CDN, NO npm.
@@ -148,7 +152,7 @@ Self-audit: `python -m src.models.leakage_probe` (adversarial eval integrity)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (57 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (60 pass, no network needed)
 REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
 random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
 Methodology transfers; the 0.934 does NOT. NEGATIVE RESULT (entry 24): our
@@ -453,3 +457,34 @@ merchants.
 ## Style
 Plain, direct comments explaining WHY. Small modules. No cleverness that costs
 explainability — every component must be defensible to a judge in one sentence.
+
+25. A NULL FIELD SILENTLY DISABLED THE GUARD WRITTEN TO PREVENT THE EXACT BUG
+   IT THEN CAUSED. The dashboard auto-selects an opening merchant, and had a
+   deliberate guard: prefer a spiking merchant whose entity graph has something
+   to draw, because account takeover shares no entities by construction and
+   opening the demo on an empty graph is a terrible first frame. The guard
+   filtered on `top_cause` — which is sourced ONLY from the LLM investigation.
+   The hosted deployment runs `--no-agent`, so `top_cause` is null on every
+   merchant, `.find()` matched nothing, and the fallback selected `spiking[0]`
+   = m2, the account takeover. The live demo opened on the empty graph the
+   guard exists to avoid, under a panel titled "entity network", every time.
+   Same null also meant five cards read "UNDER ATTACK" with nothing on screen
+   saying what the attack was — the `cause` row simply never rendered.
+   FIX: `MerchantState.signature()`, computed server-side by counting what is
+   already in `entities` — "1 device shared by 50 accounts", "183 different
+   cards, none used twice", or, when nothing is shared AND the detector fired,
+   "the abuse is inside the accounts, not between them". Always present,
+   independent of the LLM, and pytest-locked against ever carrying `scenario`.
+   Deliberately NOT a diagnosis: it reports what is shared, never what kind of
+   attack it is. Two directional facts (sharing, card novelty) are stated in
+   WORDS with their direction, which is failure-log 22's lesson applied at the
+   point of display rather than left for a reader to infer.
+   ALSO FOUND while fixing it: `action_mix` was in the API payload and shown
+   nowhere, so the board never said what the system DID; and `now/baseline`
+   read "0.0%" on all 12 cards after the replay ends, which under a red UNDER
+   ATTACK badge reads as a contradiction rather than as "the burst is over".
+   LESSON: the same shape as entry 11. A guard that depends on an optional
+   field fails OPEN and silently — it does not error, it just stops guarding,
+   and the failure looks like an unrelated design flaw. Assert on the guard's
+   observable outcome, not on the field it happens to read.
+

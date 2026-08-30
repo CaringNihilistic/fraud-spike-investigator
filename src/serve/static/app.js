@@ -103,9 +103,28 @@ function MerchantCard({ m, selected, onSelect }) {
   const d = m.fraud_rate || {};
   const isFlash = m.merchant_id === 'm11' && m.txn_count > 300;
   const peakPct = (m.peak_rate_ever || 0) * 100;
+  const sig = m.signature || {};
+  const mix = m.action_mix || {};
   const cls = ['mcard', m.in_spike ? 'spiking' : '',
                isFlash && !m.in_spike ? 'flash' : '',
                selected ? 'selected' : ''].join(' ');
+
+  // Lead with the conclusion in words, then show the numbers that support it.
+  // The card used to be five metrics and no sentence, which left the reader to
+  // assemble "a 5.5L account takeover hit 79 transactions" for themselves.
+  const verdict = m.in_spike
+    ? html`<b>${inr(m.exposure_inr)}</b>${' '}at risk across ${m.flagged_count}${' '}
+           of ${(m.txn_count || 0).toLocaleString()} transactions`
+    : isFlash
+      ? html`${(m.txn_count || 0).toLocaleString()} transactions —${' '}<b>6× normal volume</b>,
+             and${' '}<b>not one of them was blocked</b>`
+      : html`${m.flagged_count} of ${(m.txn_count || 0).toLocaleString()} transactions flagged —
+             ordinary background rate`;
+
+  // The burst can be over by the time anyone looks. Saying so is the
+  // difference between "0.0%" reading as a contradiction and reading as news.
+  const cooled = m.in_spike && (d.current_rate || 0) < (d.baseline_rate || 0);
+
   return html`
     <div class=${cls} onClick=${() => onSelect(m.merchant_id)}>
       <div class="top">
@@ -120,20 +139,30 @@ function MerchantCard({ m, selected, onSelect }) {
         <i class=${peakPct < 1 ? 'zero' : ''}
            style=${{ width: Math.min(100, peakPct) + '%', background: rateColor(m.peak_rate_ever) }}></i>
       </div>
-      <div class="stat hero"><span class="k" title="Worst 30-transaction window in this merchant's history: what share of them the ML scorer flagged as high risk. This is the number the spike detector watches.">peak flagged rate</span>
+
+      <div class="verdict">${verdict}</div>
+      ${sig.text ? html`<div class="sig" title="Counted from this merchant's own flagged transactions. Not a model output and not a label - just who shares what.">${sig.text}</div>` : ''}
+
+      ${(mix.restrict || mix.step_up || mix.review) ? html`
+        <div class="acts">
+          <span class="al">system did</span>
+          ${mix.restrict ? html`<span class="act r">blocked ${mix.restrict}</span>` : ''}
+          ${mix.step_up ? html`<span class="act s">OTP on ${mix.step_up}</span>` : ''}
+          ${mix.review ? html`<span class="act v">${mix.review} to human review</span>` : ''}
+        </div>` : html`<div class="acts"><span class="al">system did</span>
+          <span class="act n">nothing — allowed all ${(m.txn_count || 0).toLocaleString()}</span></div>`}
+
+      <div class="stat hero"><span class="k" title="Worst 30-transaction window in this merchant's history: what share of them the ML scorer flagged as high risk. This is the number the spike detector watches.">worst 30-txn window</span>
         <span class="v" style=${{ color: rateColor(m.peak_rate_ever) }}>
-          ${(m.peak_rate_ever * 100).toFixed(0)}%</span></div>
-      <div class="stat"><span class="k" title="How many standard deviations the flagged rate rose above this merchant's own normal. The detector fires at z >= 4.">spike z-score</span>
+          ${(m.peak_rate_ever * 100).toFixed(0)}% flagged</span></div>
+      <div class="stat"><span class="k" title="How many standard deviations the flagged rate rose above this merchant's own normal. The detector fires at z >= 4.">how abnormal</span>
         <span class=${'v ' + (m.peak_z_ever >= 4 ? 'delta up' : 'delta flat')}>
-          ${m.peak_z_ever >= 4 ? `z=${m.peak_z_ever} · fired` : `z=${m.peak_z_ever} · below threshold`}</span></div>
-      <div class="stat"><span class="k" title="Flagged rate right now (last 30 txns) vs this merchant's long-run normal. High peak + low now = an attack that already ended.">now / baseline</span>
+          ${m.peak_z_ever >= 4 ? `${m.peak_z_ever}σ above normal · fired` : `${m.peak_z_ever}σ · below threshold`}</span></div>
+      <div class="stat"><span class="k" title="Flagged rate right now (last 30 txns) vs this merchant's long-run normal.">right now / normal</span>
         <span class="v" style=${{ color: 'var(--dim)' }}>
-          ${(d.current_rate * 100).toFixed(1)}% vs ${(d.baseline_rate * 100).toFixed(1)}%</span></div>
-      <div class="stat"><span class="k" title="Total value of this merchant's flagged transactions - the money at stake if nothing is done.">₹ exposure</span><span class="v">${inr(m.exposure_inr)}</span></div>
-      <div class="stat"><span class="k">txns at risk</span>
-        <span class="v">${m.flagged_count} / ${m.txn_count}</span></div>
-      ${m.top_cause ? html`<div class="stat"><span class="k">cause</span>
-        <span class="v mono" style=${{ color: 'var(--violet)' }}>${m.top_cause}</span></div>` : ''}
+          ${(d.current_rate * 100).toFixed(1)}% vs ${(d.baseline_rate * 100).toFixed(1)}%${cooled ? ' · burst has passed' : ''}</span></div>
+      ${m.top_cause ? html`<div class="stat"><span class="k">agent's diagnosis</span>
+        <span class="v mono" style=${{ color: 'var(--violet)' }}>${m.top_cause.replace(/_/g, ' ')}</span></div>` : ''}
     </div>`;
 }
 
@@ -721,11 +750,15 @@ function App() {
   // construction, so auto-selecting it opens the demo on an empty graph —
   // technically correct and a terrible first frame. Prefer a spiking merchant
   // whose entity network actually has something to draw.
+  //
+  // This used to filter on top_cause, which only exists once the LLM has run —
+  // so on the hosted instance (--no-agent) the guard silently did nothing and
+  // the demo always opened on the empty graph it was written to avoid. It now
+  // reads the signature, which is counted server-side and always present.
   useEffect(() => {
     if (sel || !merchants.length) return;
     const spiking = merchants.filter((m) => m.in_spike);
-    const withEntities = spiking.find((m) => m.top_cause &&
-      ['device_farm', 'fraud_ring', 'ip_cluster', 'card_testing'].includes(m.top_cause));
+    const withEntities = spiking.find((m) => (m.signature || {}).hubs > 0);
     setSel((withEntities || spiking[0] || merchants[0]).merchant_id);
   }, [merchants, sel]);
 
@@ -750,6 +783,15 @@ function App() {
                  view=${view} setView=${setView} />
       <main>
         ${view === 'pitch' ? html`<${Pitch} />` : html`<div>
+        <div class="watching">
+          <b>What you are watching:</b> ${(status?.total || 0).toLocaleString()}${' '}
+          transactions replayed one at a time across ${merchants.length} merchants,
+          through the real pipeline — scorer, spike detector, policy engine, review
+          queue. ${nAttack > 0 ? html`<b class="bad">${nAttack} of these merchants are
+          under coordinated attack right now.</b>` : ''} Every block and every review
+          below is held for a human to confirm.${' '}<b>Nothing here acts on its own,
+          and the language model cannot authorise anything.</b>
+        </div>
         ${finale ? html`
           <div class="finale-banner">
             <span>✓ ${finale.message}</span>

@@ -212,3 +212,66 @@ def test_index_hands_the_write_key_to_the_page(anon):
     """The SPA gets the key same-origin so the demo needs no setup step."""
     body = anon.get("/").text
     assert 'name="fsi-key"' in body and API_KEY in body
+
+
+# --- the merchant signature -------------------------------------------------
+# top_cause comes from the LLM, so on any instance running without one (the
+# hosted demo does) the card said "under attack" and nothing said what the
+# attack looked like. The signature is COUNTED server-side instead, so it is
+# always present - and it must never become a second channel for ground truth.
+
+def test_signature_is_present_without_any_llm(client):
+    for i in range(6):
+        STATE.record_txn(
+            {"merchant_id": "farm", "ts": 1 + i, "p": 0.9, "amount": 100.0,
+             "customer_id": f"c{i}", "device_id": "d_SHARED",
+             "ip": f"ip{i}", "instrument_id": f"pi{i}"},
+            risk=90.0, confidence=0.8, action=Action.RESTRICT, reason="t",
+            spiking=False, spike_ts=None)
+    m = client.get("/api/merchants").json()["merchants"]
+    farm = next(x for x in m if x["merchant_id"] == "farm")
+    assert farm["top_cause"] is None            # no agent ran
+    assert farm["signature"]["hubs"] == 1       # ...and we still say what we see
+    assert farm["signature"]["accounts"] == 6
+    assert "1 device shared by 6 accounts" in farm["signature"]["text"]
+
+
+def test_signature_never_leaks_the_scenario_label(client):
+    """The generator's `scenario` is the answer key. It reaches the dashboard
+    through no path, including this one."""
+    for i in range(4):
+        STATE.record_txn(
+            {"merchant_id": "leaky", "ts": 1 + i, "p": 0.95, "amount": 50.0,
+             "customer_id": f"c{i}", "device_id": "d_FARM_F", "ip": "ip_CLUSTER_I",
+             "instrument_id": "pi_STOLEN_9", "scenario": "device_farm",
+             "is_fraud": 1},
+            risk=99.0, confidence=0.9, action=Action.RESTRICT, reason="t",
+            spiking=True, spike_ts=1)
+    sig = next(x for x in client.get("/api/merchants").json()["merchants"]
+               if x["merchant_id"] == "leaky")["signature"]
+    for banned in ("device_farm", "card_testing", "ip_cluster", "fraud_ring",
+                   "account_takeover", "scenario", "is_fraud"):
+        assert banned not in str(sig).lower()
+
+
+def test_a_spiking_merchant_with_no_shared_entities_says_so_distinctly(client):
+    """Account takeover shares nothing by construction. That absence must not
+    render identically to a quiet merchant's - it is the finding, not a blank.
+    See failure-log 16."""
+    for i in range(5):                                  # spiking, no sharing
+        STATE.record_txn(
+            {"merchant_id": "ato", "ts": 1 + i, "p": 0.95, "amount": 900.0,
+             "customer_id": f"a{i}", "device_id": f"d{i}", "ip": f"ip{i}",
+             "instrument_id": f"pi{i}"},
+            risk=95.0, confidence=0.9, action=Action.RESTRICT, reason="t",
+            spiking=True, spike_ts=1)
+    for i in range(5):                                  # quiet, no sharing
+        STATE.record_txn(
+            {"merchant_id": "calm", "ts": 1 + i, "p": 0.95, "amount": 20.0,
+             "customer_id": f"b{i}", "device_id": f"e{i}", "ip": f"jp{i}",
+             "instrument_id": f"qi{i}"},
+            risk=95.0, confidence=0.9, action=Action.REVIEW, reason="t",
+            spiking=False, spike_ts=None)
+    ms = {x["merchant_id"]: x for x in client.get("/api/merchants").json()["merchants"]}
+    assert ms["ato"]["signature"]["text"] != ms["calm"]["signature"]["text"]
+    assert ms["ato"]["signature"]["kind"] == "no_sharing_but_spiking"
