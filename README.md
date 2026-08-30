@@ -1,10 +1,79 @@
 # Fraud Spike Investigator
 
-**Razorpay Buildathon — Track 02: AI Risk Manager.** A defense-only, merchant-level risk system: it detects sudden abnormal fraud spikes in a merchant's transaction stream, correlates the entities behind them (customers / devices / IPs / payment instruments), and produces an explained, bounded, human-reviewable decision — with honest, temporally-evaluated metrics including false-positive cost in ₹.
+[![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
+[![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
+[![Tests](https://img.shields.io/badge/tests-57_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Failures logged](https://img.shields.io/badge/failures_logged-24_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
-**→ Judges: [SUBMISSION.md](SUBMISSION.md) is the one-page summary mapped to the judging criteria.**
+> 🎥 **5-min pitch video:** `[TODO: paste link]`
+> 🖥️ **Live console:** `[TODO: paste link]` — or run it locally in one command (below)
+> 📄 **Judges:** [SUBMISSION.md](SUBMISSION.md) is the one-page summary mapped to the judging criteria.
 
-Per-order scorers flag individual bad orders. Nobody tells the merchant *"you are under attack right now, here's why, who's behind it, what it costs, and what to do."* This system closes that loop — and it sits **above** per-order scoring, complementary to tools like Thirdwatch/Shield, not competing with them.
+**Merchants don't lose money one transaction at a time. They lose it in bursts.** Per-order scorers flag individual bad orders. Nobody tells the merchant *"you are under attack right now, here's why, who's behind it, what it costs, and what to do."*
+
+This closes that loop at the **merchant** level — it sits **above** per-order scoring, complementary to Thirdwatch/Shield rather than competing with them. Defense-only, temporally evaluated, costed in ₹ including the false-positive side.
+
+---
+
+## Results at a glance
+
+| | |
+|---|---|
+| **Attack merchants detected** | **25 / 25** across 5 independent worlds |
+| **False alarms** | **0** in every world — a 6× legitimate flash sale flagged **0 / 5** times |
+| **Net protected value** | **₹10.57L** on the held-out test slice, after 617 reviews × ₹50 |
+| **Legitimate ₹ wrongly impacted** | **₹4,814** — the false-positive cost, reported not hidden |
+| **Precision / Recall** | **0.994 / 0.886** at the cost-optimal threshold |
+| **Calibration (Brier / ECE)** | **0.0053 / 0.0033** — measured, not assumed |
+| **Same recipe on real public data** | ULB **0.731** PR-AUC · IEEE-CIS **0.460**, zero tuning |
+| **LLM safety** | **0/13** policy violations · **0/13** unsafe actions · it cannot authorize anything |
+
+Evaluation is temporal throughout — day-boundary splits, never random. Model selection, threshold tuning and calibration all happen on validation; the test slice is read once, at the end.
+
+### Detection speed vs two baselines
+
+Ground-truth attack starts come from the simulator, so "time to detect" is measured, not estimated.
+
+| Scenario | Static volume threshold | Naive flag counter | **This system** |
+|---|---|---|---|
+| Card testing | not detected | 62m47s | **55m22s** |
+| Device farm | 3m59s | 21m54s | **19m18s** |
+| IP cluster | not detected | **26m15s** | 31m03s ← *we lose this one* |
+| Account takeover | not detected | 53m38s | **53m30s** |
+| Fraud ring | not detected | 100m49s | **69m37s** |
+| **False alarms** | **5 merchants** (incl. the flash sale) | 0 | **0** |
+
+We report the loss. A volume threshold is fast on the device farm only because a device farm happens to be a volume event — it misses the four attacks that aren't, and it blocks the legitimate flash sale.
+
+---
+
+## How it works
+
+```mermaid
+flowchart TD
+    TX[Transaction stream] --> FE[22 incremental features<br/>built from prior events only]
+    FE --> ML[XGBoost + isotonic calibration<br/>chosen empirically over 3 alternatives · no SMOTE]
+    ML --> SD[Merchant spike detector<br/>EWMA + z-score on fraud-score RATE, not volume]
+    SD --> FU[Risk fusion<br/>calibrated probability is the FLOOR;<br/>spike / graph / rules escalate into the headroom]
+    FU --> PE{{"POLICY ENGINE<br/>the only component that authorizes anything<br/>frozen allowlist"}}
+    PE -->|risk < 25| A[Allow]
+    PE -->|25-85| S[Step-up · OTP friction]
+    PE -->|>= 85 or low confidence| R[Restrict / Review]
+    R --> HQ[Human review queue<br/>analyst override, bound by the same allowlist]
+
+    SD -.->|fires on spike, OFF the hot path| AG[LLM investigator<br/>6 read-only tools · all ₹ math in Python]
+    AG -.->|recommends only| VG{{validate_recommendation}}
+    VG -.->|unknown action degraded to REVIEW,<br/>never escalated| HQ
+
+    style PE fill:#E0EFFF,stroke:#3395FF,stroke-width:3px
+    style VG fill:#FEF0C7,stroke:#B54708,stroke-width:2px
+    style AG fill:#F4F1FE,stroke:#6E56CF
+```
+
+**The LLM is never in the decision path.** It investigates and explains; the policy engine decides. Disabling the agent changes no decision, and that is pytest-enforced. We have a live case where it called a real ₹5.5L account takeover *"legitimate, allow"* at 0.95 confidence and the system restricted 68 transactions anyway.
+
+**Scope.** This targets the burst-fraud loss class. The same machinery — rate-based spike detection over any per-order risk score, with the same policy gate and human queue — extends to RTO/COD and chargeback risk by swapping the scorer; we did not build those, and we don't claim them.
 
 ## Quickstart
 
@@ -19,7 +88,7 @@ python -m src.models.seed_stability  # re-run the pipeline across 5 worlds (~6 m
 python -m src.models.real_data_check # same recipe on REAL data (needs a Kaggle download)
 python -m src.agent.eval             # 13-case agent eval, 3 held-out (needs ANTHROPIC_API_KEY)
 python run_demo.py                   # dashboard + live replay -> http://127.0.0.1:8000
-python -m pytest tests/ -q           # safety invariants (51 tests)
+python -m pytest tests/ -q           # safety invariants (57 tests)
 ```
 
 ## Demo — what to watch
@@ -454,7 +523,7 @@ run_demo.py     one-command demo: train -> serve -> replay
 tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 no-fire, fusion floor/bounds, agent gate/audit/read-only,
                 serving side-effect-freedom, analyst allowlist, write-auth
-                gate) - 51 tests
+                gate, .env loader) - 57 tests
 ```
 
 ## Honest limitations
