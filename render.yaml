@@ -13,10 +13,12 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements-serve.txt
-    startCommand: python run_demo.py --host 0.0.0.0 --port $PORT --no-browser --no-agent --speed 800
+    startCommand: python run_demo.py --host 0.0.0.0 --port $PORT --no-browser --no-agent --defer-prepare --speed 800
     envVars:
+      # 3.11 not 3.11.9: an exact patch pin fails if the host has not built
+      # that specific version. Every dependency here requires >=3.11.
       - key: PYTHON_VERSION
-        value: 3.11.9
+        value: "3.11"
       # Write endpoints need this. Render generates one; nobody has to set it.
       - key: FSI_API_KEY
         generateValue: true

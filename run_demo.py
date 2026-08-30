@@ -39,6 +39,11 @@ def main():
     ap.add_argument("--no-agent", action="store_true",
                     help="disable LLM investigations (dashboard still runs)")
     ap.add_argument("--no-browser", action="store_true")
+    ap.add_argument("--defer-prepare", action="store_true",
+                    help="bind the port immediately and train in the background. "
+                         "Required on PaaS hosts (Render/Railway/Fly), which kill a "
+                         "service that has not bound its port within a short window - "
+                         "and on a shared-CPU free instance, training first can exceed it.")
     args = ap.parse_args()
 
     STATE.speed = args.speed
@@ -49,18 +54,30 @@ def main():
     print("=" * 68)
     print("  Training the model and scoring the test slice (~20s)...")
 
-    # Prepare synchronously so the dashboard is never served against empty
-    # state - a judge loading the page mid-training would see a blank grid.
-    scored, ctx = replay.prepare()
-    api_mod.set_context(ctx)
-
-    def _start_replay():
+    def _prepare_and_replay():
+        scored, ctx = replay.prepare()
+        api_mod.set_context(ctx)
+        STATE.total = len(scored)
+        print(f"  Ready. Replaying {len(scored):,} transactions at {args.speed:.0f}/sec")
         replay.run(scored, ctx, investigate_enabled=not args.no_agent)
 
-    threading.Thread(target=_start_replay, daemon=True).start()
-
-    print(f"  Ready. Dashboard: {url}")
-    print(f"  Replaying {len(scored):,} transactions at {args.speed:.0f}/sec")
+    if args.defer_prepare:
+        # Port first, training second. The dashboard polls /api/status and
+        # renders an empty grid for a few seconds, which is a better failure
+        # mode than the host killing the service before it ever binds.
+        threading.Thread(target=_prepare_and_replay, daemon=True).start()
+    else:
+        # Local default: prepare synchronously so the dashboard is never served
+        # against empty state - a judge loading the page mid-training would see
+        # a blank grid.
+        scored, ctx = replay.prepare()
+        api_mod.set_context(ctx)
+        STATE.total = len(scored)
+        threading.Thread(
+            target=lambda: replay.run(scored, ctx, investigate_enabled=not args.no_agent),
+            daemon=True).start()
+        print(f"  Ready. Dashboard: {url}")
+        print(f"  Replaying {len(scored):,} transactions at {args.speed:.0f}/sec")
     print("  Watch for: attack merchants spike -> investigation fires ->")
     print("             flash-sale merchant m11 spikes in VOLUME and is NOT flagged.")
     if args.no_agent:
