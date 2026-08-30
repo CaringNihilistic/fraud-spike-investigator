@@ -19,7 +19,6 @@ import time
 
 from sklearn.isotonic import IsotonicRegression
 
-from src.agent.investigator import investigate
 from src.agent.tools import InvestigationContext
 from src.features.builder import FEATURE_COLS, build_features
 from src.models.select_model import (build_gbdt, get_selected_model_name,
@@ -119,6 +118,10 @@ def run(scored, ctx, investigate_enabled: bool = True):
 def _investigate_async(ctx: InvestigationContext, mid: str):
     """Run the agent off the hot path. A slow or failing investigation must
     never stall transaction processing - the stream keeps flowing regardless."""
+    # Imported lazily, not at module scope: a serve-only deployment running
+    # with --no-agent must not need langgraph or the anthropic SDK installed
+    # at all. That is what makes requirements-serve.txt genuinely slim.
+    from src.agent.investigator import investigate
     STATE.log_event("investigation", f"{mid}: spike detected, investigating...",
                     merchant_id=mid)
     try:

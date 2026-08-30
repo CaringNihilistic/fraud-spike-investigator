@@ -32,7 +32,9 @@ python -m pytest tests/ -q           # safety invariants (51 tests)
 5. **The review queue accepts analyst overrides** — and rejects an invented action with HTTP 400. The allowlist binds humans exactly as it binds the LLM.
 6. **The closing frame: "same spike, opposite verdict."** When the replay ends, a panel puts the device farm (m5) and the flash sale (m11) side by side. The flash sale is the **busier** merchant of the two — 2,284 transactions against 1,041 — and receives **0 restrictions** against 124, because its entity graph is empty while the farm's is one device shared by 50 accounts. Same volume story, opposite structure, opposite decision, rendered from live state.
 
-Flags: `--speed N` (replay rate), `--no-agent` (skip LLM investigations, no API key needed), `--no-browser`, `--port N`.
+Flags: `--speed N` (replay rate), `--no-agent` (skip LLM investigations, no API key needed), `--no-browser`, `--port N`, `--host H`.
+
+**Deploying it.** `render.yaml` is a one-click Render blueprint. It installs `requirements-serve.txt` — the same pinned versions as `requirements.txt`, minus LightGBM/CatBoost (only needed to *reproduce* model selection, imported lazily), the agent stack (imported lazily), and the test deps. Boot to a fully replayed board takes about 20 seconds. It deploys with `--no-agent` deliberately: putting an Anthropic key on a public host would let any visitor spend credits through `/api/merchants/{id}/investigate`. Everything except the LLM investigator works without it.
 
 **Serving auth.** Every *mutating* endpoint requires an `X-API-Key`; read endpoints stay open so the state can be inspected with `curl`. Set `FSI_API_KEY` to pin the key, or let the demo mint an ephemeral one at startup and hand it to the page same-origin — either way it stays one command. This is a single-tenant gate, not identity: it stops an unauthenticated caller from overriding an analyst decision, but it does not record *which* analyst acted, and a real deployment needs per-analyst identity for that.
 

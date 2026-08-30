@@ -1,0 +1,22 @@
+# One-click deploy of the live dashboard (Render blueprint).
+#
+#   https://render.com  ->  New  ->  Blueprint  ->  point at this repo
+#
+# Deployed WITHOUT the LLM investigator on purpose: putting an Anthropic key on
+# a public host means anyone who loads the page can spend credits through
+# /api/merchants/{id}/investigate. Detection, entity graphs, the review queue,
+# the economics counter and the pitch tab all work without it. The agent is
+# demonstrated in the pitch video, where the key stays local.
+services:
+  - type: web
+    name: fraud-spike-investigator
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-serve.txt
+    startCommand: python run_demo.py --host 0.0.0.0 --port $PORT --no-browser --no-agent --speed 800
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      # Write endpoints need this. Render generates one; nobody has to set it.
+      - key: FSI_API_KEY
+        generateValue: true

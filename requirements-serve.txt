@@ -1,0 +1,25 @@
+# Slim runtime for a PUBLIC DEPLOYMENT of the dashboard only.
+#
+# requirements.txt is the reproducibility manifest: it pins every library
+# needed to regenerate every number in the README, including LightGBM and
+# CatBoost (which exist so `model_selection.csv` can be reproduced) and the
+# agent stack. None of that is needed to SERVE the demo, and installing it
+# makes a free-tier build slow and fat.
+#
+# What this file drops, and why it is safe:
+#   lightgbm / catboost  - only used by select_model.py, imported lazily
+#   langgraph / anthropic - only used by the investigator, imported lazily in
+#                           replay.py; the deployment runs with --no-agent so
+#                           no API key is ever placed on a public host
+#   pytest / httpx       - test-only
+#
+# Versions are identical to requirements.txt. If they ever diverge, that is a
+# bug: the deployed demo must run the same code as the reproduced numbers.
+
+xgboost==3.2.0
+scikit-learn==1.8.0
+pandas==3.0.1
+numpy==2.3.5
+joblib==1.5.3
+fastapi==0.136.3
+uvicorn==0.48.0
