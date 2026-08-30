@@ -60,6 +60,16 @@ app = FastAPI(title="Fraud Spike Investigator",
 # /investigate can run against the same scored slice the replay uses.
 _CTX: InvestigationContext | None = None
 
+# Whether the LLM investigator is available on THIS instance. The public
+# deployment runs with --no-agent, because an Anthropic key on a public host
+# lets any visitor spend credits through /investigate.
+AGENT_ENABLED: bool = True
+
+
+def set_agent_enabled(on: bool):
+    global AGENT_ENABLED
+    AGENT_ENABLED = bool(on)
+
 
 def set_context(ctx: InvestigationContext):
     global _CTX
@@ -89,6 +99,14 @@ class AnalystDecision(BaseModel):
 
 
 # ------------------------------------------------------------------ routes
+@app.get("/api/config")
+def config():
+    """What this instance can do. The hosted demo runs without the LLM, and
+    the dashboard says so rather than showing an empty panel that reads as
+    broken."""
+    return {"agent_enabled": AGENT_ENABLED, "has_context": _CTX is not None}
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "replay": STATE.status()["finished"] and "done" or "running"}

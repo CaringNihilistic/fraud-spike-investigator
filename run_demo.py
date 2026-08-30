@@ -47,6 +47,7 @@ def main():
     args = ap.parse_args()
 
     STATE.speed = args.speed
+    api_mod.set_agent_enabled(not args.no_agent)
     url = f"http://{args.host}:{args.port}"
 
     print("=" * 68)

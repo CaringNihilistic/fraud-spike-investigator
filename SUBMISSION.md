@@ -2,7 +2,7 @@
 
 **Merchants don't lose money one transaction at a time. They lose it in bursts.** Per-order scorers flag bad orders; nobody tells a merchant *"you are under attack right now, here's why, here's who's behind it, here's your ₹ exposure, here's the bounded action."* This system closes that loop — merchant-level spike detection, entity correlation, and a policy-gated LLM investigator that **never makes the decision**. Temporally evaluated, costed in ₹, defense-only.
 
-📹 **Demo video:** `[TODO: paste link]` · 💻 **Repo:** `[TODO: paste link]` · ▶️ **Run it:** `pip install -r requirements.txt && python run_demo.py`
+📹 **Demo video:** `[TODO: paste link]` · 💻 **Repo:** https://github.com/CaringNihilistic/fraud-spike-investigator · 🖥️ **Live console:** https://fraud-spike-investigator.onrender.com/ · ▶️ **Run it:** `pip install -r requirements.txt && python run_demo.py`
 
 ---
 

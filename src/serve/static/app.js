@@ -263,6 +263,7 @@ function EntityGraph({ merchantId, compact }) {
 
 /* ------------------------------------------------------------ investigation */
 function Investigation({ merchantId, inSpike }) {
+  const [cfg] = usePoll('/api/config', 30000);
   const [rep, setRep] = useState(null);
   const [state, setState] = useState('idle');
   const [showAudit, setShowAudit] = useState(false);
@@ -284,11 +285,18 @@ function Investigation({ merchantId, inSpike }) {
   if (!rep) return html`
     <div>
       <div class="empty">
-        ${inSpike === false
-          ? 'No spike -> no investigation. The agent only runs when the detector fires, so quiet merchants cost zero analyst time and zero tokens.'
-          : 'No investigation yet — these fire automatically when the spike detector trips.'}
+        ${cfg && cfg.agent_enabled === false
+          ? html`The LLM investigator is <b>disabled on this hosted instance</b>, on
+                 purpose: an API key on a public host would let any visitor spend
+                 credits. Everything else you see is live. Run it locally with
+                 ${' '}<span class="mono">python run_demo.py</span>${' '}and an
+                 ANTHROPIC_API_KEY to see investigations, or watch the pitch video.`
+          : inSpike === false
+            ? 'No spike -> no investigation. The agent only runs when the detector fires, so quiet merchants cost zero analyst time and zero tokens.'
+            : 'No investigation yet — these fire automatically when the spike detector trips.'}
       </div>
-      <button class="sm" onClick=${run}>run investigation now</button>
+      ${cfg && cfg.agent_enabled === false ? ''
+        : html`<button class="sm" onClick=${run}>run investigation now</button>`}
     </div>`;
 
   const conf = rep.confidence ?? 0;

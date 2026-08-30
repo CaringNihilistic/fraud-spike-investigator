@@ -7,7 +7,7 @@
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
-> 🖥️ **Live console:** `[TODO: paste link]` — or run it locally in one command (below)
+> 🖥️ **Live console:** **https://fraud-spike-investigator.onrender.com/** — or run it locally in one command (below)
 > 📄 **Judges:** [SUBMISSION.md](SUBMISSION.md) is the one-page summary mapped to the judging criteria.
 
 **Merchants don't lose money one transaction at a time. They lose it in bursts.** Per-order scorers flag individual bad orders. Nobody tells the merchant *"you are under attack right now, here's why, who's behind it, what it costs, and what to do."*
