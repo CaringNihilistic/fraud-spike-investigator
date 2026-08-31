@@ -36,7 +36,7 @@ def test_llm_cannot_invent_actions():
     assert validate_recommendation("restrict") == Action.RESTRICT  # allowlisted ok
 
 
-def test_low_risk_allows():
+def test_ordinary_traffic_is_allowed_without_friction():
     assert decide(10, 0.9, False).action == Action.ALLOW
 
 
@@ -64,7 +64,7 @@ def test_fraud_rate_spike_fires():
     assert ev is not None and ev.z >= det.z_threshold
 
 
-def test_tiny_hours_cannot_fire():
+def test_a_quiet_hour_cannot_false_alarm_on_one_stray_fraud():
     det = SpikeDetector()
     quiet = [[0.01] * 15 for _ in range(30)]
     tiny = [[0.99] * 3]                                # 3 txns, all hot - too few
@@ -84,7 +84,7 @@ def test_fusion_never_scores_below_ml_alone():
         assert rich.risk_score >= bare.risk_score
 
 
-def test_fusion_certain_ml_stays_at_top_of_scale():
+def test_fusion_never_pulls_a_certain_ml_score_down():
     """A p=1.0 transaction must still read as maximum risk, so the policy
     engine's thresholds keep the meaning they had under the p*100 shortcut."""
     assert fuse(RiskSignals(p_fraud=1.0)).risk_score == 100.0
@@ -159,7 +159,7 @@ def test_rules_are_signals_not_actions():
     assert hits and all(h not in {a.value for a in Action} for h in hits)
 
 
-def test_streaming_spike_z_needs_warmup():
+def test_streaming_detector_will_not_fire_before_it_has_a_baseline():
     """A brand-new merchant must not manufacture a large z from a few hot
     transactions - otherwise fusion escalates on no evidence."""
     det = StreamingSpikeDetector()

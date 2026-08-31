@@ -234,7 +234,7 @@ def test_disabling_the_agent_changes_no_decision():
     assert without == with_agent
 
 
-def test_fallback_report_shape_is_valid(ctx):
+def test_fallback_report_is_still_complete_enough_to_act_on(ctx):
     rep = deterministic_report(ctx, "m1", "unit_test", AuditLog())
     for k in ("merchant_id", "cause", "evidence", "exposure_inr",
               "recommended_action", "confidence"):

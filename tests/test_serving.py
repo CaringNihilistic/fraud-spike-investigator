@@ -48,13 +48,13 @@ def _seed_txn(mid="m1", p=0.9, amount=1000.0, action=Action.REVIEW, spiking=Fals
         baseline_rate=0.01, current_rate=0.5, spike_z=4.2)
 
 
-def test_health_and_status(client):
+def test_status_reports_real_pipeline_state_not_placeholders(client):
     assert client.get("/api/health").json()["ok"] is True
     s = client.get("/api/status").json()
     assert {"processed", "total", "speed_tps", "events"} <= set(s)
 
 
-def test_merchant_overview_shape(client):
+def test_merchant_overview_exposes_every_field_the_dashboard_reads(client):
     _seed_txn("m1", spiking=True)
     m = client.get("/api/merchants").json()["merchants"][0]
     for k in ("merchant_id", "risk_score", "exposure_inr", "flagged_count",
@@ -143,7 +143,7 @@ def test_score_endpoint_rejects_invalid_input(client):
     assert client.post("/api/transactions", json=bad2).status_code == 422
 
 
-def test_entity_graph_drops_single_account_entities(client):
+def test_entity_graph_hides_one_account_entities_as_noise(client):
     """Entities touching one account are the boring case and would swamp the
     picture - legitimate traffic must render as an EMPTY graph."""
     for i in range(6):
