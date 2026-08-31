@@ -111,6 +111,11 @@ def main():
     sharing = next(r["pr_auc"] for r in sets if r["feature_set"] == "entity_sharing_only")
     both = next(r["pr_auc"] for r in sets if r["feature_set"] == "suspects_plus_entity_sharing")
 
+    # Fixed in advance, same margin the model-selection tie-break uses.
+    REPRODUCE_MARGIN = 0.02
+    reproduces = bool(abs(full - proxy) < REPRODUCE_MARGIN)
+    n_full = len(FEATURE_COLS)
+
     verdict = {
         "model_family": model_name,
         "test_fraud_prevalence": round(prevalence, 6),
@@ -120,15 +125,28 @@ def main():
         "pr_auc_entity_sharing_only": sharing,
         "gap_full_vs_two_features": round(full - proxy, 4),
         "marginal_gain_of_sharing_over_suspects": round(both - proxy, 4),
-        "two_features_reproduce_headline": bool(abs(full - proxy) < 0.02),
+        "two_features_reproduce_headline": reproduces,
+        # The verdict is DERIVED, never asserted. The first version of this
+        # module hardcoded the failing conclusion, so after the generator was
+        # fixed it printed "two features reproduce the headline" directly above
+        # its own boolean saying false. An audit tool that cannot report a pass
+        # is not an audit tool.
         "conclusion": (
-            "Two features reproduce the 22-feature headline. The simulator sets attack "
-            "accounts' creation date to the attack day, so customer_age_days is close to a "
-            "direct label encoding; ambient fraud is generated as a multiple of a legitimate "
-            "amount, so amount_dev_ratio is a second proxy. Entity-SHARING features carry "
-            "real structure on their own but add almost nothing on top of the proxies, so the "
-            "ablation's stage-2 -> stage-3 jump must NOT be read as 'entity correlation is "
-            "where the lift comes from'."),
+            "PROXY LEAK PRESENT. Two features (customer_age_days, amount_dev_ratio) "
+            f"reproduce the {n_full}-feature headline to within {abs(full - proxy):.4f}. "
+            "Attack accounts are created at the attack day and ambient fraud is a fixed "
+            "multiple of a legitimate amount, so both are close to direct label encodings. "
+            "The ablation's entity/graph jump must NOT be read as 'entity correlation is "
+            "where the lift comes from'."
+            if reproduces else
+            f"NO PROXY LEAK at this threshold. The two suspect features score {proxy:.4f} "
+            f"alone against {full:.4f} for the full {n_full} - a gap of {full - proxy:.4f}, "
+            f"so the headline is not reproducible from them. Dropping them costs "
+            f"{full - minus:.4f}. Entity-SHARING features alone score {sharing:.4f}, and "
+            f"adding them to the suspects is worth {both - proxy:+.4f}, so entity "
+            "correlation is carrying real signal rather than riding a label encoding. "
+            "This is a NEGATIVE result from an adversarial test and is only as strong as "
+            "the test - it says these two proxies are gone, not that none exist."),
     }
     print("\n=== verdict ===")
     print(json.dumps(verdict, indent=2))

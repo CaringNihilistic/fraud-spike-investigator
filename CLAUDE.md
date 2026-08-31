@@ -61,9 +61,11 @@ transaction-stream "you are under attack" investigation with ₹ economics.
   (FLOOR 25 = train legit p99, SATURATE 120 = train fraud p90; train-derived
   ONLY). Also `evaluate_rules()` — deterministic rule SIGNALS, not actions.
 - `src/policy/threshold_sweep.py` — cost-optimizes restrict/step_up cutoffs on
-  the VALIDATION slice only. Adopted (85, 25): step_up 60→25 = +8.28% val NPV;
-  restrict stayed 85 (surface flat/unidentified across 40–80). Per-parameter
-  2% adopt margin fixed in advance.
+  the VALIDATION slice only. Adopted (85, 20): step_up 60→20 = +15.82% val NPV.
+  Restrict stays 85 because moving it alone to the best pair's 55 is NOT
+  INDEPENDENTLY EVALUABLE — step_up must remain the lower bar, so (55, 60) is
+  not a point on the grid at all. Per-parameter 2% adopt margin fixed in
+  advance; a move that cannot be measured alone is not evidence for making it.
 - `src/agent/` — P2 LLM investigator. `tools.py` = 6 READ-ONLY tools (no tool
   exposes is_fraud/scenario; calculate_exposure does ALL ₹ math in Python).
   `investigator.py` = LangGraph loop (Claude Haiku 4.5, max 8 rounds) whose
@@ -108,34 +110,73 @@ Model: XGBoost, selected empirically over LightGBM/CatBoost/LogisticRegression
 on temporal validation (src/models/select_model.py). All 3 GBDTs within the
 0.02 tie margin (LGBM .9308 / Cat .9265 / XGB .9249) → won on the PRE-DECLARED
 speed tie-break (0.27s vs 1.64s vs 7.94s), NOT on raw PR-AUC.
-PR-AUC 0.934 | P 0.994 / R 0.886 @ cost-optimal threshold | P@100/@500 = 1.00
-CALIBRATION: Brier 0.00533 (raw 0.00647), ECE 0.0033 - isotonic measurably
-helps, but the reliability curve is near-bimodal (13,288 txns in [0,.1], 615 in
-[.9,1]), so the low ECE is dominated by the extremes. Report both.
-REVIEW LOAD: 44.1 cases per 1,000 txns (4.41%) - staffing question, not just
+PR-AUC 0.898 | P 0.927 / R 0.857 @ cost-optimal threshold | P@100/@500 = 1.00
+STABILITY: 0.910 +/- 0.007 over 5 independent SEEDS OF THE SAME GENERATOR
+(not independent worlds - identical scenario definitions; it controls for seed
+luck, nothing more). Seed 7, the demo world, is the WORST of the five.
+CALIBRATION: Brier 0.00819 (raw 0.01153), ECE 0.00312 - isotonic measurably
+helps, but the reliability curve is near-bimodal, so the low ECE is dominated
+by the extremes. Report both.
+REVIEW LOAD: 41.9 cases per 1,000 txns (4.19%) - staffing question, not just
 cost. Do not quote INR/case without it.
-!! HEADLINE CAVEAT (failure-log 21): customer_age_days + amount_dev_ratio ALONE
-score 0.9328 vs the full 22-feature 0.9344. The simulator writes the answer key.
-NEVER quote 0.934 without the caveat. The README ablation claim about
-entity/graph carrying the lift is RETRACTED and corrected in place.
-Policy cutoffs (85, 25) — step_up cost-optimized on validation (+8.28% val NPV,
-+3.7% on test); restrict unidentified on validation, left at 85.
-₹10.93L prevented, ₹10.57L net protected value (~31x), 617 review cases
-5/5 attack merchants detected, 0 false alarms, flash sale NOT flagged
-TTD beats flag-counter 4/5 (fraud ring 70m vs 101m); LOSES on IP cluster
-(31m vs 26m) — report it, don't smooth it.
-Ablation: basics 0.661 → +velocity 0.631 (mildly negative) → +entity/graph
-0.934. The "entity/graph is where the system comes from" reading is WRONG and
-RETRACTED — see failure-log 21. Diagnostics (printed by ablation.py itself):
-profile pair alone 0.9328 (n=2) | entity SHARING alone 0.8286 (n=4) | full
-minus the pair 0.8777 (n=20). What entity features DO buy, and the only
-defensible claim: legit INR wrongly blocked 68,319 (2-feature) → 5,901 (full). NOTE: an earlier dramatic "velocity collapses to 0.23" finding was
-an artifact of an attack-free calibration slice and has been RETRACTED in the
-README — keep the retraction visible, it's the honest version.
-P1b fusion changes 0/13,987 decisions vs the old p*100 shortcut. Kept for
+FALSE-POSITIVE COST: INR 21,728 of legitimate value wrongly blocked, which is
+0.21% of the INR 1,03,53,085 in legitimate transactions processed. ALWAYS give
+it that denominator - the bare rupee figure means nothing on its own.
+!! Do NOT compare this to the pre-fix INR 5,901 as if it were a regression.
+The old generator made fraud nearly linearly separable, so precision 0.994 was
+PURCHASABLE - it was a restatement of the leak, not a precision result. The two
+FP figures measure different DATASET DIFFICULTY, not different system quality.
+!! Our cost model prices a false negative at exactly the fraud amount and
+nothing else (no chargeback fees, dispute handling, regulatory exposure,
+churn). That systematically UNDER-weights FNs, biasing the cost-optimal
+threshold toward blocking less - so this FP number is conservative in the
+direction that FLATTERS us. Say so whenever it is quoted.
+LEAK AUDIT (failure-log 21, now CLOSED): customer_age_days + amount_dev_ratio
+ALONE score 0.5997 vs the full 22-feature 0.8981 - a gap of 0.2984. Pre-fix
+those same two features scored 0.9328 vs 0.9344, a gap of 0.0016. The 0.934
+figure is PRE-FIX and appears in exactly one place: failure-log entry 21,
+labelled as such - the same discipline used for the agent's pre-de-labelling
+run A. Never quote 0.934 as a current result.
+SENSITIVITY (failure-log 26): the aged_share choice is NOT load-bearing. Across
+0.3-0.9 the proxy pair never gets within 0.02 of the full set (worst 0.7179 at
+0.3) and full-set PR-AUC moves only 0.0056. A control reverting BOTH generator
+fixes reproduces the leak (gap +0.0172), which is how we know the sweep is
+measuring the right thing. Any realistic ageing removes the leak; our specific
+value is not what did it.
+Policy cutoffs (85, 20) - step_up cost-optimized on validation (+15.82% val
+NPV). Restrict stays 85: moving it alone to the best pair's 55 is NOT
+INDEPENDENTLY EVALUABLE, because step_up must remain the lower bar.
+INR 8.24L prevented, INR 7.95L net protected value (~28x), 578 review cases
+5/5 attack merchants detected | 25/25 across 5 seeds
+0 false alarms in 35 NON-ATTACK MERCHANT-WINDOWS (7 per seed x 5) - always
+carry the denominator; "0 false alarms" alone is an absolute claim on a small
+sample. Flash sale flagged 0/5.
+!! The two detector paths no longer agree: the STREAMING detector (what the
+product runs, and what 25/25 measures) catches 5/5 in all five seeds; the
+hourly EWMA path misses the account takeover on seed 7. Report the split.
+TTD beats flag-counter 4/5; LOSES on fraud ring (59m vs 48m) - report it,
+don't smooth it. We now WIN on IP cluster (24m vs 28m), which we used to lose.
+Ablation: basics 0.600 -> +velocity 0.632 -> +entity/graph 0.898. The
+"entity/graph is where the system comes from" reading was RETRACTED under the
+old generator and is now RE-ESTABLISHED on evidence: component_size is the top
+feature by BOTH single-feature PR-AUC (0.711) and model importance (0.406),
+ahead of device_account_count (0.703) and ip_account_count (0.701).
+customer_age_days fell to 0.359 and amount_dev_ratio to 0.494 - mid-pack.
+Diagnostics (printed by ablation.py itself, verdict DERIVED not hardcoded):
+profile pair alone 0.5997 (n=2) | entity SHARING alone 0.7877 (n=4, precision
+1.000) | full minus the pair 0.8105 (n=20).
+NOTE: an earlier dramatic "velocity collapses to 0.23" finding was an artifact
+of an attack-free calibration slice and has been RETRACTED in the README -
+keep the retraction visible, it's the honest version.
+P1b fusion changes 3/13,782 decisions (0.02%) vs the old p*100 shortcut (was
+0/13,987 pre-generator-fix). Kept for
 architecture (auditability, reachable fail-safe, headroom for a weaker model),
 NOT for metrics. Say so plainly; do not re-frame it as a win.
 P2 agent eval (LIVE Claude Haiku 4.5, DE-LABELLED data, run D = FINAL):
+!! SMALL SAMPLE. n=13. The 95% CI on 8/13 is roughly +/-25 points, so 8/13 and
+5/13 are NOT distinguishable at this sample size. EVERY conclusion drawn from
+the agent eval - including the run A->B->C->D progression, whose deltas are
+noisier than the table implies - is a small-sample result and must say so.
 8/13 correct cause (2/3 held-out), 100/100 evidence claims traceable,
 escalates-when-unsure 13/13, policy violations 0/13, UNSAFE ACTIONS 0/13
 (no attack ever got `allow`; all de-escalations were on attacks whose current
@@ -149,13 +190,16 @@ changes without a new held-out set, or the number stops meaning anything.
 Run: `python -m src.models.select_model && python -m src.policy.threshold_sweep
 && python -m src.models.train && python -m src.models.ablation`
 Self-audit: `python -m src.models.leakage_probe` (adversarial eval integrity)
+Generator sensitivity: `python -m src.models.aged_share_sensitivity` (is the
+aged_share choice load-bearing? no - and there is a control proving the
+sweep reproduces the leak when it should)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (60 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (61 pass, no network needed)
 REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
 random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
-Methodology transfers; the 0.934 does NOT. NEGATIVE RESULT (entry 24): our
+Methodology transfers; the 0.898 does NOT. NEGATIVE RESULT (entry 24): our
 entity fan-out features move IEEE-CIS -0.0053 and score 0.040 alone. Entity/
 graph is UNPROVEN at our hands on real data. Never claim otherwise. The
 merchant-level layer is wholly UNVALIDATED on real data - neither set has
@@ -246,7 +290,8 @@ merchants.
    central claim. Removed it; peak flagged-RATE and peak z discriminate
    properly (93%/z5.8 attack vs 3%/z1.1 quiet) because they're merchant-level.
 
-16. LIVE AGENT RUN: the agent labelled m2 (a real ₹5.5L account-takeover) as
+16. THE LIVE AGENT RUN THAT DEMONSTRATED THE ARCHITECTURE (one incident
+   demonstrates the separation works; it does not PROVE it). The agent labelled m2 (a real ₹5.5L account-takeover) as
    `legitimate_traffic` / `allow` at 0.95 CONFIDENCE. Evidence was factually
    correct ("29 customers, 29 devices, 29 IPs, zero shared entities") and the
    conclusion was exactly wrong. Root cause is a TOOL GAP, not model quality:
@@ -327,10 +372,13 @@ merchants.
    merchant-level result, since flash-sale customers are OLDER than baseline
    (230.65 vs 215.76), so 5/5-attacks / 0-false-alarms / flash-sale-not-flagged
    cannot be explained by account age.
-   DELIBERATELY NOT FIXED: regenerating attack accounts with realistic ages
-   (real fraudsters buy AGED accounts — the case we never generate) changes
-   every number in the README. Published as a measured limitation instead of
-   rushed under deadline. Listed first under Honest limitations.
+   CLOSED (see entry 26). Regenerating attack accounts with realistic ages was
+   first published as a measured limitation rather than rushed under deadline;
+   it was then actually done, and the fix cost is reported rather than hidden.
+   THIS ENTRY IS THE ONLY PLACE THE PRE-FIX NUMBERS APPEAR. 0.9344 full /
+   0.9328 proxy-pair are PRE-FIX figures and are labelled as such everywhere,
+   exactly as run A (9/10) is always labelled pre-de-labelling. They are the
+   measurement of what the leak was worth, not a competing headline.
    LESSON: we found this by attacking our own eval a SECOND time, after
    believing we had already done that. "We audited for leakage" is not a state
    you reach once — entry 19 fixed the agent's evidence and we never
@@ -370,7 +418,8 @@ merchants.
 23. REAL DATA FOUND A BUG OUR OWN DATA COULD NOT. Ran the unchanged recipe
    against ULB creditcardfraud (284,807 real card txns, 0.173% fraud) via
    `src/models/real_data_check.py`. PR-AUC 0.731 vs a 0.0017 random baseline
-   (423x lift); our simulator scores 0.934 on the same recipe, and that gap is
+   (423x lift); our simulator scores 0.898 on the same recipe (0.934 pre-fix,
+   see entry 26), and that gap is
    the honest measure of how much our own data was helping. Two findings, both
    structurally impossible to surface on synthetic data:
    (a) OUR AMOUNT MODEL IS BACKWARDS. We generate fraud as
@@ -388,7 +437,9 @@ merchants.
    ($7,729 vs $29,577). FIXED by appending np.inf to the grid. Every synthetic
    number is BIT-IDENTICAL after the fix (PR-AUC 0.9344, threshold 0.8333, NPV
    1,057,319.68, all six ablation rows) - which is what "latent" means, and is
-   how we know the fix is safe.
+   how we know the fix is safe. (Those are the PRE-entry-26 figures, quoted
+   here because bit-identity is a claim about THAT moment; the current
+   generator scores 0.8981.)
    FOLLOW-ON, reported as-is: with abstain reachable, the cost-optimal action
    on ULB is to BLOCK NOTHING. The model ranks fine (ROC-AUC 0.974) and the
    economics still say do not act. That is a limit of OUR cost model, which
@@ -487,4 +538,66 @@ explainability — every component must be defensible to a judge in one sentence
    field fails OPEN and silently — it does not error, it just stops guarding,
    and the failure looks like an unrelated design flaw. Assert on the guard's
    observable outcome, not on the field it happens to read.
+
+26. WE FIXED THE GENERATOR, AND THE FIX FOUND THREE MORE BUGS.
+   Entry 21 ended at "disclosed but not fixed", which is the weakest ending an
+   audit finding can have. Closed it. Two generator edits, both grounded in
+   real-world fact rather than in what would make the number look good:
+   (a) attack account ages now come from a MIXTURE - a share aged exactly like
+   the legitimate population, because REAL FRAUDSTERS BUY AGED ACCOUNTS, the
+   case we never generated; the rest genuinely new, because throwaway guest
+   checkout is also real. Shares fixed on stated rationale BEFORE measuring
+   and not tuned after: rings 0.8, farms/clusters 0.6, card testing 0.5.
+   (b) ambient fraud amounts are no longer uniformly expensive, because ULB's
+   real card fraud runs 0.42x the median legitimate amount while IEEE-CIS
+   e-commerce fraud runs 1.10x (entries 23/24): fraud amount is FRAUD-TYPE
+   dependent and we had modelled only the expensive case.
+   RESULT - the leak is gone: the two proxy features fall 0.9328 -> 0.5997
+   while the full set falls only 0.9344 -> 0.8981. The gap goes 0.0016 ->
+   0.2984. The headline dropped 0.036; the cheat dropped 0.333.
+   AND THE RETRACTED CLAIM BECOMES TRUE. Entry 21 forced us to retract
+   "entity/graph is where the system comes from". On data that does not hand
+   out the answer, component_size is now the top feature by BOTH single-feature
+   PR-AUC (0.711) and model importance (0.406). The claim is RE-ESTABLISHED on
+   evidence rather than quietly restored.
+   IS OUR NEW CHOICE JUST AS ARBITRARY? Measured, not argued
+   (src/models/aged_share_sensitivity.py). Across aged_share 0.3-0.9 the proxy
+   pair never comes within 0.02 of the full set (worst 0.7179 at 0.3) and
+   full-set PR-AUC moves only 0.0056. ANY realistic ageing removes the leak;
+   our specific value is not what did it. The old value (100% newborn) was a
+   judgement call too - just an implicit, never-examined one, load-bearing
+   enough to fake the headline.
+   THE SWEEP CAUGHT ITSELF FIRST. Its initial control reverted only the ages,
+   not the amounts, so it did NOT reproduce the leak - and the derived verdict
+   flagged "this sweep may not be measuring what we think it is" instead of
+   reporting a clean pass. Fixed by making the control revert BOTH edits, which
+   then reproduced the leak (gap +0.0172) as it should.
+   THREE LATENT BUGS SURFACED BY THE RE-RUN:
+   (i) threshold_sweep.py CRASHED. Its per-parameter rule (entry 10) assumed
+   each cutoff can move alone, but the grid requires step_up < restrict, so the
+   new best pair's one-at-a-time point (55, 60) does not exist -> IndexError.
+   Now reports "NOT INDEPENDENTLY EVALUABLE" and keeps the conservative
+   default. A move we cannot measure in isolation is not evidence FOR making
+   it. Adopted (85, 20).
+   (ii)+(iii) leakage_probe.py AND ablation.py both HARDCODED their failing
+   conclusions. After the fix they printed "two features reproduce the
+   headline" directly above their own output showing they don't. Both verdicts
+   are now DERIVED from the numbers. AN AUDIT TOOL THAT CANNOT REPORT A PASS IS
+   NOT AN AUDIT TOOL - and we had two of them.
+   WHAT IT COST, reported not buried: PR-AUC 0.945 -> 0.910 over 5 seeds, NPV
+   INR 10.57L -> 7.95L, legit INR wrongly blocked 5,901 -> 21,728 (0.21% of
+   legitimate value processed). Those two FP figures measure different DATASET
+   DIFFICULTY, not different system quality: precision 0.994 was purchasable on
+   data where two columns partition the label space. We did NOT retune the
+   threshold to recover the FP number - (85, 20) is what the validation sweep
+   adopted, and moving it because we dislike the result would be optimising
+   something other than expected cost. We have refused that move four times now
+   (expected_action labels, fusion re-weighting, the frozen agent design, this).
+   ALSO CHANGED: TTD now WINS on IP cluster (24m vs 28m, previously our one
+   loss) and LOSES on fraud ring (59m vs 48m). Still 4/5. And the two detector
+   paths no longer agree - streaming catches 5/5 in all seeds, the hourly EWMA
+   path misses the account takeover on seed 7. Both reported.
+   LESSON: "disclosed but not fixed" is a resting place, not a destination. The
+   fix cost 0.036 of headline and bought back the ability to state what the
+   number means - plus three bugs that only a re-run could expose.
 

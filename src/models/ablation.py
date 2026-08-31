@@ -159,6 +159,7 @@ def main():
     # --- diagnostics: decompose stage 3. See module docstring + failure-log 21. ---
     print()
     print("--- diagnostics (NOT ladder stages): where does stage 3 lift come from? ---")
+    diag: dict[str, float] = {}
     for label, cols in DIAGNOSTICS:
         if cols is None:  # D3
             cols = [c for c in STAGES[-1][1] if c not in LABEL_PROXY_SUSPECTS]
@@ -166,9 +167,31 @@ def main():
         metrics["stage"] = label
         rows.append(metrics)
         print(f"  {label:<26} n={metrics['n_features']:<3} pr_auc={metrics['pr_auc']}")
-    print("  -> two PROFILE features reproduce the 22-feature headline; entity SHARING")
-    print("     alone is real but adds little on top of them. Full audit:")
-    print("     python -m src.models.leakage_probe")
+        diag[label] = float(metrics["pr_auc"])
+
+    # DERIVED, never asserted. This line used to be hardcoded to the failing
+    # finding, so after the generator was fixed it printed the old verdict
+    # directly underneath numbers that contradicted it. A diagnostic that
+    # cannot report its own pass is not a diagnostic.
+    # stage4 carries stage 3's pr_auc forward, so this stays correct no matter
+    # how many diagnostic rows the loop above appended to `rows`.
+    full_pr = float(stage4["pr_auc"])
+    proxy_pr = diag.get("D1_profile_proxies_only", float("nan"))
+    share_pr = diag.get("D2_entity_sharing_only", float("nan"))
+    minus_pr = diag.get("D3_full_minus_proxies", float("nan"))
+    if abs(full_pr - proxy_pr) < 0.02:
+        print(f"  -> WARNING: two PROFILE features ({proxy_pr:.4f}) reproduce the "
+              f"{len(STAGES[-1][1])}-feature headline ({full_pr:.4f}).")
+        print("     The stage-3 jump must NOT be read as 'entity correlation is where")
+        print("     the lift comes from'. Full audit: python -m src.models.leakage_probe")
+    else:
+        print(f"  -> the profile pair alone is {proxy_pr:.4f} against {full_pr:.4f} for the "
+              f"full set (gap {full_pr - proxy_pr:+.4f}),")
+        print(f"     so the headline is NOT reproducible from them. Entity SHARING alone "
+              f"is {share_pr:.4f};")
+        print(f"     dropping the pair entirely costs {full_pr - minus_pr:.4f}. The stage-3 "
+              "lift is carried by")
+        print("     entity/graph structure. Full audit: python -m src.models.leakage_probe")
 
     table = pd.DataFrame(rows)
     col_order = ["stage", "n_features", "pr_auc", "precision", "recall",
