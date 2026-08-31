@@ -733,6 +733,84 @@ function Pitch() {
         report a pass.</p>
     </div>
 
+    ${/* Failure recovery is a judging criterion and our strongest asset for it,
+         but it lived only in CLAUDE.md - invisible to anyone who watches the
+         demo and never opens the repo. Static content, no new logic. */''}
+    <div class="panel">
+      <h2>what broke, and what we did about it</h2>
+      <p class="note" style=${{ marginTop: 0 }}>
+        <b>26 failures</b> are logged with root causes in the repo. Not "we hit some
+        bugs" — each one names what we believed, what measurement contradicted it, and
+        what changed. Five that a judge should see:
+      </p>
+      <div class="audits">
+        <div class="aud">
+          <div class="an">16</div>
+          <div>
+            <h3>The agent called a ₹5.5L account takeover “legitimate — allow”, at 0.95 confidence</h3>
+            <p>Its evidence was <i>factually correct</i> — “29 customers, 29 devices, 29 IPs,
+              zero shared entities” — and its conclusion was exactly wrong, because account
+              takeover doesn't share entities. <b>The policy engine restricted 68 transactions
+              and queued 8 for review anyway</b>, because the LLM is not in the decision path.
+              That is our central architectural claim, demonstrated rather than asserted. The
+              fix was a new tool exposing new-device and geo-mismatch rates — evidence, not
+              prompt coaching. The prompt is sha256-verified unchanged.</p>
+          </div>
+        </div>
+        <div class="aud">
+          <div class="an">26</div>
+          <div>
+            <h3>Two of our own audit tools could not report a pass</h3>
+            <p><span class="mono">leakage_probe.py</span> and${' '}
+              <span class="mono">ablation.py</span> both <b>hardcoded their failing
+              conclusions</b>. After we fixed the generator they printed “two features
+              reproduce the headline” directly above their own output showing they don't.
+              That is confirmation bias compiled into the measuring instrument. Both verdicts
+              are now derived from the numbers.</p>
+          </div>
+        </div>
+        <div class="aud">
+          <div class="an">06</div>
+          <div>
+            <h3>A dramatic result we published, then had to retract</h3>
+            <p>Ablation appeared to collapse 0.55 → 0.23 and we wrote it up as “velocity alone
+              is a trap.” <b>The cause was ours:</b> the calibration slice contained no attack,
+              so isotonic calibration fit degenerate plateaus. Fixed, the effect shrank to
+              0.661 → 0.631 — mild, not a collapse. The retraction is left visible in the
+              README on purpose. A dramatic result on a small slice is a prompt to re-measure,
+              not to publish.</p>
+          </div>
+        </div>
+        <div class="aud">
+          <div class="an">11</div>
+          <div>
+            <h3>A silent framework bug that looked exactly like “the model is bad”</h3>
+            <p>LangGraph dropped <span class="mono">stop_reason</span> because it wasn't
+              declared in the state schema, so routing never saw a tool call and${' '}
+              <b>every</b> investigation fell through to the fallback. Undeclared state keys
+              vanish without an error. We only caught it because tests assert on the audit
+              log's tool sequence — the observable side effect — not on the final output.</p>
+          </div>
+        </div>
+        <div class="aud">
+          <div class="an">15</div>
+          <div>
+            <h3>A dashboard metric that would have destroyed this demo</h3>
+            <p>We added “peak risk ever” to keep the story after a burst cools. It came out${' '}
+              <b>100 for all 12 merchants — including the flash sale</b>, because every
+              merchant has at least one ambient-fraud transaction scoring ~100. It would have
+              shown “peak 100/100” on the legitimate merchant, contradicting the central claim
+              on screen. Removed. Peak flagged <i>rate</i> and peak z discriminate properly
+              because they are merchant-level.</p>
+          </div>
+        </div>
+      </div>
+      <p class="note">Every one of these was caught by <b>measuring a claim</b>, not by
+        re-reading code. <b>Two</b> of them — 06 and 26 — contradicted something we had
+        already written down and published, and were corrected in place rather than
+        quietly. The other three were caught before they shipped.</p>
+    </div>
+
     <div class="panel">
       <h2>what we're not claiming</h2>
       <ul class="lims">
