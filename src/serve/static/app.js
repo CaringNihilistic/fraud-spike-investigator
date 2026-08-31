@@ -511,15 +511,15 @@ function Contrast({ merchants }) {
    gitignored, so a fresh deployment has no CSV to read - same convention the
    metric tiles above already use. Values are the validation slice. */
 const SWEEP = [
-  { cut: 20, npv: 125639, legit: 2514 },
-  { cut: 25, npv: 125840, legit: 2313 },
-  { cut: 30, npv: 121284, legit: 1597 },
-  { cut: 35, npv: 116034, legit: 408 },
-  { cut: 40, npv: 116216, legit: 226 },
-  { cut: 50, npv: 116216, legit: 226 },
-  { cut: 60, npv: 116216, legit: 226 },
-  { cut: 70, npv: 116216, legit: 226 },
-  { cut: 80, npv: 116216, legit: 226 },
+  { cut: 20, npv: 79147, legit: 336 },
+  { cut: 25, npv: 76756, legit: 257 },
+  { cut: 30, npv: 76756, legit: 257 },
+  { cut: 40, npv: 76756, legit: 257 },
+  { cut: 50, npv: 76756, legit: 257 },
+  { cut: 55, npv: 76756, legit: 257 },
+  { cut: 60, npv: 68339, legit: 0 },
+  { cut: 70, npv: 66685, legit: 0 },
+  { cut: 80, npv: 66685, legit: 0 },
 ];
 
 function CostCurve() {
@@ -537,7 +537,7 @@ function CostCurve() {
       <div class="curve">
         ${SWEEP.map((d) => {
           const w = 100 * (d.npv - min) / (max - min);
-          const on = d.cut === 25, old = d.cut === 60;
+          const on = d.cut === 20, old = d.cut === 60;
           return html`
           <div class=${'crow' + (on ? ' on' : '') + (old ? ' old' : '')} key=${d.cut}>
             <div class="cc">step-up ≥ ${d.cut}</div>
@@ -552,23 +552,29 @@ function CostCurve() {
         <span>bar = net protected value</span>
         <span>right column = legitimate ₹ wrongly impacted</span>
       </div>
-      <p>Moving the step-up cutoff from 60 to 25 is worth <b>+8.28%</b> net
-        protected value — and costs <b>10× more</b> legitimate revenue
-        (₹226 → ₹2,313). We took that trade because step-up is friction, not a
-        block: a real customer completes an OTP. We would not take it for the${' '}
-        <i>restrict</i> cutoff, and we didn't.</p>
-      <p class="note"><b>What the flat run above 40 actually means.</b> Net
-        protected value is <i>identical</i> from 40 to 80 because no validation
-        transaction scores in that band. Our pre-declared "adopt the best pair"
-        rule would have picked an arbitrary point inside that dead zone on a
-        +0.53% difference. We caught it, refined the rule to a per-parameter
-        margin, and left restrict at 85 — documented as a post-hoc refinement
-        rather than presented as foresight. That's failure-log 10.</p>
+      <p>Moving the step-up cutoff from 60 to 20 is worth <b>+15.8%</b> net
+        protected value — and it does cost legitimate revenue that the old cut
+        did not touch at all (₹0 → ₹336). We took that trade because step-up is
+        friction, not a block: a real customer completes an OTP. We would not
+        take it for the${' '}<i>restrict</i> cutoff, and we didn't.</p>
+      <p class="note"><b>What the flat run in the middle actually means.</b> Net
+        protected value is <i>identical</i> across a wide band because no
+        validation transaction scores there. Our pre-declared "adopt the best
+        pair" rule would have picked an arbitrary point inside that dead zone.
+        We caught it and refined the rule to a per-parameter margin — documented
+        as a post-hoc refinement rather than presented as foresight
+        (failure-log 10). It then earned its keep twice more: the best pair now
+        wants restrict=55, but moving restrict alone while step-up sits at 60 is
+        not a valid policy at all (step-up must stay the lower bar), so the rule
+        reports it <b>not independently evaluable</b> and keeps 85. Getting
+        there crashed the sweep, and the first fix left the console printing a
+        correct verdict while the saved artifact silently kept stale numbers.
+        Both fixed; that's failure-log 26.</p>
     </div>`;
 }
 
 function Capacity() {
-  const perK = 44.1, perAnalystHour = 30;
+  const perK = 41.9, perAnalystHour = 30;
   const rows = [10e3, 100e3, 1e6].map((v) => {
     const cases = v / 1000 * perK;
     const hours = cases / perAnalystHour;
@@ -596,7 +602,7 @@ function Capacity() {
       </div>
       <p><b>At PSP scale this does not staff.</b> 184 full-time analysts to
         clear one million transactions a day is not a rounding error, it is a
-        department. Our 4.41% review rate is tuned for net rupees, and nothing
+        department. Our 4.19% review rate is tuned for net rupees, and nothing
         in the objective function knows that analyst capacity is finite.</p>
       <p class="note">The honest fix is not a better model — it is a second
         constraint. The restrict and review cutoffs would have to be re-swept
@@ -663,13 +669,13 @@ function Pitch() {
     <div class="panel">
       <h2>results — temporal held-out test slice, synthetic data</h2>
       <div class="mets">
-        <${Metric} k="attacks detected" v="25 / 25" note="across 5 independent worlds" />
-        <${Metric} k="false alarms" v="0" note="in every world" />
+        <${Metric} k="attacks detected" v="25 / 25" note="across 5 seeds of the generator" />
+        <${Metric} k="false alarms" v="0" note="in 35 non-attack merchant-windows" />
         <${Metric} k="flash sale flagged" v="0 / 5" note="the legitimate 6× spike" />
-        <${Metric} k="net protected value" v="₹10.57L" note="after 617 reviews × ₹50" />
-        <${Metric} k="precision / recall" v="0.994 / 0.886" note="at the cost-optimal threshold" />
-        <${Metric} k="legitimate ₹ impacted" v="₹4,814" note="the false-positive cost" />
-        <${Metric} k="calibration (Brier / ECE)" v="0.0053 / 0.0033" note="measured, not assumed" />
+        <${Metric} k="net protected value" v="₹7.95L" note="after 578 reviews × ₹50" />
+        <${Metric} k="precision / recall" v="0.927 / 0.857" note="at the cost-optimal threshold" />
+        <${Metric} k="legitimate ₹ wrongly blocked" v="₹21.7K" note="0.21% of legitimate value processed" />
+        <${Metric} k="calibration (Brier / ECE)" v="0.0082 / 0.0031" note="measured, not assumed" />
         <${Metric} k="LLM policy violations" v="0 / 13" note="0/13 unsafe actions too" />
       </div>
     </div>
@@ -698,10 +704,16 @@ function Pitch() {
           <div class="an">02</div>
           <div>
             <h3>Was the <i>model</i> reading our answer key?</h3>
-            <p>Same attack, one layer down. <b>Two features reproduce the entire 22-feature
-              model</b> — because our generator creates attack accounts on the attack day.
-              This forced us to retract our own headline claim that entity/graph features
+            <p>Same attack, one layer down. <b>Two features reproduced the entire 22-feature
+              model</b> — because our generator created attack accounts on the attack day.
+              It forced us to retract our own headline claim that entity/graph features
               were the source of the lift.</p>
+            <p><b>Then we fixed the generator and re-measured.</b> The two proxies fell${' '}
+              <b>0.9328 → 0.5997</b>; the headline fell only <b>0.9344 → 0.8981</b>. The
+              shortcut dropped 0.333, the headline 0.036 — and the retracted claim turned out
+              to be <b>true</b>: component_size is now the top feature by both single-feature
+              PR-AUC and model importance. The fix cost us ₹10.57L → ₹7.95L in net protected
+              value, and we published that too.</p>
           </div>
         </div>
         <div class="aud">
@@ -715,8 +727,10 @@ function Pitch() {
           </div>
         </div>
       </div>
-      <p class="note"><b>24 failures</b> are logged with root causes in the repo. Every one was
-        caught by measuring a claim, not by re-reading code.</p>
+      <p class="note"><b>26 failures</b> are logged with root causes in the repo. Every one was
+        caught by measuring a claim, not by re-reading code. Two of them were our own audit
+        tools hardcoding their failing verdicts — instruments that structurally could not
+        report a pass.</p>
     </div>
 
     <div class="panel">
@@ -724,14 +738,18 @@ function Pitch() {
       <ul class="lims">
         <li>Data is <b>synthetic</b> and labelled as such everywhere. Simulator parameters are
           design choices, not Razorpay statistics. <b>Nothing here is Razorpay data.</b></li>
-        <li>Our simulator encodes the label into two features, so the headline PR-AUC
-          overstates real detection ability. Audit 02, published rather than hidden.</li>
+        <li>Our audit tooling was written by the person whose work it audits — and two of
+          those tools hardcoded their own failing verdicts. Fixed, but the bias is structural.</li>
+        <li>We fixed the two label proxies we found. <b>We have not proven there are no
+          others</b> — a negative result is only as strong as the test that produced it.</li>
         <li>The <b>merchant-level</b> layer is validated on controlled scenarios only —
           neither public dataset we evaluated has a merchant column.</li>
         <li>The agent gets the cause right <b>8/13</b> times. It is advisory and cannot act.
           That separation is the point, and it's tested.</li>
-        <li>44 review cases per 1,000 transactions is priced at ₹50 but never checked
+        <li>42 review cases per 1,000 transactions is priced at ₹50 but never checked
           against whether the analysts exist.</li>
+        <li>The agent eval is <b>n=13</b> — roughly a ±25-point confidence interval, so 8/13
+          and 5/13 are not distinguishable. Every number from it is a small-sample result.</li>
       </ul>
     </div>
   </div>`;

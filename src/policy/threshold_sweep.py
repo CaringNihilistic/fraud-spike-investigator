@@ -231,8 +231,15 @@ def main():
                              "net_protected_value_inr": float(best.net_protected_value_inr),
                              "review_cases": int(best.review_cases)},
                "lift_pct": round(lift_pct, 4), "adopt_margin_pct": ADOPT_MARGIN_PCT,
-               "per_parameter_lift_pct": {"restrict": round(restrict_lift, 4),
-                                           "step_up": round(step_lift, 4)},
+               # null, not a number, when the one-at-a-time move is not a point
+               # on the grid. Rounding None crashed the write AFTER the verdict
+               # had already printed, so the console said success while the
+               # artifact silently went stale - the same failure shape as a
+               # guard that fails open.
+               "per_parameter_lift_pct": {
+                   "restrict": None if restrict_lift is None else round(restrict_lift, 4),
+                   "step_up": None if step_lift is None else round(step_lift, 4)},
+               "restrict_not_independently_evaluable": restrict_lift is None,
                "restrict_surface_flat_over": "40-80 (exact NPV ties -> unidentified)",
                "validation_rows": n_cal, "validation_fraud": n_fraud,
                "verdict": verdict},

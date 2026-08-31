@@ -275,3 +275,20 @@ def test_a_spiking_merchant_with_no_shared_entities_says_so_distinctly(client):
     ms = {x["merchant_id"]: x for x in client.get("/api/merchants").json()["merchants"]}
     assert ms["ato"]["signature"]["text"] != ms["calm"]["signature"]["text"]
     assert ms["ato"]["signature"]["kind"] == "no_sharing_but_spiking"
+
+
+def test_a_two_account_coincidence_is_not_reported_as_a_hub(client):
+    """Two accounts behind one IP is a consumer NAT, not a cluster. Reporting
+    it as "1 IP address shared by 2 accounts" reads identically to a real
+    40-account cluster and buries the actual finding."""
+    for i in range(6):
+        STATE.record_txn(
+            {"merchant_id": "nat", "ts": 1 + i, "p": 0.95, "amount": 100.0,
+             "customer_id": f"n{i % 2}",            # only TWO accounts
+             "device_id": f"nd{i}", "ip": "ip_NAT", "instrument_id": f"np{i}"},
+            risk=95.0, confidence=0.9, action=Action.REVIEW, reason="t",
+            spiking=False, spike_ts=None)
+    sig = next(x for x in client.get("/api/merchants").json()["merchants"]
+               if x["merchant_id"] == "nat")["signature"]
+    assert sig["hubs"] == 0
+    assert "shared by 2 accounts" not in sig["text"]

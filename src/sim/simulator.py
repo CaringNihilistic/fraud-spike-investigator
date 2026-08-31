@@ -123,8 +123,13 @@ def gen_baseline(w: World, rng) -> list[dict]:
                     # the median legitimate amount, while IEEE-CIS e-commerce
                     # fraud runs 1.10x (failure-log 23/24). Generate both, so the
                     # ratio is no longer monotonic in the label.
-                    mult = (float(rng.uniform(0.08, 0.6)) if rng.random() < 0.4
-                            else float(rng.uniform(1.2, 3.5)))
+                    if AMBIENT_AMOUNT_MIXTURE:
+                        mult = (float(rng.uniform(0.08, 0.6)) if rng.random() < 0.4
+                                else float(rng.uniform(1.2, 3.5)))
+                    else:
+                        # The ORIGINAL broken model, kept reachable ONLY so the
+                        # sensitivity sweep has a true control. Never shipped.
+                        mult = float(rng.uniform(1.5, 4.0))
                     r["amount"] = round(max(1.0, r["amount"] * mult), 2)
                 rows.append(r)
     return rows
@@ -146,6 +151,14 @@ def gen_baseline(w: World, rng) -> list[dict]:
 # tuned afterwards: rings buy aged accounts and are the most patient (0.8);
 # farms and IP clusters mix bought with fresh (0.6); card testing runs largely
 # on disposable guest checkouts, so it stays the youngest (0.5).
+# Whether ambient fraud amounts use the two-mode mixture (shipped) or the
+# original uniform(1.5, 4.0) (broken). This exists so
+# aged_share_sensitivity.py can build a TRUE control that reverts BOTH
+# generator fixes at once. Reverting only one produced a control that did
+# not reproduce the leak, and the sweep correctly flagged itself as
+# untrustworthy rather than reporting a clean pass (failure 26).
+AMBIENT_AMOUNT_MIXTURE = True
+
 AGED_SHARE_RING = 0.8
 AGED_SHARE_FARM = 0.6
 AGED_SHARE_CLUSTER = 0.6

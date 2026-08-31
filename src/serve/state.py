@@ -92,9 +92,20 @@ class MerchantState:
                     "text": "no flagged transactions"}
         # Widest fan-out wins: one entity touching many accounts is the shape
         # that separates coordinated abuse from ordinary traffic.
+        #
+        # MIN_HUB_ACCOUNTS is 3, not 2, and that is deliberate. Two accounts
+        # sharing one IP is coincidence - two account-takeover victims behind
+        # the same consumer NAT, say - and reporting it as "1 IP address shared
+        # by 2 accounts" renders identically to a real 40-account cluster while
+        # burying the finding that actually matters for that merchant, which is
+        # that nothing is shared at all. The entity GRAPH still draws >=2,
+        # because seeing the whole picture is its job; this one-line summary
+        # reports only what is notable.
+        MIN_HUB_ACCOUNTS = 3
         best_kind, best_hubs, best_accts = None, 0, 0
         for kind in ("device", "ip", "instrument"):
-            hubs = [a for a in self.entities[kind].values() if len(a) >= 2]
+            hubs = [a for a in self.entities[kind].values()
+                    if len(a) >= MIN_HUB_ACCOUNTS]
             if not hubs:
                 continue
             accts = len(set().union(*hubs))
