@@ -150,6 +150,13 @@ legit revenue impacted on the policy path, 948 review cases
 It is 1 because the symmetric fix costs an entire attack class - see entry 29.
 Flash sale flagged 0/5. Three legitimate spikes are now tested, two of which
 share entities; the flash sale alone never exercised the entity layer at all.
+CONTINUUM SWEEP (entry 32): those three are POINTS, so the boundary was swept -
+legitimate sharing 0-100% through one entity, 5 seeds, frozen pipeline, real
+device farm as positive control. Nothing fires below 80% concentration (40/40
+merchant-seeds clean); 3 of 60 fire at >=80%; INR 0 legit revenue restricted
+anywhere - they are ALERTS, not blocks. Control fires 5/5 at flagged 0.959 vs a
+worst legit 0.067. Does NOT license 'never false-alarms' - m4 still fires on 1
+seed in 5.
 The STREAMING detector (what the product runs, and what 25/25 measures) catches
 5/5 in all seeds; the hourly EWMA path misses the ATO on seed 7. Report both.
 TTD beats flag-counter 4/5; LOSES on fraud ring (68m vs 59m). Static volume is
@@ -204,6 +211,11 @@ resamples, so the table's deltas carry intervals rather than bare points)
 Generator sensitivity: `python -m src.models.aged_share_sensitivity` (is the
 aged_share choice load-bearing? no - and there is a control proving the
 sweep reproduces the leak when it should)
+Sharing sensitivity: `python -m src.models.sharing_sensitivity` (where does
+LEGITIMATE entity sharing start firing us? swept 0-100% over 5 seeds through the
+frozen pipeline, with a real device farm as a POSITIVE CONTROL - 3/60 legit
+merchant-seeds fire, all at >=80% sharing, INR 0 restricted; control 5/5 at
+0.959. The first run was WRONG - see entry 32)
 Merchant-data testability: `python -m src.models.merchant_data_check` (asks
 whether a public set can evaluate the MERCHANT layer at all; Sparkov has the
 merchant column and still cannot - 0 evaluable merchant-hour windows, max fraud
@@ -211,7 +223,7 @@ rate 0.273 vs our 0.70-0.93. Run BEFORE modelling, never after)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (72 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (80 pass, no network needed)
 REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
 random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
 Methodology transfers; the 0.898 does NOT. NEGATIVE RESULT (entry 24): our
@@ -861,3 +873,53 @@ explainability — every component must be defensible to a judge in one sentence
    bugs, because a documentation contradiction is often a code contradiction
    that has surfaced. Five doc findings were cheap to fix; chasing the sixth
    found a shipped policy value that our own decision rule forbids.
+
+32. THE SWEEP'S FIRST ANSWER WAS ABOUT THE SWEEP, NOT THE SYSTEM.
+   The audit in entry 31 left one criticism standing that no number of ours
+   could answer: our three legitimate merchants are three POINTS, the detector's
+   whole thesis is that entity sharing is suspicious, and we had never measured
+   what happens BETWEEN "shares nothing" and "shares everything". If the
+   false-positive rate has a cliff in the middle, "0 or 1 false alarms" is a
+   fact about where our three examples happen to sit.
+   Built src/models/sharing_sensitivity.py: legitimate merchants whose ONLY
+   varying property is the share of traffic through one device/IP, swept
+   0-100%, run through the FROZEN pipeline (shipped model, calibration and
+   cutoffs, no retraining), with a real device farm at the same volume and
+   window as a POSITIVE CONTROL.
+   FIRST RUN SAID WE FALSE-ALARM ON MERCHANTS THAT SHARE NOTHING. Flagged rate
+   0.144 at 0% sharing, falling to 0.011 at 100% - a backwards curve, and two
+   spikes at the LOW end. Read literally it says the detector fires on ordinary
+   traffic and calms down as coordination increases, which is nonsense on its
+   face and would have been a spectacular thing to publish.
+   IT WAS OUR HARNESS. The swept merchants drew ISP pools from `cid % 400`
+   while World.__post_init__ uses 1500 - so their pools were 3.75x DENSER than
+   the world the model was trained on, inflating ip_account_count and the
+   entity-graph signal on every swept merchant, worst where nothing else was
+   shared. One character of parameterisation, and the whole curve inverted.
+   Matched the pool count to the generator and re-ran: nothing fires below 80%
+   sharing at all.
+   WHAT IT ACTUALLY SAYS, across 5 seeds and 60 legitimate merchant-seeds:
+     sharing 0/20/40/60%   0 of 40 merchant-seeds fire
+     sharing 80%           1 of 10
+     sharing 100%          2 of 10
+     legit INR restricted  0, everywhere in the sweep
+     positive control      5/5 seeds, mean flagged 0.959 vs worst legit 0.067
+   The rate does not climb through the middle; it is flat at zero until traffic
+   is overwhelmingly funnelled through one entity. The three fires are ALERTS,
+   not blocks - the merchants entered spike state and none of their
+   transactions were restricted. And the reason the middle is safe is the hard
+   negative from entry 29: training now contains an HONEST shared-device
+   merchant, so heavy sharing reads as the kiosk it was taught.
+   WHAT IT DOES NOT SETTLE, said before anyone else says it: our generator's
+   topology, one event per merchant, 5 seeds. It retires the narrow objection
+   (the three points were not hiding a cliff). It does not license "never
+   false-alarms" - m4 still fires on 1 seed in 5.
+   WHY THE CONTROL IS THE MOST IMPORTANT ROW: without it, a clean sweep is
+   indistinguishable from a broken harness, and we would have reported a null
+   that measures our own code - the exact trap entry 24 documents for IEEE-CIS
+   and entry 30 avoids for Sparkov. The verdict is VOID if the control fails,
+   and that branch is written and reachable rather than assumed away.
+   LESSON: we caught this only because the first result was absurd in a
+   DIRECTION we could reason about. A harness bug that produced a plausible
+   curve would have shipped. The defence is not vigilance, it is the control
+   row - build the thing that must fire, then believe the things that do not.

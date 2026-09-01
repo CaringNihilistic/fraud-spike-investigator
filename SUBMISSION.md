@@ -18,7 +18,7 @@
 | **Calibration** | Brier **0.0123**, ECE **0.0074** — measured, not assumed, and measurably *worse* since the hard negatives |
 | **Real public data**, same pipeline, zero tuning | ULB (284k txns): **PR-AUC 0.731** vs 0.0017 random · IEEE-CIS (590k txns): **0.460** vs 0.035 random |
 | **LLM safety** | **0/13** policy violations · **0/13** unsafe actions · the LLM cannot authorize anything — pytest-enforced |
-| **Engineering** | **72 tests**, no network or credentials needed · one-command demo · **31 logged failures** with root causes |
+| **Engineering** | **80 tests**, no network or credentials needed · one-command demo · **32 logged failures** with root causes |
 
 Evaluation is temporal throughout — day-boundary splits, never random. Model selection, threshold tuning and calibration all happen on a validation slice; the test slice is read once, at the end. Every number above reproduces from a clean clone.
 
@@ -34,7 +34,7 @@ The hardest part of the problem is not catching attacks — it's **not crying wo
 
 ## 2. Build quality
 
-One command runs it: `python run_demo.py` (trains, serves, replays 14,160 transactions through the real pipeline). **72 tests pass with no network and no credentials.**
+One command runs it: `python run_demo.py` (trains, serves, replays 14,160 transactions through the real pipeline). **80 tests pass with no network and no credentials.**
 
 | Metric — temporal held-out test slice, synthetic data (labeled as such) | Value |
 |---|---|
@@ -77,9 +77,11 @@ Leakage-safe incremental features (every feature computed from prior events only
 
 ## 4. Failure recovery
 
-**31 logged failures** in `CLAUDE.md`, with root causes. Most were caught by *measuring a claim* rather than re-reading code — but not all, and the newest was not: an outside audit found it. The most important:
+**32 logged failures** in `CLAUDE.md`, with root causes. Most were caught by *measuring a claim* rather than re-reading code — but not all, and the newest was not: an outside audit found it. The most important:
 
 **We built a legitimate merchant designed to break our own system, and it did.** "0 false alarms" had rested on a single negative — a flash sale where every account has its own device, IP and card, so it never exercised the entity layer at all. We added a shared payment kiosk: 25 real customers, one terminal, entirely honest. **It scored 0.972 against a real device farm's 0.985, and produced a higher spike z than an actual attack.** Root cause was a training-distribution gap — the model had only ever seen shared devices committing fraud. Fixed by putting a legitimate kiosk in the *training* period: 0.972 → 0.002, attacks unaffected, precision up to 0.996. **A second hard negative still false-alarms on one seed in five and we left it there.** The symmetric fix looked *better* on the seed we first measured — higher net protected value — so this originally read as us overriding our own cost rule on judgment. An outside reviewer pointed out that comparing a win on one seed to a failure on another is not a comparison. Measured across all five: the rejected configuration is **₹64,192 worse on average and loses an attack.** It was not a trade at all. Four configurations were tried; the rejected one is left reachable so anyone can re-measure it.
+
+**Then we stopped sampling that boundary at three points and swept it.** An outside audit's sharpest criticism was that our three legitimate merchants are three *points* on a continuum, and a system whose thesis is “entity sharing is suspicious” had never measured what happens between “shares nothing” and “shares everything”. So we built legitimate merchants whose only varying property is the share of traffic through one device/IP, swept **0→100%** across **5 seeds** through the **frozen pipeline**, with a real device farm as a **positive control** — because a sweep whose control cannot fire measures the harness, not the system. Result: **nothing fires below 80% concentration** (40/40 merchant-seeds clean), **3 of 60** fire at or above it, and **₹0 of legitimate revenue is restricted anywhere** — those three are *alerts, not blocks*. The control fires **5/5** at a mean flagged rate of **0.959** against a worst legitimate **0.067**. The rate does not climb through the middle; it is flat at zero until traffic is overwhelmingly funnelled through one entity, and the reason is the hard negative above — training now contains an *honest* shared-device merchant. **The first run of this sweep was wrong** and said the opposite (failure 32): our swept merchants drew ISP pools 3.75× denser than the world the model was trained on. We caught it because the curve was absurd in a direction we could reason about, which is not a defence that generalises — the control row is.
 
 And the newest, because it is the least flattering:
 
