@@ -203,6 +203,10 @@ resamples, so the table's deltas carry intervals rather than bare points)
 Generator sensitivity: `python -m src.models.aged_share_sensitivity` (is the
 aged_share choice load-bearing? no - and there is a control proving the
 sweep reproduces the leak when it should)
+Merchant-data testability: `python -m src.models.merchant_data_check` (asks
+whether a public set can evaluate the MERCHANT layer at all; Sparkov has the
+merchant column and still cannot - 0 evaluable merchant-hour windows, max fraud
+rate 0.273 vs our 0.70-0.93. Run BEFORE modelling, never after)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
@@ -212,8 +216,11 @@ random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
 Methodology transfers; the 0.898 does NOT. NEGATIVE RESULT (entry 24): our
 entity fan-out features move IEEE-CIS -0.0053 and score 0.040 alone. Entity/
 graph is UNPROVEN at our hands on real data. Never claim otherwise. The
-merchant-level layer is wholly UNVALIDATED on real data - neither set has
-merchants.
+merchant-level layer is wholly UNVALIDATED on real data. ULB and IEEE-CIS have
+no merchant column; Sparkov HAS one and still cannot test the layer (0 evaluable
+merchant-hour windows, max merchant-day fraud rate 0.273 vs our 0.70-0.93) -
+public card-fraud data models stolen CARDS spent across merchants, not merchants
+under attack. Different loss class. Do not claim we simply did not look.
 
 ## Roadmap (in priority order)
 - ~~P1a-0 — empirical model selection~~ DONE: `src/models/select_model.py`,
@@ -555,6 +562,41 @@ explainability — every component must be defensible to a judge in one sentence
 
 
 
+
+
+30. THE EXPERIMENT WE DID NOT RUN, AND WHY THAT IS THE RESULT.
+   Our standing limitation was "the merchant-level layer is validated only on
+   our own data, because the public sets have no merchant column". That is an
+   argument from ABSENCE and invites one reply: then go and find one that does.
+   So we did. kartik2112/fraud-detection (Sparkov) has a merchant column, card
+   ids and timestamps - everything the spike detector needs. Downloaded it and
+   ran a TESTABILITY CHECK BEFORE writing any modelling code
+   (src/models/merchant_data_check.py).
+   IT CANNOT TEST THE LAYER, and not for want of data:
+     evaluable merchant-HOUR windows (>=10 txns)      0
+     highest fraud rate of any merchant-DAY           0.273
+     windows at an attack-like rate (>=0.70)          0
+     our own attacks, 30-txn window                   0.70 - 0.93
+   Worst-affected merchant: 49 fraud txns spread over 538 DAYS, max 2 per day.
+   Nothing in it is a burst.
+   THE STRUCTURAL TELL: 7,506 fraud txns = 9.8 per compromised CARD but only
+   11.1 per merchant across 693 merchants, of which just 14 escape entirely.
+   Public card-fraud data models STOLEN CARDS SPENT ACROSS MANY MERCHANTS. This
+   product models MERCHANTS UNDER COORDINATED ATTACK. Different loss class. A
+   merchant column is necessary to test our layer and nowhere near sufficient -
+   the burst structure has to be there too, and in three public datasets now
+   examined it is not.
+   WHY THIS COUNTS AS A RESULT RATHER THAN A DEAD END: running the detector
+   anyway would have produced a null that measures the DATASET, not the
+   detector - exactly the invalid-evidence trap entry 24 documents for
+   IEEE-CIS. We nearly repeated the mistake we had already written up; the only
+   thing that stopped it was checking testability first. The limitation is now
+   narrower and evidenced: it is not that we did not look, it is that this loss
+   class is not represented in reachable public data, and closing it needs a
+   PSP's own traffic rather than another Kaggle download.
+   LESSON: "we could not find data" and "we looked, and here is the measurement
+   showing why the data that exists cannot answer it" are the same conclusion
+   with very different evidential weight. The second costs half an hour.
 
 29. WE BUILT A LEGITIMATE MERCHANT DESIGNED TO BREAK US, AND IT DID.
    For most of this project "0 false alarms" rested on ONE negative - the flash

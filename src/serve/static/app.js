@@ -804,7 +804,7 @@ function Pitch() {
           </div>
         </div>
       </div>
-      <p class="note"><b>29 failures</b> are logged with root causes in the repo. Every one was
+      <p class="note"><b>30 failures</b> are logged with root causes in the repo. Every one was
         caught by measuring a claim, not by re-reading code. Two of them were our own audit
         tools hardcoding their failing verdicts — instruments that structurally could not
         report a pass.</p>
@@ -816,7 +816,7 @@ function Pitch() {
     <div class="panel">
       <h2>What broke, and what we did about it</h2>
       <p class="note" style=${{ marginTop: 0 }}>
-        <b>29 failures</b> are logged with root causes in the repo. Not "we hit some
+        <b>30 failures</b> are logged with root causes in the repo. Not "we hit some
         bugs" — each one names what we believed, what measurement contradicted it, and
         what changed. Five that a judge should see:
       </p>
