@@ -631,6 +631,13 @@ function Capacity() {
         exist. This is that check. Assumption stated so it can be argued with:${' '}
         <b>30 cases per analyst-hour</b> (two minutes each), 8-hour shifts.
       </p>
+      <p class="note">
+        <b>And if ₹50 is wrong?</b> Review cost is 3.5% of gross fraud prevented,
+        so net protected value stays positive up to${' '}<b>₹1,425 per review —
+        28× the assumption</b>. The rupee conclusion is not resting on that
+        guess. Staffing is the part that does not follow: 4.19% of the stream
+        still has to be worked by people who may not exist.
+      </p>
       <div class="tscroll2">
         <table class="cap">
           <tr><th>transactions / day</th><th>review cases / day</th><th>analyst-hours / day</th><th>full-time analysts</th></tr>
@@ -769,7 +776,7 @@ function Pitch() {
           </div>
         </div>
       </div>
-      <p class="note"><b>26 failures</b> are logged with root causes in the repo. Every one was
+      <p class="note"><b>27 failures</b> are logged with root causes in the repo. Every one was
         caught by measuring a claim, not by re-reading code. Two of them were our own audit
         tools hardcoding their failing verdicts — instruments that structurally could not
         report a pass.</p>
@@ -781,7 +788,7 @@ function Pitch() {
     <div class="panel">
       <h2>What broke, and what we did about it</h2>
       <p class="note" style=${{ marginTop: 0 }}>
-        <b>26 failures</b> are logged with root causes in the repo. Not "we hit some
+        <b>27 failures</b> are logged with root causes in the repo. Not "we hit some
         bugs" — each one names what we believed, what measurement contradicted it, and
         what changed. Five that a judge should see:
       </p>
@@ -870,7 +877,8 @@ function Pitch() {
         <li>The agent gets the cause right <b>8/13</b> times. It is advisory and cannot act.
           That separation is the point, and it's tested.</li>
         <li>42 review cases per 1,000 transactions is priced at ₹50 but never checked
-          against whether the analysts exist.</li>
+          against whether the analysts exist. The ₹ figure is robust to that price
+          (break-even at ₹1,425/review, 28× the assumption); the headcount is not.</li>
         <li>The agent eval is <b>n=13</b> — roughly a ±25-point confidence interval, so 8/13
           and 5/13 are not distinguishable. Every number from it is a small-sample result.</li>
       </ul>

@@ -18,7 +18,7 @@
 | **Calibration** | Brier **0.0053**, ECE **0.0033** — measured, not assumed |
 | **Real public data**, same pipeline, zero tuning | ULB (284k txns): **PR-AUC 0.731** vs 0.0017 random · IEEE-CIS (590k txns): **0.460** vs 0.035 random |
 | **LLM safety** | **0/13** policy violations · **0/13** unsafe actions · the LLM cannot authorize anything — pytest-enforced |
-| **Engineering** | **61 tests**, no network or credentials needed · one-command demo · **26 logged failures** with root causes |
+| **Engineering** | **64 tests**, no network or credentials needed · one-command demo · **27 logged failures** with root causes |
 
 Evaluation is temporal throughout — day-boundary splits, never random. Model selection, threshold tuning and calibration all happen on a validation slice; the test slice is read once, at the end. Every number above reproduces from a clean clone.
 
@@ -34,7 +34,7 @@ The hardest part of the problem is not catching attacks — it's **not crying wo
 
 ## 2. Build quality
 
-One command runs it: `python run_demo.py` (trains, serves, replays 13,782 transactions through the real pipeline). **61 tests pass with no network and no credentials.**
+One command runs it: `python run_demo.py` (trains, serves, replays 13,782 transactions through the real pipeline). **64 tests pass with no network and no credentials.**
 
 | Metric — temporal held-out test slice, synthetic data (labeled as such) | Value |
 |---|---|
@@ -44,6 +44,7 @@ One command runs it: `python run_demo.py` (trains, serves, replays 13,782 transa
 | Fraud ₹ prevented | **₹8.24L** |
 | Legitimate ₹ wrongly blocked | **₹21,728 — 0.21%** of legitimate value processed |
 | Net protected value (after 578 reviews × ₹50) | **₹7.95L (~28×)** |
+| Robustness of that figure | break-even at **₹1,425/review — 28× the assumed ₹50** |
 | Calibration — Brier / ECE | 0.0053 / 0.0033 |
 | Human review load | 41.9 cases per 1,000 transactions (4.19%) |
 | Merchant-level, across 5 seeds | **25/25 attacks caught, 0 false alarms in 35 non-attack merchant-windows, flash sale flagged 0/5** |
@@ -74,7 +75,7 @@ Leakage-safe incremental features (every feature computed from prior events only
 
 ## 4. Failure recovery
 
-**26 logged failures** in `CLAUDE.md`, every one caught by *measuring a claim* rather than re-reading code. The five that matter most:
+**27 logged failures** in `CLAUDE.md`, every one caught by *measuring a claim* rather than re-reading code. The five that matter most:
 
 1. **The agent got a ₹5.5L attack completely wrong — and it changed nothing.** On a live run, Claude labelled merchant m2 (a real account takeover) as `legitimate_traffic` / `allow` at **0.95 confidence**. Its evidence was factually correct ("29 customers, 29 devices, 29 IPs, zero shared entities") and the conclusion was exactly wrong. Root cause was a *tool gap*: account takeover means established customers on new devices, and no tool exposed that. **The system restricted 68 transactions and queued 8 for human review anyway, because the LLM was never in the decision path.** This is the architecture's central claim, demonstrated under a real failure rather than asserted. Closed by adding evidence — a seventh tool exposing new-device / geo-mismatch / amount-vs-own-average / account-age against the non-flagged base rate — **not by coaching the prompt**, which is sha256-identical across all five eval runs.
 

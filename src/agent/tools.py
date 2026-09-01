@@ -44,6 +44,16 @@ class InvestigationContext:
             raise ValueError(f"InvestigationContext missing columns: {missing}")
         self.df = scored
 
+    def known_merchant(self, merchant_id: str) -> bool:
+        """Whether this id is one we actually hold data for.
+
+        The only caller-supplied string that reaches the model's prompt is
+        merchant_id, so it is checked against real data before it gets there
+        rather than being interpolated on trust. Every other string the agent
+        sees is an entity id from oid(), which is structurally `kind_<8 hex>`
+        and cannot carry a payload."""
+        return bool((self.df.merchant_id == merchant_id).any())
+
     def merchant_slice(self, merchant_id: str) -> pd.DataFrame:
         return self.df[self.df.merchant_id == merchant_id]
 

@@ -2,8 +2,8 @@
 
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
-[![Tests](https://img.shields.io/badge/tests-61_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![Failures logged](https://img.shields.io/badge/failures_logged-25_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Tests](https://img.shields.io/badge/tests-64_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Failures logged](https://img.shields.io/badge/failures_logged-27_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
@@ -90,7 +90,7 @@ python -m src.models.seed_stability  # re-run the pipeline across 5 worlds (~6 m
 python -m src.models.real_data_check # same recipe on REAL data (needs a Kaggle download)
 python -m src.agent.eval             # 13-case agent eval, 3 held-out (needs ANTHROPIC_API_KEY)
 python run_demo.py                   # dashboard + live replay -> http://127.0.0.1:8000
-python -m pytest tests/ -q           # safety invariants (61 tests)
+python -m pytest tests/ -q           # safety invariants (64 tests)
 ```
 
 ## Demo — what to watch
@@ -156,6 +156,26 @@ Every test transaction is routed through the actual policy engine (allow / step-
 | Human review cost (578 cases × ₹50) | ₹28,900 |
 | **Net protected value** | **₹7.95L** |
 | ₹ protected per ₹ of cost imposed | ~28x |
+
+**How much does this rest on the ₹50 review cost?** Less than it looks. Review
+cost is 3.5% of gross prevented at ₹50, so the conclusion survives being badly
+wrong about it:
+
+| review cost per case | net protected value |
+|---|---|
+| **₹50** *(assumed)* | **₹7,94,657** |
+| ₹200 (4×) | ₹7,07,957 |
+| ₹500 (10×) | ₹5,34,557 |
+| ₹1,000 (20×) | ₹2,45,557 |
+| **₹1,425** | **₹0 — break-even** |
+
+**You would have to be wrong by 28× before the answer flips.** That is the useful
+form of this robustness question here: because the fused score distribution is
+near-bimodal, moving cost assumptions does not move the *policy* — it only
+rescales the headline. The genuinely open question is the one in
+[Honest limitations](#honest-limitations): we price a false negative at exactly
+the fraud amount and nothing else, which is an under-count in a direction that
+*flatters* us, not a knob this table can settle.
 
 (Figures use the validation-optimized step-up cutoff — see Policy thresholds below. Note the two different false-positive figures on this page and why they differ: **₹21,728** is what the *classifier* would block at its threshold; **₹138** is what survives to actually impact revenue after the *policy engine* routes most of it to step-up and human review instead of an outright block. Both are real; the first is the honest headline for model quality, the second for system behaviour.)
 
@@ -586,7 +606,7 @@ run_demo.py     one-command demo: train -> serve -> replay
 tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 no-fire, fusion floor/bounds, agent gate/audit/read-only,
                 serving side-effect-freedom, analyst allowlist, write-auth
-                gate, .env loader) - 61 tests
+                gate, .env loader) - 64 tests
 ```
 
 ## Honest limitations
@@ -600,7 +620,7 @@ Ordered by how much they should discount the results.
 4. **The merchant-level system — the actual product — is validated only on synthetic data.** Neither public dataset has a merchant column, so the spike detector, the "you are under attack" framing, the entity graph in the dashboard and the policy layer have never met real traffic. Methodology transfers (ULB PR-AUC 0.731, IEEE-CIS 0.460, both with zero tuning); the product claim does not yet.
 5. **Data is synthetic throughout** (simulator parameters like "0.7%→5% fraud" are design choices, not Razorpay statistics). The simulator explicitly wires shared entities across accounts — fraud rings only exist in a graph if you construct them.
 6. **One legitimate-spike scenario.** The flash sale is the only benign volume event tested. Festival sales, product launches and marketing campaigns are untested, and the EWMA baseline has no day-of-week or hour-of-day seasonality term.
-7. **The review queue may not be staffable.** 41.9 cases per 1,000 transactions is 4.19% of the stream. We price analyst time at ₹50/case but never ask whether the analysts exist; at PSP volume that is a headcount question, and the honest answer is that the restrict/review cutoffs would have to be re-swept against a capacity constraint, not only against cost.
+7. **The review queue may not be staffable — though the ₹ conclusion is robust to what a review costs.** 41.9 cases per 1,000 transactions is 4.19% of the stream. Net protected value stays positive up to **₹1,425 per review — 28× our ₹50 assumption** (table above), so the economics are not resting on that guess. Staffing is the part that does not follow: 4.19% of the stream still has to be worked by people who may not exist. We price analyst time at ₹50/case but never ask whether the analysts exist; at PSP volume that is a headcount question, and the honest answer is that the restrict/review cutoffs would have to be re-swept against a capacity constraint, not only against cost.
 8. **Headline metrics carry a range, but a narrow one.** PR-AUC is 0.910 ± 0.007 over five seeds ([stability](#stability-across-worlds-is-this-a-result-or-one-lucky-seed)); differences below roughly ±0.02 should not be treated as real. Five seeds of one generator measures *sampling* variance only — not model-family variance, and certainly not real-world variance.
 
    **And the agent evaluation is far smaller: n=13.** The 95% confidence interval on 8/13 is roughly **±25 points**, which means 8/13 and 5/13 are not distinguishable at this sample size. Every conclusion drawn from the agent eval — including the run A→B→C→D progression, whose deltas are noisier than the table implies — is a small-sample result.

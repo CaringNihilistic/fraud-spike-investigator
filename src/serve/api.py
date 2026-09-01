@@ -170,6 +170,10 @@ def run_investigation(merchant_id: str):
     """Trigger an investigation on demand (the replay also fires these on spike)."""
     if _CTX is None:
         raise HTTPException(503, "investigation context not ready")
+    if not _CTX.known_merchant(merchant_id):
+        # 404 rather than a degraded report on an empty slice - and it keeps a
+        # caller-supplied path segment out of the model prompt entirely.
+        raise HTTPException(404, "unknown merchant")
     from src.agent.investigator import investigate as _investigate
     res = _investigate(_CTX, merchant_id)
     STATE.set_investigation(merchant_id, res.report, res.audit.to_records(),

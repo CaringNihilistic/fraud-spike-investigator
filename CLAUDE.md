@@ -119,6 +119,13 @@ helps, but the reliability curve is near-bimodal, so the low ECE is dominated
 by the extremes. Report both.
 REVIEW LOAD: 41.9 cases per 1,000 txns (4.19%) - staffing question, not just
 cost. Do not quote INR/case without it.
+COST-MODEL ROBUSTNESS: review cost is 3.5% of gross prevented at the assumed
+INR 50/case, and NPV break-even is INR 1,425/case - 28x the assumption. Quote
+that when asked "what if your cost guess is wrong": it is wrong-by-28x before
+the conclusion flips. Do NOT build a full cost-assumption sweep - the fused
+score distribution is near-bimodal, so cost changes rescale the headline
+without moving the policy, and the sweep would report "nothing changes" at
+length. The genuinely open cost question is the FN price (see entry 23).
 FALSE-POSITIVE COST: INR 21,728 of legitimate value wrongly blocked, which is
 0.21% of the INR 1,03,53,085 in legitimate transactions processed. ALWAYS give
 it that denominator - the bare rupee figure means nothing on its own.
@@ -198,7 +205,7 @@ sweep reproduces the leak when it should)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (61 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (64 pass, no network needed)
 REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
 random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
 Methodology transfers; the 0.898 does NOT. NEGATIVE RESULT (entry 24): our
@@ -544,6 +551,36 @@ explainability — every component must be defensible to a judge in one sentence
    field fails OPEN and silently — it does not error, it just stops guarding,
    and the failure looks like an unrelated design flaw. Assert on the guard's
    observable outcome, not on the field it happens to read.
+
+
+27. THE ONE CALLER-SUPPLIED STRING THAT REACHED THE MODEL'S PROMPT.
+   Prompted by reviewing a competitor that documents a prompt-injection
+   defence we did not have. Audited our own surface rather than assuming it
+   was fine, and found one real hole: `merchant_id` is taken straight off the
+   URL path by `POST /api/merchants/{merchant_id}/investigate` and
+   interpolated into the agent's opening message. Nothing validated it. An
+   authenticated caller could have put arbitrary text in front of the model.
+   WHAT WAS ALREADY TRUE, and why the impact was bounded rather than nil:
+   every OTHER string the agent sees is an entity id from oid(), which is
+   structurally `kind_<8 hex>` and cannot carry a payload; and
+   validate_recommendation() degrades any unknown action to REVIEW, so even a
+   successful injection could not have produced an unauthorised action - the
+   LLM is not in the decision path. Worst case was a wasted call and a garbage
+   report, not a bad decision.
+   FIXED anyway: `InvestigationContext.known_merchant()` checks the id against
+   real data; `investigate()` refuses an unknown id BEFORE building any prompt
+   and returns a degraded REVIEW report; the route answers 404. Guarded in two
+   places on purpose, so it does not depend on the caller. Three tests: an
+   injection-shaped merchant id never reaches graph construction, known_merchant
+   rejects near-misses, and oid() stays opaque under hostile keys including
+   NUL, newlines and a 5,000-character string.
+   SCOPE, stated because it matters more than the fix: this is a property of
+   OUR generator. On real production traffic, device fingerprints and
+   instrument ids come from the payment stream, are not oid() output, and would
+   need sanitising at ingestion. The test says so in its docstring rather than
+   leaving a reader to assume the guarantee travels.
+   LESSON: "we probably do not have that problem" is not an audit. The surface
+   took ten minutes to check and there was something in it.
 
 26. WE FIXED THE GENERATOR, AND THE FIX FOUND THREE MORE BUGS.
    Entry 21 ended at "disclosed but not fixed", which is the weakest ending an

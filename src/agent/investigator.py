@@ -256,6 +256,19 @@ def investigate(ctx: InvestigationContext, merchant_id: str,
                                    degraded_reason="no_llm_client_available",
                                    tools_called=audit.tools_called())
 
+    # merchant_id is the ONE caller-supplied string that reaches the prompt
+    # (api.py takes it straight off the URL path). Validate it against real
+    # data here, not only at the route, so the guard holds for every caller.
+    # Bounded impact even without it - validate_recommendation() degrades any
+    # unknown action to REVIEW and the LLM is not in the decision path - but an
+    # unvalidated string in a model prompt is not something to leave standing.
+    if not ctx.known_merchant(merchant_id):
+        rep = deterministic_report(ctx, merchant_id, "unknown_merchant", audit)
+        return InvestigationResult(merchant_id, rep, Action.REVIEW, audit,
+                                   degraded=True,
+                                   degraded_reason="unknown_merchant",
+                                   tools_called=audit.tools_called())
+
     try:
         graph = build_graph(ctx, audit, client)
         final = graph.invoke({
