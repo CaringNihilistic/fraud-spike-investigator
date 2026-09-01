@@ -16,7 +16,7 @@
 | **Net protected value** | **₹8.13L** on the held-out test slice, after 948 human reviews costed at ₹50 each |
 | **Precision / Recall** | **0.996 / 0.735** at the cost-optimal threshold |
 | **Calibration** | Brier **0.0123**, ECE **0.0074** — measured, not assumed, and measurably *worse* since the hard negatives |
-| **Real public data**, same pipeline, zero tuning | ULB (284k txns): **PR-AUC 0.731** vs 0.0017 random · IEEE-CIS (590k txns): **0.460** vs 0.035 random |
+| **Real public data**, same pipeline, zero tuning | ULB (284k txns): **PR-AUC 0.731** vs 0.0017 random · IEEE-CIS (590k txns): **0.460** vs 0.035 random. **Transaction level only** — neither dataset exercises the spike detector, entity graph or policy engine, so this validates the *methodology*, never the merchant-level product claim |
 | **LLM safety** | **0/13** policy violations · **0/13** unsafe actions · the LLM cannot authorize anything — pytest-enforced |
 | **Engineering** | **80 tests**, no network or credentials needed · one-command demo · **32 logged failures** with root causes |
 
@@ -57,12 +57,14 @@ One command runs it: `python run_demo.py` (trains, serves, replays 14,160 transa
 
 | Scenario | Static volume | Flag counter | **Streaming spike** |
 |---|---|---|---|
-| Card-testing | not detected | 62m47s | **55m22s** |
-| Device farm | 3m59s | 21m54s | **19m18s** |
-| IP cluster | not detected | **26m15s** | 31m03s ← *we lose this one* |
-| Account takeover | not detected | 53m38s | **53m30s** |
-| Fraud ring | not detected | 100m49s | **69m37s** |
-| **False alarms** | **5 merchants (incl. flash sale)** | 0 | **0** |
+| Card-testing | not detected | 106m35s | **84m07s** |
+| Device farm | **4m34s** | 17m19s | 9m47s |
+| IP cluster | not detected | 30m53s | **29m40s** |
+| Account takeover | not detected | 228m46s | **144m11s** |
+| Fraud ring | not detected | **59m14s** | 67m59s ← *we lose this one* |
+| **False alarms, seed 7 only** | **6 merchants** — incl. **all three** legitimate spikes | 0 | **0** |
+
+*The false-alarm row is **this seed**, which is what a per-detector race can be run on. Across all five seeds the streaming detector's figure is **1 in 35 non-attack merchant-windows**, not 0 — the number in the summary table at the top of this page. Source: `artifacts_out/ttd_table.csv` and `seed_stability.json`.*
 
 Leakage-safe incremental features (every feature computed from prior events only, state updated after emission), day-boundary temporal splits — never random.
 
@@ -77,7 +79,7 @@ Leakage-safe incremental features (every feature computed from prior events only
 
 ## 4. Failure recovery
 
-**32 logged failures** in `CLAUDE.md`, with root causes. Most were caught by *measuring a claim* rather than re-reading code — but not all, and the newest was not: an outside audit found it. The most important:
+**32 logged entries** in `CLAUDE.md`, with root causes. Calling all 32 "failures" would be generous and an outside audit said so: some are genuine breakage (a model with no positives to learn from, an empty calibration slice, a fusion stage overruling the calibrated model, an agent clearing a ₹5.5L takeover), and some are design corrections we had simply never made explicit (the review queue had no stated sort objective; a dashboard metric was ill-defined). Both are worth recording; only the first kind broke. Most were caught by *measuring a claim* rather than re-reading code — but not all, and the newest was not: an outside audit found it. The most important:
 
 **We built a legitimate merchant designed to break our own system, and it did.** "0 false alarms" had rested on a single negative — a flash sale where every account has its own device, IP and card, so it never exercised the entity layer at all. We added a shared payment kiosk: 25 real customers, one terminal, entirely honest. **It scored 0.972 against a real device farm's 0.985, and produced a higher spike z than an actual attack.** Root cause was a training-distribution gap — the model had only ever seen shared devices committing fraud. Fixed by putting a legitimate kiosk in the *training* period: 0.972 → 0.002, attacks unaffected, precision up to 0.996. **A second hard negative still false-alarms on one seed in five and we left it there.** The symmetric fix looked *better* on the seed we first measured — higher net protected value — so this originally read as us overriding our own cost rule on judgment. An outside reviewer pointed out that comparing a win on one seed to a failure on another is not a comparison. Measured across all five: the rejected configuration is **₹64,192 worse on average and loses an attack.** It was not a trade at all. Four configurations were tried; the rejected one is left reachable so anyone can re-measure it.
 
@@ -93,7 +95,7 @@ Five more:
 
 2. **A dramatic finding that was wrong — retraction left visible in the README.** The ablation appeared to show velocity features *collapsing* PR-AUC 0.55 → 0.23. Root cause was ours: the calibration slice contained **no attack at all**, so isotonic calibration fit degenerate score plateaus. Fixed, the effect shrank to 0.661 → 0.631 — mild, not a collapse. After the generator fix it reversed again, to **+0.0317 [+0.0189, +0.0445]** — positive and significant on a paired bootstrap. Published, retracted, then revised a second time in the opposite direction. A supporting top-200 diagnostic *also* dissolved: it sat inside a 447-transaction tie-plateau where composition was decided by row order. Both the original claim and its retraction stay in the README, because "we chased a dramatic result and it didn't survive" is the honest version.
 
-3. **A threshold sweep that would have optimized a dead zone.** The pre-declared "adopt the best pair" rule picked restrict=80 — but restrict NPV was *exactly flat* from 40–80 (no validation transaction scores in that band). Refined to a per-parameter margin: step-up moved (+2.73% validation), restrict stayed at 85. The refinement was made after seeing the surface and is documented as such rather than presented as foresight.
+3. **A threshold sweep that would have optimized a dead zone.** The pre-declared "adopt the best pair" rule picked restrict=80 — but restrict NPV was *exactly flat* from 40–80 (no validation transaction scores in that band). Refined to a per-parameter margin: step-up moved (+2.73% validation), restrict stayed at 85. **Stated precisely, because it matters:** the 2% margin was declared in advance, but the decision to apply it *per parameter* was a change made after seeing that the restrict surface was unidentifiable. The final procedure is therefore not purely pre-registered, and we do not claim it is. The refinement was made after seeing the surface and is documented as such rather than presented as foresight.
 
 4. **A silent LangGraph bug that looked like a bad model.** An undeclared `stop_reason` state key was dropped by LangGraph, so `route()` never saw `tool_use` and **every** investigation fell through to the fallback. Caught only because a test asserted on the audit log's *tool sequence*, not the final output.
 
