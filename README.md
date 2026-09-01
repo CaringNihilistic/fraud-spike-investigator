@@ -2,8 +2,8 @@
 
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
-[![Tests](https://img.shields.io/badge/tests-117_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![Failures logged](https://img.shields.io/badge/failures_logged-34_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Tests](https://img.shields.io/badge/tests-124_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Failures logged](https://img.shields.io/badge/failures_logged-35_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
@@ -127,7 +127,7 @@ python -m src.models.seed_stability  # re-run the pipeline across 5 worlds (~6 m
 python -m src.models.real_data_check # same recipe on REAL data (needs a Kaggle download)
 python -m src.agent.eval             # 13-case agent eval, 3 held-out (needs ANTHROPIC_API_KEY)
 python run_demo.py                   # dashboard + live replay -> http://127.0.0.1:8000
-python -m pytest tests/ -q           # safety invariants (117 tests)
+python -m pytest tests/ -q           # safety invariants (124 tests)
 ```
 
 ## Demo — what to watch
@@ -200,14 +200,20 @@ wrong about it:
 
 | review cost per case | net protected value |
 |---|---|
-| **₹50** *(assumed)* | **₹8,10,854** |
-| ₹200 (4×) | ₹6,68,654 |
-| ₹500 (10×) | ₹3,84,254 |
-| **₹905** | **₹0 — break-even** |
+| **₹50** *(assumed)* | **₹8,13,211** |
+| ₹200 (4×) | ₹6,71,011 |
+| ₹500 (10×) | ₹3,86,611 |
+| **₹908** | **₹0 — break-even** |
 
 **You would have to be wrong by 18× before the answer flips.** That is the useful
-form of this robustness question here: because the fused score distribution is
-near-bimodal, moving cost assumptions does not move the *policy* — it only
+form of the question for the REVIEW cost specifically. It does not generalise to
+every cost assumption: pricing a *false negative* at 5× the fraud amount moves
+the cost-optimal threshold from 0.20 to 0.05 and blocks 23× more legitimate
+revenue ([cost curve](#the-false-positive-cost-as-a-curve-rather-than-a-number)).
+We previously wrote that cost changes could not move the policy; **that claim is
+retracted — it was asserted, then measured, and it was wrong.** What remains true
+is narrower: because the fused score distribution is near-bimodal, moving the
+REVIEW cost
 rescales the headline. The genuinely open question is the one in
 [Honest limitations](#honest-limitations): we price a false negative at exactly
 the fraud amount and nothing else, which is an under-count in a direction that
@@ -559,6 +565,54 @@ Reproduce: `python -m src.models.topology_generalisation` · construction guarde
 by `tests/test_topology_generalisation.py` (27 tests), which assert the pairs are
 matched on volume, window, prevalence and amounts, that the topology genuinely
 differs, and that the unseen variants are not quietly *easier*.
+
+---
+
+### The false-positive cost, as a curve rather than a number
+
+Track 02 asks for honest metrics *including false-positive cost*, and we were
+reporting a single point on a curve we had already computed. One number invites
+the fair question "why that one?" — and the answer is a shape.
+
+| threshold | precision | recall | legit ₹ blocked | fraud ₹ missed | expected loss |
+|---|---|---|---|---|---|
+| 0.05 | 0.808 | 0.790 | ₹76,662 | ₹1,01,606 | ₹2,12,918 |
+| 0.10 | 0.984 | 0.760 | ₹3,455 | ₹1,29,212 | ₹1,60,067 |
+| **0.20** | **0.987** | **0.760** | **₹3,291** | **₹1,29,212** | **₹1,59,803** ← cheapest |
+| 0.50 | 0.994 | 0.745 | ₹2,946 | ₹1,57,207 | ₹1,86,703 |
+| 0.70 | 0.996 | 0.736 | ₹2,575 | ₹1,69,125 | ₹1,97,901 |
+| 0.99 | 0.996 | 0.735 | ₹2,575 | ₹1,70,289 | ₹1,99,015 |
+
+**This is reporting, not tuning.** The shipped cutoffs are derived on the
+*validation* slice and stay there; nothing on this page feeds back into them.
+
+**It also corrected one of our own claims.** Our notes said a cost sweep would
+"rescale the headline without moving the policy." Measured, expected loss varies
+**33.2%** across the range — and the false-negative price is load-bearing:
+
+| FN priced at | cheapest threshold | legit ₹ blocked |
+|---|---|---|
+| 0.5× – 2× the fraud amount | 0.20 | ₹3,291 |
+| **5× – 10×** | **0.05** | **₹76,662** |
+
+Price a missed fraud at 5× its face value — adding chargeback fees, dispute
+handling, regulatory exposure and churn, all of which a real issuer carries —
+and the optimum jumps to a far more aggressive threshold that blocks **23× more
+legitimate revenue**. [Failure-log 23](CLAUDE.md) named the FN price as our
+weakest assumption and we had answered it by assertion. **The claim is
+retracted.**
+
+**Two break-even figures, kept apart on purpose:** ₹908/case on the *policy*
+path (the published figure, now artifact-backed) and ₹1,498/case on the
+*classifier* path. Different denominators, both real — quoting one against the
+other is the error [failure-log 31](CLAUDE.md) records.
+
+**What this does not show:** robustness on real traffic. A tame middle is a
+symptom of a cleanly separated dataset — 13,612 of 14,160 transactions score
+inside [0.0, 0.1]. On ULB, where scores genuinely spread out, the cost-optimal
+action was to **block nothing at all**.
+
+Reproduce: `python -m src.policy.cost_curve`
 
 ---
 
@@ -932,7 +986,7 @@ run_demo.py     one-command demo: train -> serve -> replay
 tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 no-fire, fusion floor/bounds, agent gate/audit/read-only,
                 serving side-effect-freedom, analyst allowlist, write-auth
-                gate, .env loader) - 117 tests
+                gate, .env loader) - 124 tests
 ```
 
 ## The repository refuses to ship a stale headline
@@ -1083,7 +1137,7 @@ Ordered by how much they should discount the results.
 4. **The merchant-level system — the actual product — is validated only on synthetic data, and we now know why that is hard to fix.** Of the **nine** datasets in Amazon Science's fraud-dataset-benchmark, exactly **one** (Sparkov) has a merchant identifier. We measured that one and IBM's 24M-transaction TabFormer set, and [neither can evaluate this layer](#we-went-looking-for-public-merchant-data-twice-here-is-what-we-found) — Sparkov because no merchant can pack 30 transactions into the detector's 6-hour window (**0 of 693**, fastest 19.3h), TabFormer because its fraud is never concentrated (**max merchant-day rate 0.417**, zero attack-rate windows, **97,512 of 100,343** merchants carrying no fraud at all). Public card-fraud data models *stolen cards spent across merchants*; this models *merchants under attack*. Methodology transfers at transaction level (ULB PR-AUC 0.731, IEEE-CIS 0.460, zero tuning); the product claim does not, and closing it properly needs a PSP's own traffic rather than another Kaggle download. What we *can* do inside our own data is stop sampling the false-positive boundary at three points and sweep it: [legitimate entity sharing 0→100%](#three-points-are-not-a-distribution--so-we-swept-the-continuum) fires nothing below 80% concentration, 3 of 60 merchant-seeds above it, and restricts ₹0 either way.
 5. **Data is synthetic throughout** (simulator parameters like "0.7%→5% fraud" are design choices, not Razorpay statistics). The simulator explicitly wires shared entities across accounts — fraud rings only exist in a graph if you construct them.
 6. **~~One legitimate-spike scenario.~~ Now three — and one of them still breaks us.** The flash sale used to be the only benign event tested, and it shares no entities, so it never exercised the entity layer at all. There are now also a corporate buyer (shared office IP) and a shared payment kiosk (shared device), both built from established customers so that entity sharing is the only difference from ordinary traffic. **The kiosk broke the system on first contact and was fixed; the corporate buyer still false-alarms on one seed in five and is deliberately unfixed** — [the symmetric fix costs an entire attack class](#the-hard-negative-a-legitimate-merchant-built-to-look-like-an-attack). Festival sales, product launches and marketing campaigns remain untested, and the EWMA baseline still has no seasonality term.
-7. **The review queue may not be staffable — and the load just went up 60%.** 66.9 cases per 1,000 transactions is 6.69% of the stream, up from 41.9 before the hard negatives: teaching the model that shared devices can be honest made it more cautious everywhere. At 1M transactions/day that is roughly 279 full-time analysts rather than 175. Net protected value stays positive up to **₹905 per review — 18× our ₹50 assumption** (table above), so the economics are not resting on that guess. Staffing is the part that does not follow: 4.19% of the stream still has to be worked by people who may not exist. We price analyst time at ₹50/case but never ask whether the analysts exist; at PSP volume that is a headcount question, and the honest answer is that the restrict/review cutoffs would have to be re-swept against a capacity constraint, not only against cost.
+7. **The review queue may not be staffable — and the load just went up 60%.** 66.9 cases per 1,000 transactions is 6.69% of the stream, up from 41.9 before the hard negatives: teaching the model that shared devices can be honest made it more cautious everywhere. At 1M transactions/day that is roughly 279 full-time analysts rather than 175. Net protected value stays positive up to **₹908 per review — 18× our ₹50 assumption** (table above), so the economics are not resting on that guess. Staffing is the part that does not follow: 4.19% of the stream still has to be worked by people who may not exist. We price analyst time at ₹50/case but never ask whether the analysts exist; at PSP volume that is a headcount question, and the honest answer is that the restrict/review cutoffs would have to be re-swept against a capacity constraint, not only against cost.
 8. **Headline metrics carry a range, and it widened.** PR-AUC is 0.862 ± 0.024 over five seeds ([stability](#stability-across-worlds-is-this-a-result-or-one-lucky-seed)); differences below roughly ±0.02 should not be treated as real. Five seeds of one generator measures *sampling* variance only — not model-family variance, and certainly not real-world variance.
 
    **And the agent evaluation is far smaller: n=13.** The 95% confidence interval on 8/13 is roughly **±25 points**, which means 8/13 and 5/13 are not distinguishable at this sample size. Every conclusion drawn from the agent eval — including the run A→B→C→D progression, whose deltas are noisier than the table implies — is a small-sample result.

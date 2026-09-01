@@ -18,7 +18,7 @@
 | **Calibration** | Brier **0.0123**, ECE **0.0074** — measured, not assumed, and measurably *worse* since the hard negatives |
 | **Real public data**, same pipeline, zero tuning | ULB (284k txns): **PR-AUC 0.731** vs 0.0017 random · IEEE-CIS (590k txns): **0.460** vs 0.035 random. **Transaction level only** — neither dataset exercises the spike detector, entity graph or policy engine, so this validates the *methodology*, never the merchant-level product claim |
 | **LLM safety** | **0/13** policy violations · **0/13** unsafe actions · the LLM cannot authorize anything — pytest-enforced |
-| **Engineering** | **117 tests**, no network or credentials needed · one-command demo · **34 logged entries** with root causes |
+| **Engineering** | **124 tests**, no network or credentials needed · one-command demo · **35 logged entries** with root causes |
 
 Evaluation is temporal throughout — day-boundary splits, never random. Model selection, threshold tuning and calibration all happen on a validation slice; the test slice is read once, at the end. Every number above reproduces from a clean clone.
 
@@ -34,7 +34,7 @@ The hardest part of the problem is not catching attacks — it's **not crying wo
 
 ## 2. Build quality
 
-One command runs it: `python run_demo.py` (trains, serves, replays 14,160 transactions through the real pipeline). **117 tests pass with no network and no credentials.**
+One command runs it: `python run_demo.py` (trains, serves, replays 14,160 transactions through the real pipeline). **124 tests pass with no network and no credentials.**
 
 | Metric — temporal held-out test slice, synthetic data (labeled as such) | Value |
 |---|---|
@@ -45,7 +45,8 @@ One command runs it: `python run_demo.py` (trains, serves, replays 14,160 transa
 | Legitimate ₹ wrongly blocked (classifier, at its threshold) | **₹2,575 — 0.024%** of the ₹1.07Cr legitimate value processed |
 | Legitimate ₹ actually impacted (policy path, after step-up/review routing) | **₹452** |
 | Net protected value (after 948 reviews × ₹50) | **₹8.13L (~18×)** |
-| Robustness of that figure | break-even at **₹905/review — 18× the assumed ₹50** |
+| Robustness of that figure | break-even at **₹908/review — 18× the assumed ₹50** (policy path; the classifier path is ₹1,498 — different denominators, both reported) |
+| False-positive cost as a **curve** | 12 thresholds, precision 0.808→0.996, legit ₹ blocked ₹76,662→₹2,575. Expected loss varies **33.2%**, and pricing a false negative at 5× moves the optimum from 0.20 to 0.05 — **retracting our own claim** that cost changes could not move the policy |
 | Legitimate spikes tested | **3**, two of which share entities — incl. one built to defeat the entity layer |
 | Calibration — Brier / ECE | 0.0123 / 0.0074 |
 | Human review load | 66.9 cases per 1,000 transactions (6.69%) |
@@ -79,7 +80,7 @@ Leakage-safe incremental features (every feature computed from prior events only
 
 ## 4. Failure recovery
 
-**34 logged entries** in `CLAUDE.md`, with root causes. Calling all 32 "failures" would be generous and an outside audit said so: some are genuine breakage (a model with no positives to learn from, an empty calibration slice, a fusion stage overruling the calibrated model, an agent clearing a ₹5.5L takeover), and some are design corrections we had simply never made explicit (the review queue had no stated sort objective; a dashboard metric was ill-defined). Both are worth recording; only the first kind broke. Most were caught by *measuring a claim* rather than re-reading code — but not all, and the newest was not: an outside audit found it. The most important:
+**35 logged entries** in `CLAUDE.md`, with root causes. Calling all 32 "failures" would be generous and an outside audit said so: some are genuine breakage (a model with no positives to learn from, an empty calibration slice, a fusion stage overruling the calibrated model, an agent clearing a ₹5.5L takeover), and some are design corrections we had simply never made explicit (the review queue had no stated sort objective; a dashboard metric was ill-defined). Both are worth recording; only the first kind broke. Most were caught by *measuring a claim* rather than re-reading code — but not all, and the newest was not: an outside audit found it. The most important:
 
 **We built a legitimate merchant designed to break our own system, and it did.** "0 false alarms" had rested on a single negative — a flash sale where every account has its own device, IP and card, so it never exercised the entity layer at all. We added a shared payment kiosk: 25 real customers, one terminal, entirely honest. **It scored 0.972 against a real device farm's 0.985, and produced a higher spike z than an actual attack.** Root cause was a training-distribution gap — the model had only ever seen shared devices committing fraud. Fixed by putting a legitimate kiosk in the *training* period: 0.972 → 0.002, attacks unaffected, precision up to 0.996. **A second hard negative still false-alarms on one seed in five and we left it there.** The symmetric fix looked *better* on the seed we first measured — higher net protected value — so this originally read as us overriding our own cost rule on judgment. An outside reviewer pointed out that comparing a win on one seed to a failure on another is not a comparison. Measured across all five: the rejected configuration is **₹64,192 worse on average and loses an attack.** It was not a trade at all. Four configurations were tried; the rejected one is left reachable so anyone can re-measure it.
 
@@ -143,7 +144,7 @@ Ordered by how much each should discount the results.
 3. **The merchant-level system is validated on synthetic data only — and we went looking twice.** Amazon Science's fraud-dataset-benchmark curates **nine** fraud datasets; exactly **one** (Sparkov) has a merchant identifier. We measured that one *and* IBM's 24M-transaction TabFormer set, and **neither can evaluate this layer** — Sparkov because no merchant can pack 30 transactions into the detector's 6-hour window (0 of 693, fastest 19.3h), TabFormer because its fraud is never concentrated (max merchant-day rate **0.417**, zero attack-rate windows, 97,512 of 100,343 merchants carrying no fraud at all). Public card-fraud data models stolen cards spent across many merchants; this product models merchants under coordinated attack. Different loss class. Checked *before* modelling, so we did not publish a null that measures the dataset rather than the detector.
 4. **Our entity graph is unvalidated on public data.** The two datasets we evaluated do not expose the persistent entity relationships needed to test it — IEEE-CIS `DeviceInfo` is a device *type* ("Windows" is 40.2% of rows), not a fingerprint, and it has no account identifier. We ran the experiment and publish the rows, but do not present them as evidence either way, because they do not measure the hypothesis. Independent support does exist: Vesta's own entity-counting features are the single largest contributor to IEEE-CIS performance (+0.352).
 5. **One legitimate-spike scenario.** The flash sale is the only benign volume event tested; the EWMA baseline has no seasonality term.
-6. **The review queue may not be staffable, and the load rose 60%.** 66.9 cases per 1,000 transactions (up from 41.9) is priced at ₹50 each but never checked against whether the analysts exist. The ₹ conclusion is robust to that price — break-even at ₹905/review — the headcount is not.
+6. **The review queue may not be staffable, and the load rose 60%.** 66.9 cases per 1,000 transactions (up from 41.9) is priced at ₹50 each but never checked against whether the analysts exist. The ₹ conclusion is robust to that price — break-even at ₹908/review — the headcount is not.
 7. **Metrics carry a range, and it widened.** PR-AUC 0.862 ± 0.024 across five *seeds of the same generator* measures sampling variance, not real-world variance. Differences below ~±0.02 should not be treated as real. **The agent eval is far smaller — n=13, giving roughly a ±25-point confidence interval, so 8/13 and 5/13 are not distinguishable.** Every conclusion drawn from it, including the A→B→C→D progression, is a small-sample result.
 8. **The agent's reasoning is the weakest component.** 8/13 correct cause; on quiet merchants it has twice contradicted its own evidence. It reads instrument *novelty* as evidence against card testing when that is the signature of it (failure 22, logged and deliberately unfixed — the design is frozen and the fix must come from evidence, not prompt hints). Output varies run to run. It is advisory only and cannot act.
 9. **Risk fusion changed almost nothing until the data got hard.** 0 → 3 → 433 decisions across three dataset versions. Retained for architecture throughout, and reported the same way when it did nothing and when it did something.

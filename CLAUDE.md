@@ -134,8 +134,13 @@ FALSE-POSITIVE COST: INR 2,575 wrongly blocked = 0.024% of the INR 1.07Cr in
 legitimate value processed. ALWAYS give it that denominator.
 COST-MODEL ROBUSTNESS: review cost is 5.5% of gross prevented at INR 50/case;
 NPV break-even is INR 905/case, 18x the assumption. Do NOT build a full cost
-sweep - fused scores are near-bimodal so cost changes rescale the headline
-without moving the policy. The open cost question is the FN price (entry 23).
+sweep to DRIVE POLICY - the shipped cutoffs are validation-derived and stay
+that way. We used to say a cost sweep "rescales the headline without moving the
+policy"; that was asserted, and entry 35 measured it FALSE. Expected loss varies
+33.2% across thresholds, and the cost-optimal threshold moves 0.20 -> 0.05 once
+a false negative is priced at 5x the fraud amount. The FN price (entry 23) was
+the open cost question and it turns out to be LOAD-BEARING. Reported, not acted
+on: `python -m src.policy.cost_curve`.
 LEAK AUDIT (entry 21, CLOSED): the two profile proxies score 0.5970 vs the full
 0.8248 - gap 0.2278. Pre-fix they were 0.9328 vs 0.9344, gap 0.0016. The 0.934
 and 0.898 figures are PRE-FIX and appear only where labelled as history.
@@ -215,6 +220,12 @@ BEFORE claiming any number is current - entry 31)
 Config 4 NPV: `python -m src.policy.config4_npv` (the REJECTED training-data
 configuration, measured over 5 seeds rather than argued about - it is worse on
 both NPV and attack detection, and stays reachable via HIST_CORPORATE_BUYER)
+Cost curve: `python -m src.policy.cost_curve` (the FP/FN trade as a SHAPE, not
+one number: precision/recall/legit INR/expected loss across 12 thresholds, plus
+a sweep of the false-negative price. Reporting only - it never feeds a cutoff.
+Backs the published INR ~905 break-even with an artifact, and distinguishes the
+POLICY-path break-even (908) from the CLASSIFIER-path one (1,498) instead of
+mixing them. Retracts our "cost changes cannot move the policy" claim - entry 35)
 Queue order: `python -m src.policy.queue_order` (what the review queue's sort
 key is worth; arrival order cost 45%->5% of fraud value at 50 cases worked, and
 ranking by risk_score measured WORSE than arrival - it is not rupees)
@@ -248,7 +259,7 @@ rate 0.273 vs our 0.70-0.93. Run BEFORE modelling, never after)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (117 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (124 pass, no network needed)
 REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
 random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
 Methodology transfers; the 0.898 does NOT. NEGATIVE RESULT (entry 24): our
@@ -1078,3 +1089,48 @@ explainability — every component must be defensible to a judge in one sentence
    result, because it failed loudly at the point of reporting rather than
    quietly at the point of measuring. That is the difference between a bug that
    costs five minutes and one that nearly shipped a false finding.
+
+35. THE COST TOOL HARDCODED ITS CONCLUSION, AND THE CONCLUSION WAS WRONG.
+   Track 02 asks for honest metrics INCLUDING false-positive cost, and we were
+   reporting a single point on a curve we had already computed. Built
+   src/policy/cost_curve.py to render the shape - precision, recall, legit INR
+   blocked and expected loss across 12 thresholds, plus a sweep of the
+   false-negative price that entry 23 named as our weakest assumption.
+   TWO THINGS CAME BACK, AND BOTH CORRECT SOMETHING WE HAD ASSERTED.
+   (a) THE CURVE IS NOT FLAT. Our own note said "do NOT build a full cost sweep
+   - fused scores are near-bimodal so cost changes rescale the headline without
+   moving the policy". Measured: expected loss varies INR 53,114, or 33.2% of
+   the cheapest point, across thresholds 0.05-0.99. The middle of the range IS
+   tame - 13,612 of 14,160 transactions score inside [0.0, 0.1], so neighbouring
+   thresholds pick nearly the same rows - but the ends are not, and "rescales
+   without moving the policy" was an assertion we never tested.
+   (b) THE FALSE-NEGATIVE PRICE IS LOAD-BEARING. Price a missed fraud at its
+   face value and the cheapest threshold is 0.20. Price it at 5x - which is what
+   a real issuer carries once chargeback fees, dispute handling, regulatory
+   exposure and churn are counted - and the optimum jumps to 0.05, blocking
+   INR 76,662 of legitimate revenue instead of INR 3,291. That is 23x more
+   legitimate money, from changing ONE assumption we had never swept. Entry 23
+   called the FN price the open cost question and we had been answering it by
+   assertion for weeks.
+   WE DID NOT RETUNE ANYTHING. The shipped cutoffs are validation-derived; this
+   is a test-slice description. Moving policy because a test-slice curve
+   suggested it would be the fifth refusal in this project's history and we are
+   not starting now. The CLAIM is retracted; the CONFIGURATION is unchanged.
+   THE BUG IS THE ENTRY'S REAL SUBJECT. The first run printed "The curve is
+   FLAT" directly above its own 33.2% spread, because that sentence was
+   HARDCODED. That is exactly failure-log 26's finding (i)+(ii), where
+   leakage_probe.py and ablation.py both printed conclusions their output
+   disproved - and it is the THIRD time, committed in the tool built to check
+   our economics, by someone who had written the earlier entry. The module
+   docstring said the same thing and had to be corrected too: rewriting the
+   verdict is half the job, and the prose that interprets it is the other half
+   (entry 26's fourth finding, also reproduced here).
+   ALSO CLOSED, quietly: the published INR ~905 break-even had no artifact
+   behind it - an outside audit flagged it as prose. It is now derived, and the
+   POLICY-path figure (908) is reported separately from the CLASSIFIER-path one
+   (1,498) rather than mixed, which is entry 31(d)'s lesson applied in advance
+   instead of after an auditor finds it.
+   LESSON: a derived verdict is not a style preference. Three tools in this repo
+   have now shipped a hardcoded conclusion that their own numbers contradicted,
+   and every one was written by someone who believed the conclusion was
+   obviously true. It is obvious right up until the data changes underneath it.

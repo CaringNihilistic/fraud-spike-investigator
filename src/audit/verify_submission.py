@@ -98,6 +98,7 @@ HISTORY_MARKERS = (
 
 def build_claims() -> list[Claim]:
     e, m, c = art("economics.json"), art("metrics.json"), art("config4_npv.json")
+    cc = art("cost_curve.json")
     s = art("seed_stability.json")
     lakh = lambda v: v / 1e5  # noqa: E731
     return [
@@ -131,6 +132,9 @@ def build_claims() -> list[Claim]:
         Claim("config3 mean NPV",
               r"shipped configuration\*{0,2}\s*\|\s*\*{0,2}₹([\d,]+)",
               c["config3_shipped_mean_npv"], 1.0, files=("README.md",)),
+        Claim("break-even review cost",
+              r"break-even at \*{0,2}₹([\d,]+)/review",
+              cc["break_even_review_cost_policy_inr"], 1.5),
         Claim("config4 mean NPV",
               r"rejected configuration\s*\|\s*₹([\d,]+)",
               c["config4_rejected_mean_npv"], 1.0, files=("README.md",)),
