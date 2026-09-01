@@ -64,6 +64,11 @@ function Header({ status, onSpeed, onPause, view, setView }) {
     timer.current = setTimeout(() => { onSpeed(v); setTimeout(() => setSpd(null), 1500); }, 350);
   };
   const done = (s.pct || 0) >= 100;
+  // Before prepare() finishes there is no test slice yet, so every figure
+  // is legitimately zero. Rendering that as "\u20b90 net protected" makes a
+  // booting board look like a broken one - show nothing rather than a
+  // number we do not have.
+  const booting = !(s.total > 0);
   return html`
     <header>
       ${/* Row 1: identity and where you are. Row 2: live state and controls.
@@ -94,8 +99,8 @@ function Header({ status, onSpeed, onPause, view, setView }) {
         <span class="spacer"></span>
         ${/* The biggest number on screen is money, not throughput. */''}
         <div class="hero-inr" title="Fraud prevented minus legitimate revenue impacted minus analyst review cost, costed live with the same constants as the offline report (₹50/review, 7% step-up abandon, 90% of fraud fails step-up).">
-          <span class="hv">${inr((s.economics || {}).net_protected_inr)}</span>
-          <span class="hl">net protected</span>
+          <span class="hv">${booting ? '\u2014' : inr((s.economics || {}).net_protected_inr)}</span>
+          <span class="hl">${booting ? 'warming up' : 'net protected'}</span>
         </div>
       </div>
 
@@ -118,7 +123,8 @@ function Header({ status, onSpeed, onPause, view, setView }) {
         <div class="prog" title=${`${(s.pct || 0).toFixed(0)}% of the test slice replayed`}>
           <i style=${{ width: Math.min(100, s.pct || 0) + '%' }}></i>
         </div>
-        <span class="pstate">${done ? 'Replay complete' : `${(s.pct || 0).toFixed(0)}%`}</span>
+        <span class="pstate">${booting ? 'Training\u2026'
+          : done ? 'Replay complete' : `${(s.pct || 0).toFixed(0)}%`}</span>
         <span class="spacer"></span>
         <label class="speed">
           <span class="cl">Speed</span>
@@ -130,6 +136,40 @@ function Header({ status, onSpeed, onPause, view, setView }) {
           ${s.paused ? '▶  Resume' : '❙❙  Pause'}</button>
       </div>
     </header>`;
+}
+
+/* ---------- cold start ----------
+   Free hosting spins the instance down when idle, and waking it RE-TRAINS
+   the model instead of loading a cached score file - about 40 seconds during
+   which every number on the board is honestly zero. A dashboard full of
+   zeros reads as broken, not as booting, and the only signal saying
+   otherwise was one line in the events panel below the fold. This says what
+   is happening where the eye actually lands, and makes the wait the point:
+   you are watching a model get trained, not a recording get played. */
+function Booting({ status }) {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSecs((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const sys = (status?.events || []).filter((e) => e.kind === 'system');
+  const last = sys.length ? sys[sys.length - 1].message : 'starting up\u2026';
+  return html`
+    <div class="booting">
+      <span class="pulse" aria-hidden="true"></span>
+      <div>
+        <b>Training the model right now \u2014 nothing on this page is pre-computed.</b>
+        <span class="bsub">
+          This instance builds 22 features over the transaction world, fits the
+          scorer, calibrates it on a held-out slice, and only then starts the
+          replay. From cold that takes <b>about 40 to 60 seconds</b>, because
+          free hosting spins the server down when nobody is looking. The wait
+          is the honest version: you are watching a model being trained, not a
+          recording being played.
+          <span class="bnow">${last}<span class="bt">${secs}s</span></span>
+        </span>
+      </div>
+    </div>`;
 }
 
 /* ------------------------------------------------------------ merchants */
@@ -943,6 +983,7 @@ function App() {
     setSel((withEntities || spiking[0] || merchants[0]).merchant_id);
   }, [merchants, sel]);
 
+  const booting = !(status?.total > 0);
   const finale = (status?.events || []).find((e) => e.kind === 'finale');
   const setSpeed = (v) => post(`/api/replay/speed?speed=${v}`).catch(() => {});
   const setPause = (p) => post(`/api/replay/pause?paused=${p}`).catch(() => {});
@@ -964,7 +1005,7 @@ function App() {
                  view=${view} setView=${setView} />
       <main>
         ${view === 'pitch' ? html`<${Pitch} />` : html`<div>
-        <div class="watching">
+        ${booting ? html`<${Booting} status=${status} />` : html`<div class="watching">
           <b>What you are watching:</b> ${(status?.total || 0).toLocaleString()}${' '}
           transactions replayed one at a time across ${merchants.length} merchants,
           through the real pipeline — scorer, spike detector, policy engine, review
@@ -976,7 +1017,7 @@ function App() {
           signature. <b>None of the three is restricted.</b> Every block and every
           review below is held for a human to confirm; nothing here acts on its own,
           and the language model cannot authorise anything.</span>
-        </div>
+        </div>`}
         ${finale ? html`
           <div class="finale-banner">
             <span class="fv">✓</span>
