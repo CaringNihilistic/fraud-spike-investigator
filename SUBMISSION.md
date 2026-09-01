@@ -138,6 +138,22 @@ Ordered by how much each should discount the results.
 
 **Data is synthetic throughout and labeled as such everywhere. Simulator parameters are design choices, not Razorpay statistics. Nothing here is Razorpay data.**
 
+
+### Defense-only, including the obvious objection
+
+The repo contains a synthetic generator that produces labelled attack traffic,
+which is the thing to challenge on a defense-only track. The argument, not just
+the assertion: it emits rows with an `is_fraud` label so a supervised model has
+positives to learn from and the evaluation has ground truth. It touches no real
+system, optimizes nothing (the attack shapes are fixed hand-written topologies
+from the public literature), models no evasion, and discovers no weaknesses.
+**The output is a labelled dataset, not attack tooling.**
+
+The defensive side is enforced in code: the LLM has read-only tools, cannot
+authorise anything, and any unrecognised recommendation is degraded to `REVIEW`
+rather than escalated. Every action comes from a frozen four-item allowlist that
+binds the human analyst as tightly as the model. All pytest-enforced.
+
 ---
 
 ### The rule we hold ourselves to

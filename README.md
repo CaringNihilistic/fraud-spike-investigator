@@ -14,6 +14,43 @@
 
 This closes that loop at the **merchant** level — it sits **above** per-order scoring, complementary to Thirdwatch/Shield rather than competing with them. Defense-only, temporally evaluated, costed in ₹ including the false-positive side.
 
+<details>
+<summary><b>Defense-only — including why the attack generator in <code>src/sim/</code> is not an exception</b></summary>
+
+<br>
+
+This repository contains a synthetic data generator that produces labelled
+attack traffic — card-testing waves, device farms, IP clusters, account
+takeovers, fraud rings. That is the obvious thing to challenge on a
+defense-only track, so here is the argument rather than an assertion.
+
+**What it does:** emits rows into a pandas DataFrame with an `is_fraud` label,
+so that a supervised model has positives to learn from and the evaluation has
+ground truth. Without it there is no training signal and no measurable recall.
+
+**What it does not do, and cannot:**
+
+- It never touches a real system. No network calls, no payment rails, no probing.
+- It does not optimize anything. The attack shapes are fixed, hand-written
+  topologies — "one device across fifty accounts", "one IP across forty" — the
+  kind described in any public fraud-detection paper. There is no search, no
+  objective function, no adaptation against a defender.
+- It does not model evasion. Nothing in the codebase asks "what would avoid
+  detection", and no component consumes the detector's output to modify an attack.
+- It discovers no weaknesses. It cannot analyse a real merchant, gateway or
+  rulebook, and produces nothing an attacker could act on.
+
+**The output is not attack tooling; it is a labelled dataset.** An attacker
+gains strictly less from it than from the published literature it is modelled on.
+
+**And the defensive side is enforced in code, not convention:** the LLM has
+seven read-only tools, cannot authorise anything, and any unrecognised
+recommendation is degraded to `REVIEW` rather than escalated. Every action comes
+from a frozen four-item allowlist that binds the human analyst as tightly as the
+model. All of it is pytest-enforced (`tests/test_safety.py`, `tests/test_agent.py`).
+
+</details>
+
 ---
 
 ## Results at a glance
