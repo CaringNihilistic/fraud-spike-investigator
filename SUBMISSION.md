@@ -18,7 +18,7 @@
 | **Calibration** | Brier **0.0053**, ECE **0.0033** — measured, not assumed |
 | **Real public data**, same pipeline, zero tuning | ULB (284k txns): **PR-AUC 0.731** vs 0.0017 random · IEEE-CIS (590k txns): **0.460** vs 0.035 random |
 | **LLM safety** | **0/13** policy violations · **0/13** unsafe actions · the LLM cannot authorize anything — pytest-enforced |
-| **Engineering** | **72 tests**, no network or credentials needed · one-command demo · **29 logged failures** with root causes |
+| **Engineering** | **72 tests**, no network or credentials needed · one-command demo · **30 logged failures** with root causes |
 
 Evaluation is temporal throughout — day-boundary splits, never random. Model selection, threshold tuning and calibration all happen on a validation slice; the test slice is read once, at the end. Every number above reproduces from a clean clone.
 
@@ -76,7 +76,7 @@ Leakage-safe incremental features (every feature computed from prior events only
 
 ## 4. Failure recovery
 
-**29 logged failures** in `CLAUDE.md`, every one caught by *measuring a claim* rather than re-reading code. The most important is the newest:
+**30 logged failures** in `CLAUDE.md`, every one caught by *measuring a claim* rather than re-reading code. The most important is the newest:
 
 **We built a legitimate merchant designed to break our own system, and it did.** "0 false alarms" had rested on a single negative — a flash sale where every account has its own device, IP and card, so it never exercised the entity layer at all. We added a shared payment kiosk: 25 real customers, one terminal, entirely honest. **It scored 0.972 against a real device farm's 0.985, and produced a higher spike z than an actual attack.** Root cause was a training-distribution gap — the model had only ever seen shared devices committing fraud. Fixed by putting a legitimate kiosk in the *training* period: 0.972 → 0.002, attacks unaffected, precision up to 0.996. **A second hard negative still false-alarms on one seed in five and we left it there.** The symmetric fix looked *better* on the seed we first measured — higher net protected value — so this originally read as us overriding our own cost rule on judgment. An outside reviewer pointed out that comparing a win on one seed to a failure on another is not a comparison. Measured across all five: the rejected configuration is **₹73,424 worse on average and loses an attack.** It was not a trade at all. Four configurations were tried; the rejected one is left reachable so anyone can re-measure it.
 
@@ -127,7 +127,7 @@ Ordered by how much each should discount the results.
 
 1. **Our audit tooling was written by the person whose work it audits, and we have a documented instance of that biting us.** `leakage_probe.py` and `ablation.py` both hardcoded their *failing* conclusions, so once the generator was fixed they printed "two features reproduce the headline" above their own output showing they don't. Neither could structurally report a pass. Both verdicts are now derived from the numbers — but every "we checked this" here was checked by the person who wrote the thing being checked.
 2. **We fixed the two label proxies we found. We have not proven there are no others.** A negative result from an adversarial test is only ever as strong as the test.
-3. **The merchant-level system is validated on synthetic data only.** Public data validates the *transaction-risk* component; neither dataset we evaluated has a merchant column.
+3. **The merchant-level system is validated on synthetic data only — and we went looking.** ULB and IEEE-CIS have no merchant column. A third dataset (Sparkov) does, and we measured that it *still* cannot test this layer: **zero evaluable merchant-hour windows, and a maximum merchant-day fraud rate of 0.273 against the 0.70–0.93 our attacks reach.** Public card-fraud data models stolen cards spent across many merchants; this product models merchants under coordinated attack. Different loss class. Checked *before* modelling, so we did not publish a null that measures the dataset rather than the detector.
 4. **Our entity graph is unvalidated on public data.** The two datasets we evaluated do not expose the persistent entity relationships needed to test it — IEEE-CIS `DeviceInfo` is a device *type* ("Windows" is 40.2% of rows), not a fingerprint, and it has no account identifier. We ran the experiment and publish the rows, but do not present them as evidence either way, because they do not measure the hypothesis. Independent support does exist: Vesta's own entity-counting features are the single largest contributor to IEEE-CIS performance (+0.352).
 5. **One legitimate-spike scenario.** The flash sale is the only benign volume event tested; the EWMA baseline has no seasonality term.
 6. **The review queue may not be staffable, and the load rose 60%.** 66.9 cases per 1,000 transactions (up from 41.9) is priced at ₹50 each but never checked against whether the analysts exist. The ₹ conclusion is robust to that price — break-even at ₹905/review — the headcount is not.
