@@ -144,8 +144,8 @@ Policy cutoffs (85, 25) - step_up cost-optimized on validation (+2.73%).
 Restrict stays 85: moving it alone is NOT INDEPENDENTLY EVALUABLE.
 INR 8.63L prevented, INR 8.11L net protected value (~17x), 948 review cases
 5/5 attack merchants detected | 25/25 across 5 seeds
-!! 1 FALSE ALARM in 35 non-attack merchant-windows - a LEGITIMATE corporate
-buyer (m4) on seed 11. This is NOT 0 any more and must never be quoted as 0.
+!! 1 FALSE ALARM in 35 non-attack merchant-windows (2.9%, 95% CI 0.1-14.9%)
+- a LEGITIMATE corporate buyer (m4) on seed 11, checked across all 5 seeds. This is NOT 0 any more and must never be quoted as 0.
 It is 1 because the symmetric fix costs an entire attack class - see entry 29.
 Flash sale flagged 0/5. Three legitimate spikes are now tested, two of which
 share entities; the flash sale alone never exercised the entity layer at all.
@@ -192,6 +192,9 @@ changes without a new held-out set, or the number stops meaning anything.
 Run: `python -m src.models.select_model && python -m src.policy.threshold_sweep
 && python -m src.models.train && python -m src.models.ablation`
 Self-audit: `python -m src.models.leakage_probe` (adversarial eval integrity)
+Config 4 NPV: `python -m src.policy.config4_npv` (the REJECTED training-data
+configuration, measured over 5 seeds rather than argued about - it is worse on
+both NPV and attack detection, and stays reachable via HIST_CORPORATE_BUYER)
 Queue order: `python -m src.policy.queue_order` (what the review queue's sort
 key is worth; arrival order cost 45%->5% of fraud value at 50 cases worked, and
 ranking by risk_score measured WORSE than arrival - it is not rupees)
@@ -583,19 +586,30 @@ explainability — every component must be defensible to a judge in one sentence
    peak z 5.34 -> 0.00, while device farm stayed 0.985 -> 0.982 and all five
    attacks still fire. Precision IMPROVED to 0.996 and legit INR blocked fell
    to 2,575.
-   NOT FULLY FIXED, and this is the important part. The corporate buyer still
-   false-alarms on 1 seed in 5. The symmetric fix is obvious - add a legitimate
-   shared-IP merchant to training - and WE MEASURED IT: it removes the false
-   alarm and raises NPV to INR 9.44L, but on seed 101 it drops card-testing
-   detection to mean p=0.004 and loses the attack entirely. Missing a whole
-   attack class is worse than one false alarm on an honest merchant, and WE
-   CANNOT EXPLAIN why corporate-buyer examples destabilise card testing.
-   Shipping an unexplained change is worse than shipping a characterised
-   limitation, so the false alarm stays and is documented.
-   FOUR CONFIGURATIONS WERE TRIED. That number goes next to the result. We
-   stopped at the one we could explain, not the one that scored best. NPV is
-   the declared rule for choosing CUTOFFS; there is no pre-declared rule for
-   training-data composition, so this was a judgment call and is labelled one.
+   NOT FULLY FIXED. The corporate buyer still false-alarms on 1 seed in 5 -
+   measured across ALL five, not spot-checked. 1 in 35 non-attack
+   merchant-windows is 2.9%, 95% CI [0.1%, 14.9%]; never quote the point alone.
+   THE REJECTION WAS ARGUED BEFORE IT WAS MEASURED, and that was our error.
+   The symmetric fix (teach it a legitimate shared IP too) removes the false
+   alarm and on SEED 7 raises NPV to INR 9.44L vs our 8.11L - so this entry
+   used to say we were OVERRIDING our own declared cost rule on failure-severity
+   grounds. An outside reviewer pointed out that a win on one seed against a
+   failure on another is not a comparison. Correct. Measured across all five
+   (src/policy/config4_npv.py):
+     shipped   mean NPV INR 943,276   25/25 attacks
+     rejected  mean NPV INR 869,852   24/25 attacks
+   The advantage was a SEED-7 ARTIFACT. Averaged, the rejected configuration is
+   INR 73,424 WORSE and also loses an attack. There is no money-vs-safety trade;
+   it is worse on both axes. We only believed otherwise because we compared one
+   seed in a project that keeps a five-seed harness to prevent exactly that.
+   We still cannot explain WHY corporate-buyer examples destabilise card
+   testing, so the false alarm stays rather than be fixed by a change we do not
+   understand. The rejected config is left REACHABLE (HIST_CORPORATE_BUYER) so
+   it can be re-measured.
+   FOUR CONFIGURATIONS WERE TRIED. That number goes next to the result.
+   LESSON (second one in this entry): we made a design decision on a
+   single-seed comparison while owning a five-seed harness. Reach for the
+   harness you already built before reasoning about which failure you prefer.
    WHAT ELSE MOVED: entity-sharing-alone collapsed 0.7877 -> 0.3950 and now
    blocks INR 187.7K of legitimate value - which is the point, and makes the
    honest claim "necessary, not sufficient". Fusion went from a no-op to

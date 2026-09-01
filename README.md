@@ -360,22 +360,40 @@ wrongly blocked fell to ₹2,575.
 
 ### What we did not fix, and why
 
-The corporate buyer still false-alarms **on one seed out of five**. The
-symmetric fix is obvious — add a legitimate shared-*IP* merchant to training
-too — and **we measured it: it removes the false alarm and raises NPV to
-₹9.44L, but on seed 101 it drops card-testing detection to a mean score of
-0.004 and loses the attack entirely.**
+The corporate buyer still false-alarms **on one seed out of five** — measured
+across all five, not spot-checked (`false_alarm_merchants` in
+`artifacts_out/seed_stability.csv`). One event in 35 non-attack
+merchant-windows is **2.9%, 95% CI [0.1%, 14.9%]** — a wide interval on a small
+sample, and quoting the point estimate alone would overstate it.
 
-Missing a whole attack class is a worse failure than one false alarm on a
-legitimate merchant, and **we cannot explain why corporate-buyer examples
-destabilise card testing.** Shipping an unexplained change is worse than
-shipping a characterised limitation, so the false alarm stays, documented.
+The symmetric fix is obvious: teach the model that a shared *IP* can be honest
+too. **We measured it rather than reasoning about it**, and the first
+measurement was misleading. On seed 7 it removes the false alarm and raises NPV
+to ₹9.44L against our ₹8.11L — so for a while this section said we were
+*overriding* our own cost rule on failure-severity grounds. **An outside
+reviewer pointed out that a win on one seed and a catastrophic failure on
+another is not a comparison.** They were right. Run across all five seeds
+(`python -m src.policy.config4_npv`):
+
+| | mean NPV over 5 seeds | attacks caught |
+|---|---|---|
+| **shipped configuration** | **₹9,43,276** | **25 / 25** |
+| rejected configuration | ₹8,69,852 | 24 / 25 |
+
+**The apparent NPV advantage was a seed-7 artifact.** Averaged properly the
+rejected configuration is **₹73,424 worse** *and* loses an attack — on seed 101
+it drops card-testing detection to a mean score of 0.004. There is no
+money-versus-safety trade here at all; it is simply worse on both axes, and we
+only thought otherwise because we had compared one seed in a project that keeps
+a five-seed harness precisely to prevent that.
+
+We still cannot explain *why* corporate-buyer examples destabilise card
+testing, so the false alarm stays and is documented rather than fixed by a
+change we do not understand. The rejected configuration is left **reachable**
+(`HIST_CORPORATE_BUYER` in the simulator) so anyone can re-measure it.
 
 **We tried four configurations in total** — that number matters more than any
-one result. We stopped at the one we could explain, not the one that scored
-best. NPV is the project's declared rule for choosing *cutoffs*; there is no
-pre-declared rule for training-data composition, so this was a judgment call
-and is labelled as one.
+one result.
 
 Reproduce: `python -m src.models.seed_stability`, and `pytest tests/test_hard_negatives.py`.
 

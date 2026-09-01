@@ -159,6 +159,16 @@ def gen_baseline(w: World, rng) -> list[dict]:
 # untrustworthy rather than reporting a clean pass (failure 26).
 AMBIENT_AMOUNT_MIXTURE = True
 
+# Whether to also teach the model that a shared IP can be honest. OFF.
+# It removes the corporate-buyer false alarm and raises NPV on seed 7, but on
+# seed 101 it drops card-testing detection to mean p=0.004 and loses the attack
+# entirely - and we cannot explain why. Missing a whole attack class is worse
+# than one false alarm on a legitimate merchant, and shipping an unexplained
+# change is worse than shipping a characterised limitation. Left switchable so
+# the rejected configuration stays measurable: see failure-log 29 and
+# src/policy/config4_npv.py.
+HIST_CORPORATE_BUYER = False
+
 AGED_SHARE_RING = 0.8
 AGED_SHARE_FARM = 0.6
 AGED_SHARE_CLUSTER = 0.6
@@ -372,7 +382,15 @@ def generate(seed: int = 7) -> pd.DataFrame:
     # ids disjoint from the held-out kiosk at m10/day 26.
     rows += s8_shared_kiosk_burst(w, rng, merchant=6, day=16,
                                   tag="s8_hist_kiosk", n=140)
-    # NOT ADDED, deliberately: the shared-IP counterpart. Training contains
+    # The shared-IP counterpart is REACHABLE but OFF by default - see
+    # HIST_CORPORATE_BUYER below for why it is rejected. It is left switchable
+    # so the rejected configuration can be measured by anyone, rather than
+    # asserted to be worse.
+    if HIST_CORPORATE_BUYER:
+        rows += s7_corporate_buyer(w, rng, merchant=1, day=19,
+                                   tag="s7_hist_corporate", n=160)
+
+    # NOT ENABLED, deliberately: the shared-IP counterpart. Training contains
     # shared-IP fraud and no shared-IP honest traffic, which is why a legitimate
     # corporate buyer still false-alarms on seed 11 - the symmetric fix. We
     # measured it: adding s7_corporate_buyer to training does remove that false
