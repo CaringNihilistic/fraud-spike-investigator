@@ -199,12 +199,26 @@ Streaming spike beats the naive flag-counter on 4 of 5 scenarios (largest margin
 
 How much does each feature group — and the merchant-level spike/policy layer on top of the classifier — actually contribute? Same temporal split, same calibration and cost-optimal-threshold procedure as above, evaluated on the test slice, using the empirically-selected model (XGBoost):
 
-| Stage | Features | PR-AUC | Precision | Recall | Fraud ₹ prevented | Legit ₹ wrongly blocked |
-|---|---|---|---|---|---|---|
-| 1. basics | 6 | 0.600 | 1.000 | 0.515 | ₹3.89L | ₹0 |
-| 2. + velocity | 12 | 0.632 | 0.942 | 0.549 | ₹4.17L | ₹8.9K |
-| 3. + entity/graph (full 22) | 22 | **0.898** | 0.927 | 0.857 | ₹8.38L | ₹21.7K |
-| 4. full system (+ spike/policy layer) | 22 | 0.898 | — | — | — | — |
+| Stage | Features | PR-AUC | 95% CI | Precision | Recall | Fraud ₹ prevented | Legit ₹ wrongly blocked |
+|---|---|---|---|---|---|---|---|
+| 1. basics | 6 | 0.600 | [0.566, 0.634] | 1.000 | 0.515 | ₹3.89L | ₹0 |
+| 2. + velocity | 12 | 0.632 | [0.600, 0.665] | 0.942 | 0.549 | ₹4.17L | ₹8.9K |
+| 3. + entity/graph (full 22) | 22 | **0.898** | [0.878, 0.918] | 0.927 | 0.857 | ₹8.38L | ₹21.7K |
+| 4. full system (+ spike/policy layer) | 22 | 0.898 | — | — | — | — | — |
+
+**Are those steps real, or noise?** Measured, not asserted — a *paired* bootstrap
+over 2,000 resamples of the test slice, every variant scored on the same resampled
+rows (`python -m src.models.ablation_ci`):
+
+| step | Δ PR-AUC | 95% CI | verdict |
+|---|---|---|---|
+| basics → + velocity | **+0.0317** | [+0.0189, +0.0445] | significant |
+| + velocity → + entity/graph | **+0.2665** | [+0.2361, +0.2960] | significant |
+| basics → full 22 | **+0.2982** | [+0.2666, +0.3291] | significant |
+
+Both steps clear zero. This is *sampling* uncertainty over one test slice; the
+five-seed spread below measures generative variance, and the two are
+complementary. Neither is real-world variance.
 
 Stage 4 isn't a bigger feature set — stage 3 already uses all 22 features. It replays stage 3's calibrated scores through the merchant `StreamingSpikeDetector` + policy engine and reports **5/5 attack merchants caught, 0 false alarms, flash sale correctly not flagged** — i.e. what the spike/policy layer adds on top of a strong per-transaction classifier (merchant-level, actionable detection), which raw PR-AUC alone doesn't capture.
 
@@ -233,9 +247,9 @@ The profile pair now scores **0.5997 against the full set's 0.8981** — a gap o
 
 **One thing the ladder shows that the headline doesn't:** D2 and D3 both achieve **precision 1.000 and ₹0 wrongly blocked**, better than the full model's 0.927 / ₹21.7K. The full feature set trades precision for recall (0.744 → 0.857) and nearly ₹3.3L more fraud prevented. That trade is the right one under our cost model, but it is a trade, and the full model is *not* dominant on every axis.
 
-Velocity alone is roughly neutral-to-slightly-negative (0.661 → 0.631) — rolling-window counts spike for busy *legitimate* merchants too, so without entity history to tell "one device across 50 throwaway accounts" from "a popular merchant having a good hour," velocity adds about as much noise as signal.
+**Velocity now measurably helps, and it did not before.** Under the old generator this step was a mild *regression* and this README described it as roughly neutral — rolling-window counts spike for busy *legitimate* merchants too, so the reasoning went that velocity adds about as much noise as signal. On the fixed generator it adds **+0.0317 [+0.0189, +0.0445]**, which clears zero. The explanation for the reversal is the same one that runs through the leakage audit: when two profile features were quietly encoding the label, everything else looked redundant. Remove the shortcut and the honest features start earning their place. It is still an order of magnitude smaller than the entity/graph step, and that ordering is the point.
 
-*A retracted claim, kept visible on purpose.* An earlier version of this section reported a dramatic stage-2 **collapse** (PR-AUC 0.55 → 0.23, legit ₹ blocked 6x) and explained it as "velocity alone is a trap." That was an artifact, not a finding: with no attack in the calibration slice, isotonic calibration had almost nothing to fit and produced degenerate score plateaus. Once validation contained a real attack (see Model selection), the effect shrank to −0.03 — a mild regression, not a collapse. A follow-up diagnostic on the top-200 scored transactions initially seemed to confirm the story (18 flash-sale transactions ranked as top fraud risk under the velocity-only model), but that too dissolved under scrutiny: the top-200 sits entirely inside a ~447-transaction tie-plateau where every score is exactly 1.0, so its composition was decided by row order. Re-ranking the same plateau by raw model score gives **zero** flash-sale transactions and precision 1.000 for all three variants. The feature slicing was verified correct (a clean 6/6/10 partition of all 22 features), so there was no bug to fix — the diagnostic simply could not support the claim. Both the original finding and its retraction are left here because "we chased a dramatic result and it did not survive" is the honest version of this table.
+*A retracted claim, kept visible on purpose.* An earlier version of this section reported a dramatic stage-2 **collapse** (PR-AUC 0.55 → 0.23, legit ₹ blocked 6x) and explained it as "velocity alone is a trap." That was an artifact, not a finding: with no attack in the calibration slice, isotonic calibration had almost nothing to fit and produced degenerate score plateaus. Once validation contained a real attack (see Model selection), the effect shrank to −0.03 — a mild regression, not a collapse. A follow-up diagnostic on the top-200 scored transactions initially seemed to confirm the story (18 flash-sale transactions ranked as top fraud risk under the velocity-only model), but that too dissolved under scrutiny: the top-200 sits entirely inside a ~447-transaction tie-plateau where every score is exactly 1.0, so its composition was decided by row order. Re-ranking the same plateau by raw model score gives **zero** flash-sale transactions and precision 1.000 for all three variants. The feature slicing was verified correct (a clean 6/6/10 partition of all 22 features), so there was no bug to fix — the diagnostic simply could not support the claim. Both the original finding and its retraction are left here because "we chased a dramatic result and it did not survive" is the honest version of this table. **And it has a third act:** after the generator fix (see the leakage self-audit), the same step turned *positive* and significant. A claim we published, retracted, and then had to revise a second time in the other direction — which is what it looks like when the measurement, not the narrative, decides.
 
 Reproduce: `python -m src.models.ablation` → writes `artifacts_out/ablation_table.csv`.
 

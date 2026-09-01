@@ -190,6 +190,8 @@ changes without a new held-out set, or the number stops meaning anything.
 Run: `python -m src.models.select_model && python -m src.policy.threshold_sweep
 && python -m src.models.train && python -m src.models.ablation`
 Self-audit: `python -m src.models.leakage_probe` (adversarial eval integrity)
+Ablation CIs: `python -m src.models.ablation_ci` (paired bootstrap, 2,000
+resamples, so the table's deltas carry intervals rather than bare points)
 Generator sensitivity: `python -m src.models.aged_share_sensitivity` (is the
 aged_share choice load-bearing? no - and there is a control proving the
 sweep reproduces the leak when it should)
@@ -240,7 +242,11 @@ merchants.
    calibration slice (days 21–23) contained NO attack, so isotonic
    calibration fit degenerate score plateaus. Fix: move one historical
    device-farm attack to day 22. Effect shrank to 0.661 → 0.631 — mild, not
-   a collapse. A supporting top-200 diagnostic ALSO dissolved: the top-200
+   a collapse. THIRD ACT (entry 26): after the generator fix the same step is
+   +0.0317 with a 95% bootstrap CI of [+0.0189, +0.0445] — positive and
+   significant. Published, retracted, then revised again in the other
+   direction. Do not quote the "velocity is neutral" reading; it belonged to
+   the leaky generator. A supporting top-200 diagnostic ALSO dissolved: the top-200
    sat inside a ~447-txn tie-plateau at p=1.0, so its composition was decided
    by row order; re-ranking by raw score gives 0 flash-sale txns and
    precision 1.000 for every variant. Feature slicing was verified correct
@@ -597,7 +603,18 @@ explainability — every component must be defensible to a judge in one sentence
    loss) and LOSES on fraud ring (59m vs 48m). Still 4/5. And the two detector
    paths no longer agree - streaming catches 5/5 in all seeds, the hourly EWMA
    path misses the account takeover on seed 7. Both reported.
-   LESSON: "disclosed but not fixed" is a resting place, not a destination. The
+   FOURTH THING THE RE-RUN CHANGED, found later: the ablation's velocity step
+   flipped SIGN. Under the leaky generator it was a mild regression and the
+   README called velocity "roughly neutral"; on fixed data it is +0.0317 with a
+   paired-bootstrap 95% CI of [+0.0189, +0.0445] - positive and significant.
+   When two profile features were quietly encoding the label, every honest
+   feature looked redundant next to them. We shipped the corrected tables
+   without following through to the PROSE underneath, so for a while the README
+   had a table saying +0.032 and a paragraph forty lines below saying
+   "neutral-to-slightly-negative". Caught and fixed. Lesson: rewriting the
+   numbers is half the job; the sentences that INTERPRET them are the other
+   half, and they fail silently because nothing type-checks English.
+      LESSON: "disclosed but not fixed" is a resting place, not a destination. The
    fix cost 0.036 of headline and bought back the ability to state what the
    number means - plus three bugs that only a re-run could expose.
 

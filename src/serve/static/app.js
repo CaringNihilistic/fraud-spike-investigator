@@ -814,13 +814,16 @@ function Pitch() {
         <div class="aud">
           <div class="an">06</div>
           <div>
-            <h3>A dramatic result we published, then had to retract</h3>
+            <h3>A dramatic result we published, retracted, then had to revise again</h3>
             <p>Ablation appeared to collapse 0.55 → 0.23 and we wrote it up as “velocity alone
               is a trap.” <b>The cause was ours:</b> the calibration slice contained no attack,
-              so isotonic calibration fit degenerate plateaus. Fixed, the effect shrank to
-              0.661 → 0.631 — mild, not a collapse. The retraction is left visible in the
-              README on purpose. A dramatic result on a small slice is a prompt to re-measure,
-              not to publish.</p>
+              so isotonic calibration fit degenerate plateaus. Fixed, the effect shrank to a
+              mild regression — not a collapse.</p>
+            <p><b>Then the generator fix reversed it a second time.</b> On data that no longer
+              encodes the label, the same step is <b>+0.0317</b>, 95% CI${' '}
+              <span class="mono">[+0.0189, +0.0445]</span> — positive and significant on a
+              paired bootstrap. Published, retracted, revised again in the opposite direction.
+              That is what it looks like when the measurement decides and not the narrative.</p>
           </div>
         </div>
         <div class="aud">
