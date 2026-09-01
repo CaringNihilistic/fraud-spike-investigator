@@ -440,8 +440,8 @@ function ReviewQueue() {
           <br />Worked in order of${' '}<b>expected loss</b>${' '}(₹ × calibrated
           probability), because the analyst runs out of time before the queue runs out
           of cases. We shipped arrival order first; at 50 cases worked that put${' '}
-          <b>5%</b>${' '}of the queue's fraud value in front of a human instead of${' '}
-          <b>45%</b>.
+          <b>6%</b>${' '}of the queue's fraud value in front of a human instead of${' '}
+          <b>47%</b>.
         </div>
         <button class=${'chip sm' + (pendingOnly ? ' active' : '')}
                 style=${{ marginLeft: 'auto' }}
@@ -623,7 +623,7 @@ function CostCurve() {
 }
 
 function Capacity() {
-  const perK = 41.9, perAnalystHour = 30;
+  const perK = 66.9, perAnalystHour = 30;
   const rows = [10e3, 100e3, 1e6].map((v) => {
     const cases = v / 1000 * perK;
     const hours = cases / perAnalystHour;
@@ -636,13 +636,16 @@ function Capacity() {
       <p class="note" style=${{ marginTop: 0 }}>
         We price an analyst review at ₹50 but never checked whether the analysts
         exist. This is that check. Assumption stated so it can be argued with:${' '}
-        <b>30 cases per analyst-hour</b> (two minutes each), 8-hour shifts.
+        <b>30 cases per analyst-hour</b> (two minutes each), 8-hour shifts.${' '}
+        The load rose <b>60%</b> — 41.9 to 66.9 per 1,000 — when we taught the model
+        that a shared payment terminal can be honest. It got more cautious
+        everywhere, and that has a headcount price.
       </p>
       <p class="note">
-        <b>And if ₹50 is wrong?</b> Review cost is 3.5% of gross fraud prevented,
-        so net protected value stays positive up to${' '}<b>₹1,425 per review —
-        28× the assumption</b>. The rupee conclusion is not resting on that
-        guess. Staffing is the part that does not follow: 4.19% of the stream
+        <b>And if ₹50 is wrong?</b> Review cost is 5.5% of gross fraud prevented,
+        so net protected value stays positive up to${' '}<b>₹905 per review —
+        18× the assumption</b>. The rupee conclusion is not resting on that
+        guess. Staffing is the part that does not follow: 6.69% of the stream
         still has to be worked by people who may not exist.
       </p>
       <div class="tscroll2">
@@ -658,7 +661,7 @@ function Capacity() {
       </div>
       <p><b>At PSP scale this does not staff.</b> 184 full-time analysts to
         clear one million transactions a day is not a rounding error, it is a
-        department. Our 4.19% review rate is tuned for net rupees, and nothing
+        department. Our 6.69% review rate is tuned for net rupees, and nothing
         in the objective function knows that analyst capacity is finite.</p>
       <p class="note">The honest fix is not a better model — it is a second
         constraint. The restrict and review cutoffs would have to be re-swept
@@ -726,12 +729,12 @@ function Pitch() {
       <h2>Results — temporal held-out test slice, synthetic data</h2>
       <div class="mets">
         <${Metric} k="attacks detected" v="25 / 25" note="across 5 seeds of the generator" />
-        <${Metric} k="false alarms" v="0" note="in 35 non-attack merchant-windows" />
-        <${Metric} k="flash sale flagged" v="0 / 5" note="the legitimate 6× spike" />
-        <${Metric} k="net protected value" v="₹7.95L" note="after 578 reviews × ₹50" />
-        <${Metric} k="precision / recall" v="0.927 / 0.857" note="at the cost-optimal threshold" />
-        <${Metric} k="legitimate ₹ wrongly blocked" v="₹21.7K" note="0.21% of legitimate value processed" />
-        <${Metric} k="calibration (Brier / ECE)" v="0.0082 / 0.0031" note="measured, not assumed" />
+        <${Metric} k="false alarms" v="1" note="in 35 non-attack merchant-windows" />
+        <${Metric} k="legitimate spikes tested" v="3" note="two of them share entities" />
+        <${Metric} k="net protected value" v="₹8.11L" note="after 948 reviews × ₹50" />
+        <${Metric} k="precision / recall" v="0.996 / 0.735" note="at the cost-optimal threshold" />
+        <${Metric} k="legitimate ₹ wrongly blocked" v="₹2.6K" note="0.024% of legitimate value processed" />
+        <${Metric} k="calibration (Brier / ECE)" v="0.0123 / 0.0074" note="measured, not assumed" />
         <${Metric} k="LLM policy violations" v="0 / 13" note="0/13 unsafe actions too" />
       </div>
     </div>
@@ -740,7 +743,7 @@ function Pitch() {
     <${Capacity} />
 
     <div class="panel">
-      <h2>We attacked our own evaluation three times</h2>
+      <h2>We attacked our own evaluation four times</h2>
       <p class="note" style=${{ marginTop: 0 }}>Each audit lowered a number we had already
         written down. We published the lower number every time. All three reproduce from
         the repo.</p>
@@ -782,8 +785,26 @@ function Pitch() {
               on real data was <b>3.8× cheaper</b> than what it chose.</p>
           </div>
         </div>
+        <div class="aud">
+          <div class="an">04</div>
+          <div>
+            <h3>Could a legitimate merchant break the entity layer?</h3>
+            <p>"0 false alarms" rested on one negative — a flash sale where every account
+              has its own device, IP and card, so it never touched the entity layer at
+              all. So we built a shared payment kiosk: 25 real customers, one terminal,
+              completely honest.${' '}<b>It scored 0.972 against a real device farm's
+              0.985</b>, and produced a higher spike z than an actual attack.</p>
+            <p>Root cause was a training gap — the model had only ever seen shared devices
+              committing fraud. We taught it a legitimate kiosk in the training period:${' '}
+              <b>0.972 → 0.002</b>, attacks unaffected, precision up to 0.996. A second
+              hard negative still false-alarms on one seed in five and${' '}<b>we left
+              it</b> — the symmetric fix silently loses card-testing detection and we
+              could not explain why. Four configurations tried; we stopped at the one we
+              could explain, not the one that scored best.</p>
+          </div>
+        </div>
       </div>
-      <p class="note"><b>28 failures</b> are logged with root causes in the repo. Every one was
+      <p class="note"><b>29 failures</b> are logged with root causes in the repo. Every one was
         caught by measuring a claim, not by re-reading code. Two of them were our own audit
         tools hardcoding their failing verdicts — instruments that structurally could not
         report a pass.</p>
@@ -795,7 +816,7 @@ function Pitch() {
     <div class="panel">
       <h2>What broke, and what we did about it</h2>
       <p class="note" style=${{ marginTop: 0 }}>
-        <b>28 failures</b> are logged with root causes in the repo. Not "we hit some
+        <b>29 failures</b> are logged with root causes in the repo. Not "we hit some
         bugs" — each one names what we believed, what measurement contradicted it, and
         what changed. Five that a judge should see:
       </p>
@@ -881,11 +902,15 @@ function Pitch() {
           others</b> — a negative result is only as strong as the test that produced it.</li>
         <li>The <b>merchant-level</b> layer is validated on controlled scenarios only —
           neither public dataset we evaluated has a merchant column.</li>
+        <li><b>1 false alarm</b> in 35 non-attack merchant-windows — a legitimate
+          corporate buyer, on one seed in five. Deliberately unfixed: the symmetric
+          fix removes it but costs an entire attack class.</li>
         <li>The agent gets the cause right <b>8/13</b> times. It is advisory and cannot act.
           That separation is the point, and it's tested.</li>
-        <li>42 review cases per 1,000 transactions is priced at ₹50 but never checked
+        <li>67 review cases per 1,000 transactions — <b>up 60%</b> since we taught the
+          model that a shared terminal can be honest — priced at ₹50 but never checked
           against whether the analysts exist. The ₹ figure is robust to that price
-          (break-even at ₹1,425/review, 28× the assumption); the headcount is not.</li>
+          (break-even at ₹905/review, 18× the assumption); the headcount is not.</li>
         <li>The agent eval is <b>n=13</b> — roughly a ±25-point confidence interval, so 8/13
           and 5/13 are not distinguishable. Every number from it is a small-sample result.</li>
       </ul>
@@ -945,9 +970,12 @@ function App() {
           through the real pipeline — scorer, spike detector, policy engine, review
           queue. ${nAttack > 0 ? html`<b class="bad">${nAttack} of these merchants are
           under coordinated attack right now.</b>` : ''}
-          <span class="wsub">Every block and every review below is held for a human to
-          confirm. Nothing here acts on its own, and the language model cannot
-          authorise anything.</span>
+          <span class="wsub">Three of them are legitimate spikes, and two of those
+          share entities — a corporate office on one IP, and a shop counter where
+          everyone pays through the same terminal. Both carry an attack's exact
+          signature. <b>None of the three is restricted.</b> Every block and every
+          review below is held for a human to confirm; nothing here acts on its own,
+          and the language model cannot authorise anything.</span>
         </div>
         ${finale ? html`
           <div class="finale-banner">

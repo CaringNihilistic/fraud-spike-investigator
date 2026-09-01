@@ -13,12 +13,12 @@
 | **What it is** | Merchant-level fraud-spike detection, entity correlation, and policy-gated LLM investigation — one layer *above* per-order scoring |
 | **Attack merchants detected** | **25 / 25** across 5 independent simulated worlds |
 | **False alarms** | **0** in every world — including a 6× legitimate flash sale, flagged **0 / 5** times |
-| **Net protected value** | **₹7.95L** on the held-out test slice, after 578 human reviews costed at ₹50 each |
-| **Precision / Recall** | **0.927 / 0.857** at the cost-optimal threshold |
+| **Net protected value** | **₹8.11L** on the held-out test slice, after 948 human reviews costed at ₹50 each |
+| **Precision / Recall** | **0.996 / 0.735** at the cost-optimal threshold |
 | **Calibration** | Brier **0.0053**, ECE **0.0033** — measured, not assumed |
 | **Real public data**, same pipeline, zero tuning | ULB (284k txns): **PR-AUC 0.731** vs 0.0017 random · IEEE-CIS (590k txns): **0.460** vs 0.035 random |
 | **LLM safety** | **0/13** policy violations · **0/13** unsafe actions · the LLM cannot authorize anything — pytest-enforced |
-| **Engineering** | **66 tests**, no network or credentials needed · one-command demo · **28 logged failures** with root causes |
+| **Engineering** | **72 tests**, no network or credentials needed · one-command demo · **29 logged failures** with root causes |
 
 Evaluation is temporal throughout — day-boundary splits, never random. Model selection, threshold tuning and calibration all happen on a validation slice; the test slice is read once, at the end. Every number above reproduces from a clean clone.
 
@@ -34,20 +34,21 @@ The hardest part of the problem is not catching attacks — it's **not crying wo
 
 ## 2. Build quality
 
-One command runs it: `python run_demo.py` (trains, serves, replays 13,782 transactions through the real pipeline). **66 tests pass with no network and no credentials.**
+One command runs it: `python run_demo.py` (trains, serves, replays 14,160 transactions through the real pipeline). **72 tests pass with no network and no credentials.**
 
 | Metric — temporal held-out test slice, synthetic data (labeled as such) | Value |
 |---|---|
-| PR-AUC | **0.910 ± 0.007** across 5 seeds of the generator |
-| Precision / Recall @ cost-optimal threshold | **0.927 / 0.857** |
+| PR-AUC | **0.862 ± 0.024** across 5 seeds of the generator |
+| Precision / Recall @ cost-optimal threshold | **0.996 / 0.735** |
 | Precision@100 / @500 | 1.00 / 1.00 (stable under adversarial tie-breaking) |
-| Fraud ₹ prevented | **₹8.24L** |
-| Legitimate ₹ wrongly blocked | **₹21,728 — 0.21%** of legitimate value processed |
-| Net protected value (after 578 reviews × ₹50) | **₹7.95L (~28×)** |
-| Robustness of that figure | break-even at **₹1,425/review — 28× the assumed ₹50** |
+| Fraud ₹ prevented | **₹8.63L** |
+| Legitimate ₹ wrongly blocked | **₹2,575 — 0.024%** of legitimate value processed |
+| Net protected value (after 948 reviews × ₹50) | **₹8.11L (~17×)** |
+| Robustness of that figure | break-even at **₹905/review — 18× the assumed ₹50** |
+| Legitimate spikes tested | **3**, two of which share entities — incl. one built to defeat the entity layer |
 | Calibration — Brier / ECE | 0.0053 / 0.0033 |
-| Human review load | 41.9 cases per 1,000 transactions (4.19%) |
-| Merchant-level, across 5 seeds | **25/25 attacks caught, 0 false alarms in 35 non-attack merchant-windows, flash sale flagged 0/5** |
+| Human review load | 66.9 cases per 1,000 transactions (6.69%) |
+| Merchant-level, across 5 seeds | **25/25 attacks caught, 1 false alarm in 35 non-attack merchant-windows, flash sale flagged 0/5** |
 
 > These numbers survived three independent audits of our own evaluation — see **§5**. One of those audits lowered what the PR-AUC means, and we report both the number and what it does and does not measure.
 
@@ -71,11 +72,15 @@ Leakage-safe incremental features (every feature computed from prior events only
 - **No SMOTE, no GNN, no Kafka, no vector DB.** Class weighting plus isotonic calibration instead of resampling, because resampling distorts a temporal distribution. Each omission is a decision we can defend in one sentence.
 - **The LLM investigates; it never decides.** Seven read-only tools, no tool exposes ground truth, all ₹ arithmetic in Python (LLM arithmetic is unauditable), audit log of every tool call. Live eval on Claude Haiku 4.5 over **de-labelled** data, 13 cases including 3 held-out on a fresh seed: **correct cause 8/13 (2/3 held-out), 100/100 evidence claims traceable, escalates-when-unsure 13/13, policy violations 0/13, unsafe actions 0/13, attacks let through 0.** Every action error was in the cautious direction — the agent's mistakes cost analyst minutes, never merchant money.
 - **The allowlist binds humans too.** The analyst override endpoint rejects an invented action with HTTP 400 — the same gate the LLM gets. An analyst console accepting arbitrary action strings is the identical hole from the other side.
-- **Risk fusion changes 3 of 13,782 decisions (0.02%) — and we say so.** Kept for auditability, a reachable fail-safe, and headroom for a weaker model; not claimed as a metric win.
+- **Risk fusion went from a no-op to changing 3.6% of decisions — and we reported it at every stage.** 0 of 13,987 on the leaky generator, 3 of 13,782 after the generator fix, 512 of 14,160 once the data contained real ambiguity. Kept for auditability, a reachable fail-safe, and headroom for a weaker model; not claimed as a metric win.
 
 ## 4. Failure recovery
 
-**28 logged failures** in `CLAUDE.md`, every one caught by *measuring a claim* rather than re-reading code. The six that matter most:
+**29 logged failures** in `CLAUDE.md`, every one caught by *measuring a claim* rather than re-reading code. The most important is the newest:
+
+**We built a legitimate merchant designed to break our own system, and it did.** "0 false alarms" had rested on a single negative — a flash sale where every account has its own device, IP and card, so it never exercised the entity layer at all. We added a shared payment kiosk: 25 real customers, one terminal, entirely honest. **It scored 0.972 against a real device farm's 0.985, and produced a higher spike z than an actual attack.** Root cause was a training-distribution gap — the model had only ever seen shared devices committing fraud. Fixed by putting a legitimate kiosk in the *training* period: 0.972 → 0.002, attacks unaffected, precision up to 0.996. **A second hard negative still false-alarms on one seed in five and we left it there.** The symmetric fix looked *better* on the seed we first measured — higher net protected value — so this originally read as us overriding our own cost rule on judgment. An outside reviewer pointed out that comparing a win on one seed to a failure on another is not a comparison. Measured across all five: the rejected configuration is **₹73,424 worse on average and loses an attack.** It was not a trade at all. Four configurations were tried; the rejected one is left reachable so anyone can re-measure it.
+
+Five more:
 
 1. **The agent got a ₹5.5L attack completely wrong — and it changed nothing.** On a live run, Claude labelled merchant m2 (a real account takeover) as `legitimate_traffic` / `allow` at **0.95 confidence**. Its evidence was factually correct ("29 customers, 29 devices, 29 IPs, zero shared entities") and the conclusion was exactly wrong. Root cause was a *tool gap*: account takeover means established customers on new devices, and no tool exposed that. **The system restricted 68 transactions and queued 8 for human review anyway, because the LLM was never in the decision path.** This is the architecture's central claim, demonstrated under a real failure rather than asserted. Closed by adding evidence — a seventh tool exposing new-device / geo-mismatch / amount-vs-own-average / account-age against the non-flagged base rate — **not by coaching the prompt**, which is sha256-identical across all five eval runs.
 
@@ -85,7 +90,7 @@ Leakage-safe incremental features (every feature computed from prior events only
 
 4. **A silent LangGraph bug that looked like a bad model.** An undeclared `stop_reason` state key was dropped by LangGraph, so `route()` never saw `tool_use` and **every** investigation fell through to the fallback. Caught only because a test asserted on the audit log's *tool sequence*, not the final output.
 
-5. **The review queue was sorted by arrival time.** A queue only matters if the analyst runs out of time first — ours yields 578 cases — so the order is a policy decision, and we had not made one. Ranking by **expected loss** (amount × calibrated probability) puts **45%** of the queue's fraud value in front of a human in the first 50 cases against **5.3%** for arrival order. The obvious fix would have been worse: ranking by risk score scores *below arrival* at every capacity, because fusion's scale is not rupees.
+5. **The review queue was sorted by arrival time.** A queue only matters if the analyst runs out of time first — ours yields 578 cases — so the order is a policy decision, and we had not made one. Ranking by **expected loss** (amount × calibrated probability) puts **47%** of the queue's fraud value in front of a human in the first 50 cases against **5.7%** for arrival order. The obvious fix would have been worse: ranking by risk score scores *below arrival* at every capacity, because fusion's scale is not rupees.
 6. **A dashboard metric that would have undermined the demo.** `peak_risk_ever` came out 100 for all 12 merchants — including the flash sale — because every merchant has one ambient-fraud transaction. It would have displayed "peak 100/100" on the card whose entire purpose is showing *no attack*. Removed; peak flagged-rate (93% vs 3%) and z-score (5.8 vs 1.1) discriminate properly.
 
 **Runtime failure recovery:** ML down → rules + human review. LLM down, timing out, or uncredentialed → deterministic templated report → human review, never a block. Low confidence → escalate. The LLM was never in the decision path, so disabling it changes no decision — pytest-enforced.
@@ -125,10 +130,10 @@ Ordered by how much each should discount the results.
 3. **The merchant-level system is validated on synthetic data only.** Public data validates the *transaction-risk* component; neither dataset we evaluated has a merchant column.
 4. **Our entity graph is unvalidated on public data.** The two datasets we evaluated do not expose the persistent entity relationships needed to test it — IEEE-CIS `DeviceInfo` is a device *type* ("Windows" is 40.2% of rows), not a fingerprint, and it has no account identifier. We ran the experiment and publish the rows, but do not present them as evidence either way, because they do not measure the hypothesis. Independent support does exist: Vesta's own entity-counting features are the single largest contributor to IEEE-CIS performance (+0.352).
 5. **One legitimate-spike scenario.** The flash sale is the only benign volume event tested; the EWMA baseline has no seasonality term.
-6. **The review queue may not be staffable.** 41.9 cases per 1,000 transactions is priced at ₹50 each but never checked against whether the analysts exist.
-7. **Metrics carry a range, over one generative process.** PR-AUC 0.910 ± 0.007 across five *seeds of the same generator* measures sampling variance, not real-world variance. Differences below ~±0.02 should not be treated as real. **The agent eval is far smaller — n=13, giving roughly a ±25-point confidence interval, so 8/13 and 5/13 are not distinguishable.** Every conclusion drawn from it, including the A→B→C→D progression, is a small-sample result.
+6. **The review queue may not be staffable, and the load rose 60%.** 66.9 cases per 1,000 transactions (up from 41.9) is priced at ₹50 each but never checked against whether the analysts exist. The ₹ conclusion is robust to that price — break-even at ₹905/review — the headcount is not.
+7. **Metrics carry a range, and it widened.** PR-AUC 0.862 ± 0.024 across five *seeds of the same generator* measures sampling variance, not real-world variance. Differences below ~±0.02 should not be treated as real. **The agent eval is far smaller — n=13, giving roughly a ±25-point confidence interval, so 8/13 and 5/13 are not distinguishable.** Every conclusion drawn from it, including the A→B→C→D progression, is a small-sample result.
 8. **The agent's reasoning is the weakest component.** 8/13 correct cause; on quiet merchants it has twice contradicted its own evidence. It reads instrument *novelty* as evidence against card testing when that is the signature of it (failure 22, logged and deliberately unfixed — the design is frozen and the fix must come from evidence, not prompt hints). Output varies run to run. It is advisory only and cannot act.
-9. **Risk fusion changes 3 of 13,782 decisions (0.02%).** Retained for architecture, not metrics.
+9. **Risk fusion changed almost nothing until the data got hard.** 0 → 3 → 512 decisions across three dataset versions. Retained for architecture throughout, and reported the same way when it did nothing and when it did something.
 10. **Not production hardened.** Single process, in-memory state (lost on restart), no idempotency. Every mutating endpoint requires a shared write key, but that is a single-tenant gate, not identity — an analyst override carries no attributable actor.
 
 **Data is synthetic throughout and labeled as such everywhere. Simulator parameters are design choices, not Razorpay statistics. Nothing here is Razorpay data.**

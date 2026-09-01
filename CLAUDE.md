@@ -17,8 +17,13 @@ transaction-stream "you are under attack" investigation with ₹ economics.
 ## Architecture (do not change without strong reason)
 - `src/sim/` — synthetic generator. ALL entity IDs are opaque hashes via
   `oid()` — never semantic (see failure-log 19). `generate_holdout()` builds a
-  second world for held-out agent eval only. 6 scenarios (card-testing, device farm, IP
-  cluster, ATO, fraud ring, legitimate flash sale that must NEVER be flagged).
+  second world for held-out agent eval only. 8 scenarios: 5 attacks (card
+  testing, device farm, IP cluster, ATO, fraud ring) and 3 LEGITIMATE spikes
+  that must NEVER be flagged — a flash sale (6x volume, no shared entities),
+  a corporate buyer (40 accounts on ONE office IP) and a shared kiosk (25
+  accounts through ONE device). The last two are the HARD negatives: they carry
+  the exact entity signature of an attack and are honest. The flash sale alone
+  never exercised the entity layer at all. See failure-log 29.
   Historical attacks in train period (days 6–18, own entity IDs), novel attacks
   in test period (days 24–29, fresh entity IDs + different merchants).
 - `src/features/builder.py` — 22 features, STRICTLY incremental in ts order
@@ -114,73 +119,59 @@ Model: XGBoost, selected empirically over LightGBM/CatBoost/LogisticRegression
 on temporal validation (src/models/select_model.py). All 3 GBDTs within the
 0.02 tie margin (LGBM .9308 / Cat .9265 / XGB .9249) → won on the PRE-DECLARED
 speed tie-break (0.27s vs 1.64s vs 7.94s), NOT on raw PR-AUC.
-PR-AUC 0.898 | P 0.927 / R 0.857 @ cost-optimal threshold | P@100/@500 = 1.00
-STABILITY: 0.910 +/- 0.007 over 5 independent SEEDS OF THE SAME GENERATOR
-(not independent worlds - identical scenario definitions; it controls for seed
-luck, nothing more). Seed 7, the demo world, is the WORST of the five.
-CALIBRATION: Brier 0.00819 (raw 0.01153), ECE 0.00312 - isotonic measurably
-helps, but the reliability curve is near-bimodal, so the low ECE is dominated
-by the extremes. Report both.
-REVIEW LOAD: 41.9 cases per 1,000 txns (4.19%) - staffing question, not just
-cost. Do not quote INR/case without it.
-COST-MODEL ROBUSTNESS: review cost is 3.5% of gross prevented at the assumed
-INR 50/case, and NPV break-even is INR 1,425/case - 28x the assumption. Quote
-that when asked "what if your cost guess is wrong": it is wrong-by-28x before
-the conclusion flips. Do NOT build a full cost-assumption sweep - the fused
-score distribution is near-bimodal, so cost changes rescale the headline
-without moving the policy, and the sweep would report "nothing changes" at
-length. The genuinely open cost question is the FN price (see entry 23).
-FALSE-POSITIVE COST: INR 21,728 of legitimate value wrongly blocked, which is
-0.21% of the INR 1,03,53,085 in legitimate transactions processed. ALWAYS give
-it that denominator - the bare rupee figure means nothing on its own.
-!! Do NOT compare this to the pre-fix INR 5,901 as if it were a regression.
-The old generator made fraud nearly linearly separable, so precision 0.994 was
-PURCHASABLE - it was a restatement of the leak, not a precision result. The two
-FP figures measure different DATASET DIFFICULTY, not different system quality.
-!! Our cost model prices a false negative at exactly the fraud amount and
-nothing else (no chargeback fees, dispute handling, regulatory exposure,
-churn). That systematically UNDER-weights FNs, biasing the cost-optimal
-threshold toward blocking less - so this FP number is conservative in the
-direction that FLATTERS us. Say so whenever it is quoted.
-LEAK AUDIT (failure-log 21, now CLOSED): customer_age_days + amount_dev_ratio
-ALONE score 0.5997 vs the full 22-feature 0.8981 - a gap of 0.2984. Pre-fix
-those same two features scored 0.9328 vs 0.9344, a gap of 0.0016. The 0.934
-figure is PRE-FIX and appears in exactly one place: failure-log entry 21,
-labelled as such - the same discipline used for the agent's pre-de-labelling
-run A. Never quote 0.934 as a current result.
-SENSITIVITY (failure-log 26): the aged_share choice is NOT load-bearing. Across
-0.3-0.9 the proxy pair never gets within 0.02 of the full set (worst 0.7179 at
-0.3) and full-set PR-AUC moves only 0.0056. A control reverting BOTH generator
-fixes reproduces the leak (gap +0.0172), which is how we know the sweep is
-measuring the right thing. Any realistic ageing removes the leak; our specific
-value is not what did it.
-Policy cutoffs (85, 20) - step_up cost-optimized on validation (+15.82% val
-NPV). Restrict stays 85: moving it alone to the best pair's 55 is NOT
-INDEPENDENTLY EVALUABLE, because step_up must remain the lower bar.
-INR 8.24L prevented, INR 7.95L net protected value (~28x), 578 review cases
+PR-AUC 0.825 | P 0.996 / R 0.735 @ cost-optimal threshold | P@100/@500 = 1.00
+STABILITY: 0.862 +/- 0.024 over 5 SEEDS OF THE SAME GENERATOR (not independent
+worlds - identical scenario definitions). Seed 7, the demo world, is the WORST
+of the five. The spread TRIPLED after the hard negatives (was 0.007) - those
+merchants sit near the decision boundary, so where they land moves with seed.
+CALIBRATION: Brier 0.0123 (raw 0.01468), ECE 0.00736 - measurably worse than
+before the hard negatives (0.0082/0.0031); near-boundary merchants are exactly
+what a calibrator finds hardest. Reliability curve still near-bimodal.
+REVIEW LOAD: 66.9 cases per 1,000 txns (6.69%) - UP 60% from 41.9. Teaching the
+model that shared devices can be honest made it more cautious everywhere. At 1M
+txns/day that is ~279 analysts, not 175. Staffing question, not just cost.
+FALSE-POSITIVE COST: INR 2,575 wrongly blocked = 0.024% of the INR 1.07Cr in
+legitimate value processed. ALWAYS give it that denominator.
+COST-MODEL ROBUSTNESS: review cost is 5.5% of gross prevented at INR 50/case;
+NPV break-even is INR 905/case, 18x the assumption. Do NOT build a full cost
+sweep - fused scores are near-bimodal so cost changes rescale the headline
+without moving the policy. The open cost question is the FN price (entry 23).
+LEAK AUDIT (entry 21, CLOSED): the two profile proxies score 0.5970 vs the full
+0.8248 - gap 0.2278. Pre-fix they were 0.9328 vs 0.9344, gap 0.0016. The 0.934
+and 0.898 figures are PRE-FIX and appear only where labelled as history.
+SENSITIVITY (entry 26): aged_share is NOT load-bearing across 0.3-0.9.
+Policy cutoffs (85, 25) - step_up cost-optimized on validation (+2.73%).
+Restrict stays 85: moving it alone is NOT INDEPENDENTLY EVALUABLE.
+INR 8.63L prevented, INR 8.11L net protected value (~17x), 948 review cases
 5/5 attack merchants detected | 25/25 across 5 seeds
-0 false alarms in 35 NON-ATTACK MERCHANT-WINDOWS (7 per seed x 5) - always
-carry the denominator; "0 false alarms" alone is an absolute claim on a small
-sample. Flash sale flagged 0/5.
-!! The two detector paths no longer agree: the STREAMING detector (what the
-product runs, and what 25/25 measures) catches 5/5 in all five seeds; the
-hourly EWMA path misses the account takeover on seed 7. Report the split.
-TTD beats flag-counter 4/5; LOSES on fraud ring (59m vs 48m) - report it,
-don't smooth it. We now WIN on IP cluster (24m vs 28m), which we used to lose.
-Ablation: basics 0.600 -> +velocity 0.632 -> +entity/graph 0.898. The
-"entity/graph is where the system comes from" reading was RETRACTED under the
-old generator and is now RE-ESTABLISHED on evidence: component_size is the top
-feature by BOTH single-feature PR-AUC (0.711) and model importance (0.406),
-ahead of device_account_count (0.703) and ip_account_count (0.701).
-customer_age_days fell to 0.359 and amount_dev_ratio to 0.494 - mid-pack.
-Diagnostics (printed by ablation.py itself, verdict DERIVED not hardcoded):
-profile pair alone 0.5997 (n=2) | entity SHARING alone 0.7877 (n=4, precision
-1.000) | full minus the pair 0.8105 (n=20).
-NOTE: an earlier dramatic "velocity collapses to 0.23" finding was an artifact
-of an attack-free calibration slice and has been RETRACTED in the README -
-keep the retraction visible, it's the honest version.
-P1b fusion changes 3/13,782 decisions (0.02%) vs the old p*100 shortcut (was
-0/13,987 pre-generator-fix). Kept for
+!! 1 FALSE ALARM in 35 non-attack merchant-windows (2.9%, 95% CI 0.1-14.9%)
+- a LEGITIMATE corporate buyer (m4) on seed 11, checked across all 5 seeds. This is NOT 0 any more and must never be quoted as 0.
+It is 1 because the symmetric fix costs an entire attack class - see entry 29.
+Flash sale flagged 0/5. Three legitimate spikes are now tested, two of which
+share entities; the flash sale alone never exercised the entity layer at all.
+The STREAMING detector (what the product runs, and what 25/25 measures) catches
+5/5 in all seeds; the hourly EWMA path misses the ATO on seed 7. Report both.
+TTD beats flag-counter 4/5; LOSES on fraud ring (68m vs 59m). Static volume is
+fastest on the device farm (a farm IS a volume event) but misses the other four
+AND fires on ALL THREE legitimate spikes - that row is the whole argument.
+Ablation: basics 0.629 -> +velocity 0.611 -> +entity/graph 0.825. Paired
+bootstrap CIs (2,000 resamples): velocity -0.0181 [-0.0453, +0.0079] NOT
+distinguishable from zero; entity/graph +0.2138 [+0.1748, +0.2517] SIGNIFICANT.
+!! VELOCITY HAS BEEN MEASURED THREE TIMES AND GIVEN THREE ANSWERS (mild
+regression -> +0.0317 significant -> -0.0181 not significant). Do not quote a
+sign. The honest statement is that the step is small enough that the dataset
+decides it. Report the interval.
+Diagnostics: profile pair alone 0.5970 | entity SHARING alone 0.3950 (was
+0.7877 before the hard negatives, with precision 1.000 and INR 0 blocked; it is
+now precision 0.654 and INR 187.7K blocked) | full minus the pair 0.7663.
+!! ENTITY SHARING IS NECESSARY, NOT SUFFICIENT. Its collapse under the hard
+negatives is the quantitative twin of entry 16, where the agent reasoned only
+from entity sharing and called a real INR 5.5L takeover legitimate.
+P1b fusion now changes 512/14,160 decisions (3.6%). The trajectory IS the
+argument: 0/13,987 on the leaky generator, 3/13,782 after the generator fix,
+512/14,160 after the hard negatives. The value of corroboration scales with how
+much genuine ambiguity the data holds. We kept it when it changed nothing and
+said so; report the change on the same terms. Kept for
 architecture (auditability, reachable fail-safe, headroom for a weaker model),
 NOT for metrics. Say so plainly; do not re-frame it as a win.
 P2 agent eval (LIVE Claude Haiku 4.5, DE-LABELLED data, run D = FINAL):
@@ -201,6 +192,9 @@ changes without a new held-out set, or the number stops meaning anything.
 Run: `python -m src.models.select_model && python -m src.policy.threshold_sweep
 && python -m src.models.train && python -m src.models.ablation`
 Self-audit: `python -m src.models.leakage_probe` (adversarial eval integrity)
+Config 4 NPV: `python -m src.policy.config4_npv` (the REJECTED training-data
+configuration, measured over 5 seeds rather than argued about - it is worse on
+both NPV and attack detection, and stays reachable via HIST_CORPORATE_BUYER)
 Queue order: `python -m src.policy.queue_order` (what the review queue's sort
 key is worth; arrival order cost 45%->5% of fraud value at 50 cases worked, and
 ranking by risk_score measured WORSE than arrival - it is not rupees)
@@ -212,7 +206,7 @@ sweep reproduces the leak when it should)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (66 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (72 pass, no network needed)
 REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
 random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
 Methodology transfers; the 0.898 does NOT. NEGATIVE RESULT (entry 24): our
@@ -561,6 +555,71 @@ explainability — every component must be defensible to a judge in one sentence
 
 
 
+
+29. WE BUILT A LEGITIMATE MERCHANT DESIGNED TO BREAK US, AND IT DID.
+   For most of this project "0 false alarms" rested on ONE negative - the flash
+   sale - and re-reading its generator shows why that was thin: every account
+   gets its own device, IP and instrument by construction. It only ever tested
+   "does raw volume fire us" and never touched the entity layer; m11's entity
+   graph renders EMPTY. The first question a real risk person asks - "what
+   about an office where 50 people share an IP, or a counter where everyone
+   pays through one terminal?" - had no answer.
+   Built two legitimate merchants that carry an attack's entity signature, both
+   from REAL world customers (aged accounts, own amounts) so that entity
+   sharing is the ONLY difference from ordinary traffic:
+     s7 corporate buyer  40 accounts, 1 office IP, 2 company cards  (~ip cluster)
+     s8 shared kiosk     25 accounts, 1 device, own cards, bursty   (~device farm)
+   IT WORKED. The legitimate kiosk scored mean p=0.972 (97.2% flagged) against
+   a real device farm's 0.985. Peak spike z was 5.34 on the honest merchant
+   against 5.33 on a real IP-cluster ATTACK - the legitimate one produced a
+   HIGHER z than the fraud. It was restricted, INR 1,24,285 of legitimate
+   revenue was impacted, PR-AUC fell to 0.695. The corporate buyer passed
+   (z 1.10): shared entities were not the problem, a shared DEVICE was.
+   ROOT CAUSE was a TRAINING-DISTRIBUTION gap, not a missing feature. The
+   separating signal already existed - a farm has 50 accounts on ~8 shared
+   instruments, a kiosk has 25 accounts on 25 of their own - but training
+   contained shared-device FRAUD and no shared-device HONEST traffic, so the
+   model learned "shared device = fraud" because in this world it always was.
+   Same shape as entry 1 (attacks only in test) and entry 6 (no attack in cal).
+   FIX: a legitimate kiosk in the TRAINING period, different merchant, entity
+   ids pytest-verified disjoint from the held-out one. Kiosk 0.972 -> 0.002,
+   peak z 5.34 -> 0.00, while device farm stayed 0.985 -> 0.982 and all five
+   attacks still fire. Precision IMPROVED to 0.996 and legit INR blocked fell
+   to 2,575.
+   NOT FULLY FIXED. The corporate buyer still false-alarms on 1 seed in 5 -
+   measured across ALL five, not spot-checked. 1 in 35 non-attack
+   merchant-windows is 2.9%, 95% CI [0.1%, 14.9%]; never quote the point alone.
+   THE REJECTION WAS ARGUED BEFORE IT WAS MEASURED, and that was our error.
+   The symmetric fix (teach it a legitimate shared IP too) removes the false
+   alarm and on SEED 7 raises NPV to INR 9.44L vs our 8.11L - so this entry
+   used to say we were OVERRIDING our own declared cost rule on failure-severity
+   grounds. An outside reviewer pointed out that a win on one seed against a
+   failure on another is not a comparison. Correct. Measured across all five
+   (src/policy/config4_npv.py):
+     shipped   mean NPV INR 943,276   25/25 attacks
+     rejected  mean NPV INR 869,852   24/25 attacks
+   The advantage was a SEED-7 ARTIFACT. Averaged, the rejected configuration is
+   INR 73,424 WORSE and also loses an attack. There is no money-vs-safety trade;
+   it is worse on both axes. We only believed otherwise because we compared one
+   seed in a project that keeps a five-seed harness to prevent exactly that.
+   We still cannot explain WHY corporate-buyer examples destabilise card
+   testing, so the false alarm stays rather than be fixed by a change we do not
+   understand. The rejected config is left REACHABLE (HIST_CORPORATE_BUYER) so
+   it can be re-measured.
+   FOUR CONFIGURATIONS WERE TRIED. That number goes next to the result.
+   LESSON (second one in this entry): we made a design decision on a
+   single-seed comparison while owning a five-seed harness. Reach for the
+   harness you already built before reasoning about which failure you prefer.
+   WHAT ELSE MOVED: entity-sharing-alone collapsed 0.7877 -> 0.3950 and now
+   blocks INR 187.7K of legitimate value - which is the point, and makes the
+   honest claim "necessary, not sufficient". Fusion went from a no-op to
+   changing 3.6% of decisions. Review load rose 60%. Velocity flipped sign a
+   third time. Every one of those is downstream of the same cause: the dataset
+   finally contains genuine ambiguity.
+   LESSON: a negative case that cannot fail you is not a test. We shipped
+   "0 false alarms" for weeks against a merchant that shares no entities, in a
+   system whose entire thesis is entity correlation.
+
 28. THE REVIEW QUEUE WAS SORTED BY ARRIVAL TIME.
    Found by reviewing a competitor who caught the same class of bug in their
    own queue (they sorted by probability while everything else was denominated
@@ -568,14 +627,14 @@ explainability — every component must be defensible to a judge in one sentence
    and the dashboard reversed them, so an analyst worked the MOST RECENT cases.
    No relationship to money at all.
    A queue only matters if the analyst runs out of time before it runs out of
-   cases - ours yields 578 on a 13,782-txn slice, so it always does. The ORDER
+   cases - ours yields 948 on a 14,160-txn slice, so it always does. The ORDER
    is therefore a policy decision worth as much as the threshold, and we had
    never made one.
    MEASURED (src/policy/queue_order.py), share of the queue's INR 744,217 of
    fraud value put in front of an analyst:
      cases worked      arrival    by risk    by expected loss
-     50                   5.3%       4.2%              45.0%
-     240                 64.9%      24.4%              81.5%
+     50                   5.7%       5.4%              47.3%
+     240                 69.2%      41.6%              82.0%
    THE OBVIOUS FIX WOULD HAVE MADE IT WORSE. Ranking by risk_score is BELOW
    arrival order at every capacity. Fusion's risk_score is an escalation scale,
    not a probability: high scores cluster on cheap card-testing txns while the

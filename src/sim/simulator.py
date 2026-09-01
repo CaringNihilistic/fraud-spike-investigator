@@ -159,6 +159,16 @@ def gen_baseline(w: World, rng) -> list[dict]:
 # untrustworthy rather than reporting a clean pass (failure 26).
 AMBIENT_AMOUNT_MIXTURE = True
 
+# Whether to also teach the model that a shared IP can be honest. OFF.
+# It removes the corporate-buyer false alarm and raises NPV on seed 7, but on
+# seed 101 it drops card-testing detection to mean p=0.004 and loses the attack
+# entirely - and we cannot explain why. Missing a whole attack class is worse
+# than one false alarm on a legitimate merchant, and shipping an unexplained
+# change is worse than shipping a characterised limitation. Left switchable so
+# the rejected configuration stays measurable: see failure-log 29 and
+# src/policy/config4_npv.py.
+HIST_CORPORATE_BUYER = False
+
 AGED_SHARE_RING = 0.8
 AGED_SHARE_FARM = 0.6
 AGED_SHARE_CLUSTER = 0.6
@@ -264,6 +274,63 @@ def s5_fraud_ring(w, rng, merchant=9, day=28, tag="s5_fraud_ring", pfx="R", n=12
     return rows
 
 
+def s7_corporate_buyer(w, rng, merchant=4, day=25, tag="s7_corporate_buyer", n=200):
+    """LEGITIMATE shared-entity traffic. A corporate account: ~40 employees
+    buying from one office IP on two company cards.
+
+    THIS IS THE HARD NEGATIVE THE FLASH SALE NEVER WAS. Every m11 account has
+    its own device, IP and instrument by construction, so the flash sale only
+    ever tested "does raw volume fire us" - it never exercised the entity
+    layer at all, and m11's entity graph renders empty. This merchant tests
+    the thing the product is actually built on: ip_account_count around 40 and
+    a large shared component is exactly the signature we escalate on, and here
+    it is completely legitimate.
+
+    Built from REAL world customers - aged accounts, their own normal amounts,
+    their own devices - so the ONLY thing differing from baseline traffic is
+    the shared IP and card. One variable. A false alarm here cannot be blamed
+    on account age or amount.
+    """
+    rows, day_start = [], START_TS + day * DAY
+    office_ip = oid("ip", f"corp{merchant}{day}")
+    corp_cards = [oid("pi", f"corp{merchant}{day}{i}") for i in range(2)]
+    staff = rng.choice(w.n_customers, size=40, replace=False)
+    # A working day, not a burst: 09:00-18:00.
+    for i, t in enumerate(np.sort(day_start + 9 * 3600 + rng.uniform(0, 9 * 3600, n))):
+        cid = int(staff[i % len(staff)])
+        r = _base_txn(w, rng, t, merchant, cid)
+        r.update(ip=office_ip,
+                 instrument_id=str(rng.choice(corp_cards)),
+                 scenario=tag)
+        rows.append(r)
+    return rows
+
+
+def s8_shared_kiosk_burst(w, rng, merchant=10, day=26, tag="s8_shared_kiosk", n=180):
+    """LEGITIMATE, and built to break us. A shared payment terminal - a travel
+    desk, campus counter or ticketing kiosk - where many different customers
+    transact through ONE device and ONE IP inside a two-hour window.
+
+    Strictly harder than s7: it presents the device-farm signature (one device,
+    many accounts) AND compresses into a burst, so if the model scores this
+    traffic as risky the merchant's flagged RATE spikes and the detector fires.
+    If anything in this project produces a false alarm, it should be this.
+
+    Again built from real customers with their own instruments and amounts, so
+    the shared device and IP are the only difference from ordinary traffic.
+    """
+    rows, day_start = [], START_TS + day * DAY
+    kiosk_device = oid("d", f"kiosk{merchant}{day}")
+    kiosk_ip = oid("ip", f"kiosk{merchant}{day}")
+    walkins = rng.choice(w.n_customers, size=25, replace=False)
+    for i, t in enumerate(np.sort(day_start + 13 * 3600 + rng.uniform(0, 2 * 3600, n))):
+        cid = int(walkins[i % len(walkins)])
+        r = _base_txn(w, rng, t, merchant, cid)
+        r.update(device_id=kiosk_device, ip=kiosk_ip, scenario=tag)
+        rows.append(r)
+    return rows
+
+
 def s6_flash_sale(w, rng, merchant=11, day=29):
     """LEGITIMATE 6x volume spike: real customers, own devices, normal amounts.
     Ground truth is_fraud=0. The system must NOT flag this merchant."""
@@ -306,6 +373,34 @@ def generate(seed: int = 7) -> pd.DataFrame:
     # selection needs at least one attack in the slice it selects on.
     rows += s2_device_farm(w, rng, merchant=0, day=22, tag="s2_hist_b", pfx="FH2", n=90)
 
+    # A LEGITIMATE shared-device merchant in the TRAINING period. Without it the
+    # training distribution contains shared-device fraud and no shared-device
+    # honest traffic, so the model learns "shared device = fraud" - because in
+    # this world it always was. That gap is what made a legitimate kiosk score
+    # 0.972 against a device farm's 0.985 (failure-log 29). Same discipline as
+    # the historical attacks above: different merchant, different day, entity
+    # ids disjoint from the held-out kiosk at m10/day 26.
+    rows += s8_shared_kiosk_burst(w, rng, merchant=6, day=16,
+                                  tag="s8_hist_kiosk", n=140)
+    # The shared-IP counterpart is REACHABLE but OFF by default - see
+    # HIST_CORPORATE_BUYER below for why it is rejected. It is left switchable
+    # so the rejected configuration can be measured by anyone, rather than
+    # asserted to be worse.
+    if HIST_CORPORATE_BUYER:
+        rows += s7_corporate_buyer(w, rng, merchant=1, day=19,
+                                   tag="s7_hist_corporate", n=160)
+
+    # NOT ENABLED, deliberately: the shared-IP counterpart. Training contains
+    # shared-IP fraud and no shared-IP honest traffic, which is why a legitimate
+    # corporate buyer still false-alarms on seed 11 - the symmetric fix. We
+    # measured it: adding s7_corporate_buyer to training does remove that false
+    # alarm and raises NPV to INR 9.44L, but on seed 101 it drops card-testing
+    # detection to mean p=0.004 (0% flagged) and loses the attack entirely.
+    # Missing a whole attack class is a worse failure than one false alarm on a
+    # legitimate merchant, and we cannot explain WHY the corporate-buyer
+    # examples destabilise card testing. Shipping an unexplained change is worse
+    # than shipping a characterised limitation. See failure-log 29.
+
     # -- held-out (test-period) attacks: novel entities, novel merchants --
     rows += s1_fraud_spike(w, rng)      # m3,  day 24
     rows += s2_device_farm(w, rng)      # m5,  day 25
@@ -313,6 +408,12 @@ def generate(seed: int = 7) -> pd.DataFrame:
     rows += s4_account_takeover(w, rng) # m2,  day 27
     rows += s5_fraud_ring(w, rng)       # m9,  day 28
     rows += s6_flash_sale(w, rng)       # m11, day 29 (legit - must NOT flag)
+
+    # -- LEGITIMATE shared-entity traffic: the hard negatives (must NOT flag) --
+    # The flash sale gives every account its own entities, so it never tested
+    # the entity layer. These two do, and s8 is deliberately built to break it.
+    rows += s7_corporate_buyer(w, rng)     # m4,  day 25 (legit, shared IP + card)
+    rows += s8_shared_kiosk_burst(w, rng)  # m10, day 26 (legit, shared device, bursty)
 
     df = pd.DataFrame(rows).sort_values("ts").reset_index(drop=True)
     return df
