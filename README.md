@@ -2,8 +2,8 @@
 
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
-[![Tests](https://img.shields.io/badge/tests-90_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![Failures logged](https://img.shields.io/badge/failures_logged-33_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Tests](https://img.shields.io/badge/tests-117_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Failures logged](https://img.shields.io/badge/failures_logged-34_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
@@ -127,7 +127,7 @@ python -m src.models.seed_stability  # re-run the pipeline across 5 worlds (~6 m
 python -m src.models.real_data_check # same recipe on REAL data (needs a Kaggle download)
 python -m src.agent.eval             # 13-case agent eval, 3 held-out (needs ANTHROPIC_API_KEY)
 python run_demo.py                   # dashboard + live replay -> http://127.0.0.1:8000
-python -m pytest tests/ -q           # safety invariants (90 tests)
+python -m pytest tests/ -q           # safety invariants (117 tests)
 ```
 
 ## Demo — what to watch
@@ -495,6 +495,70 @@ end of the range, and it costs **review capacity rather than merchant revenue**.
 
 Reproduce: `python -m src.models.sharing_sensitivity` · construction guarded by
 `tests/test_sharing_sweep.py` (8 tests).
+
+---
+
+### Does it detect coordinated fraud, or only the shapes we drew?
+
+The last criticism our own data can answer, and the sharpest one. Our five
+attacks are five **topologies**. The model has only ever been tested against the
+shapes it was trained on — so if detection collapses when the shape changes
+while the crime does not, the merchant-level result is a fact about our
+generator rather than about fraud.
+
+So we held **everything else constant** and varied only the entity graph.
+Transaction count, burst window, amount distribution, account ageing and fraud
+prevalence are matched between each pair; the only difference is who shares what
+with whom. Frozen pipeline — shipped model, calibration and cutoffs, no
+retraining — across 5 seeds, with the **known topologies rebuilt with fresh
+entity IDs as a positive control**.
+
+| Attack | known | unseen variant | concentration |
+|---|---|---|---|
+| Card testing | 3 devices / 2 IPs | **25 devices / 20 IPs** | 60 → 7.2 txn per device — **8× diluted** |
+| Device farm | 1 device, 50 accounts | **10 devices / 6 IPs, partial overlap** | 130 → 13 — **10× diluted** |
+| IP cluster | 40 accounts on 1 IP | **6 rotating IPs** | **6× diluted** |
+| Fraud ring | dense 15 acct × 4 dev | **sparse bipartite, 30 acct × 2 of 20 dev** | 30 → 12 — **2.5× diluted** |
+| Account takeover | 25 unique devices | 5 shared proxy devices | *concentrated — easier* |
+
+**Four of the five unseen variants are strictly harder than the originals.**
+
+| | detected | mean flagged rate inside the attack |
+|---|---|---|
+| **known** (control) | **22 / 25** | 0.815 |
+| **unseen** | **21 / 25** | **0.709** |
+
+**The merchant layer holds. The transaction scorer does not — and that gap is
+the actual finding.** Every one of the four harder variants was still caught
+**5/5**, while per-transaction confidence fell sharply on exactly the families
+whose fan-out was removed: card testing **0.758 → 0.436**, IP cluster
+**0.872 → 0.612**.
+
+That is this product's thesis appearing as a measurement rather than a claim.
+The argument for a merchant-level layer is that it survives what per-order
+scoring finds ambiguous, and here the per-order model loses confidence while the
+merchant-level spike still fires.
+
+**Three caveats, stated before anyone else states them:**
+
+1. **The control is uneven.** Account takeover fires only **2/5 even in its
+   known form** here, because ATO is diffuse by construction — ~75 fraudulent
+   transactions spread across 22 hours never reaches the streaming detector's
+   rate-within-a-window bar on a merchant doing 200/day. **Both** of its rows are
+   weak evidence, and we did not tune the window until it fired. The other four
+   families have 5/5 controls.
+2. **Each variant degrades one signal, not all of them.** Card testing keeps its
+   novel instruments; the device farm keeps shared instruments. A determined
+   adversary would degrade several signatures at once, and this experiment does
+   not simulate that.
+3. **Five topologies, one variant each, our generator, 5 seeds.** It shows the
+   result is not brittle to *these* changes — not that it holds for every
+   coordination pattern someone might invent.
+
+Reproduce: `python -m src.models.topology_generalisation` · construction guarded
+by `tests/test_topology_generalisation.py` (27 tests), which assert the pairs are
+matched on volume, window, prevalence and amounts, that the topology genuinely
+differs, and that the unseen variants are not quietly *easier*.
 
 ---
 
@@ -868,7 +932,7 @@ run_demo.py     one-command demo: train -> serve -> replay
 tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 no-fire, fusion floor/bounds, agent gate/audit/read-only,
                 serving side-effect-freedom, analyst allowlist, write-auth
-                gate, .env loader) - 90 tests
+                gate, .env loader) - 117 tests
 ```
 
 ## The repository refuses to ship a stale headline
