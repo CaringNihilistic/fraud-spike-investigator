@@ -48,6 +48,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 ART = Path("artifacts_out")
 DOCS = ("README.md", "SUBMISSION.md")
+# The live dashboard states headline numbers too, and a judge reads it before
+# either markdown file. It went stale once while both docs were clean.
+DASHBOARD = "src/serve/static/app.js"
+SCANNED = DOCS + (DASHBOARD,)
 
 
 def art(name: str) -> dict:
@@ -132,6 +136,12 @@ def build_claims() -> list[Claim]:
         Claim("config3 mean NPV",
               r"shipped configuration\*{0,2}\s*\|\s*\*{0,2}₹([\d,]+)",
               c["config3_shipped_mean_npv"], 1.0, files=("README.md",)),
+        Claim("dashboard net protected value (L)",
+              r'k="net protected value" v="\u20b9([\d.]+)L"',
+              lakh(e["net_protected_value_inr"]), 0.006, files=(DASHBOARD,)),
+        Claim("dashboard break-even",
+              r"positive up to\$\{' '\}<b>\u20b9([\d,]+) per review",
+              cc["break_even_review_cost_policy_inr"], 1.5, files=(DASHBOARD,)),
         Claim("break-even review cost",
               r"break-even at \*{0,2}₹([\d,]+)/review",
               cc["break_even_review_cost_policy_inr"], 1.5),
@@ -240,7 +250,7 @@ def main() -> int:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-    texts = {f: Path(f).read_text(encoding="utf-8") for f in DOCS}
+    texts = {f: Path(f).read_text(encoding="utf-8") for f in SCANNED}
     print("=== verify_submission: do the docs still match the artifacts? ===\n")
 
     claim_problems, seen, claim_exempt = check_claims(texts, build_claims())
@@ -264,7 +274,8 @@ def main() -> int:
     total = len(seen) + len(build_retired()) + 2
     if not problems:
         print(f"PASS - {sum(n for _, n in seen)} documented headline figures across "
-              f"{len(DOCS)} files match their artifacts, no retracted phrasing is "
+              f"{len(SCANNED)} files (docs + the live dashboard) match their artifacts, "
+              f"no retracted phrasing is "
               f"unlabelled, and the shipped policy cutoffs equal the decision that "
               f"adopted them.")
         return 0

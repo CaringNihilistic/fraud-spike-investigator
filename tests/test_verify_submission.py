@@ -23,8 +23,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.audit.verify_submission import (ART, Claim, Retired, check_claims,  # noqa: E402
-                                         check_retired)
+from src.audit.verify_submission import (ART, SCANNED, Claim, Retired,  # noqa: E402
+                                         check_claims, check_retired)
 
 FILES = ("README.md",)
 
@@ -132,8 +132,9 @@ def test_shipped_cutoffs_match_the_decision_that_adopted_them():
                     reason="artifacts absent; run the pipeline first")
 def test_the_real_docs_currently_pass():
     from src.audit.verify_submission import build_claims, build_retired
-    texts = {f: Path(f).read_text(encoding="utf-8")
-             for f in ("README.md", "SUBMISSION.md")}
+    # SCANNED, not just the two markdown files: the checker also reads the
+    # dashboard, where two headline figures had already gone stale.
+    texts = {f: Path(f).read_text(encoding="utf-8") for f in SCANNED}
     claim_problems, _, _ = check_claims(texts, build_claims())
     retired_problems, _ = check_retired(texts, build_retired())
     assert not claim_problems + retired_problems, (

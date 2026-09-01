@@ -311,6 +311,27 @@ tr.overridden td { background: #FFFAEB; }
 @keyframes bpulse { 0%, 100% { opacity: 1; } 50% { opacity: .22; } }
 @media (prefers-reduced-motion: reduce) { .booting .pulse { animation: none; } }
 
+/* ---------- why-merchant split ----------
+   Two claims side by side: what the order model does when the graph changes,
+   and what the merchant layer does. The contrast IS the content, so they get
+   equal weight and only the values are coloured. */
+.whysplit {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;
+}
+.whysplit > div {
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+  background: var(--bg); display: flex; flex-direction: column; gap: 3px;
+}
+.whysplit .wl {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
+  color: var(--faint); font-weight: 700;
+}
+.whysplit .wv { font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+.whysplit .wv.bad { color: var(--red); }
+.whysplit .wv.good { color: var(--green); }
+.whysplit .wn { font-size: 12px; color: var(--dim); }
+@media (max-width: 760px) { .whysplit { grid-template-columns: 1fr; } }
+
 /* light scrollbars so the recording doesn't show chunky OS bars */
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }

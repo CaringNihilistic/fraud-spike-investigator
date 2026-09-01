@@ -14,6 +14,47 @@
 
 This closes that loop at the **merchant** level — it sits **above** per-order scoring, complementary to Thirdwatch/Shield rather than competing with them. Defense-only, temporally evaluated, costed in ₹ including the false-positive side.
 
+---
+
+### The finding this project exists to show
+
+We rebuilt every attack with a **different entity graph** — card testing spread
+across 25 devices instead of 3, the device farm across 10 instead of 1 — holding
+volume, burst window, amounts and account ageing constant, and ran the frozen
+pipeline over 5 seeds. Four of the five new shapes are **2.5–10× less
+concentrated**, i.e. strictly harder.
+
+| | on the shapes it trained on | on shapes it has never seen |
+|---|---|---|
+| **Per-transaction model** — confidence inside the attack | card testing **0.758** · IP cluster **0.872** | **0.436** · **0.612** |
+| **Merchant-level detector** — attacks caught | **22 / 25** | **21 / 25** |
+
+**Individual orders become ambiguous. The merchant is still visibly under attack.**
+That gap is the entire argument for a layer above per-order scoring, and it is a
+measurement rather than a claim. *(Account takeover fires only 2/5 even in its
+known form here and is reported as weak evidence — the other four families are
+5/5.)*
+
+| | |
+|---|---|
+| Attack merchants detected | **25 / 25** across 5 seeds |
+| False alarms | **1 in 35** non-attack merchant-windows (2.9%, 95% CI 0.1–14.9%) |
+| Net protected value | **₹8.13L** simulated, after 948 reviews × ₹50 |
+| Precision / Recall | **0.996 / 0.735** at the cost-optimal threshold |
+| Legitimate merchants built to look like attacks | **3**, two sharing entities — plus a **0→100% sharing sweep** |
+| Logged failures with root causes | **35**, including two we had to retract |
+
+**The boundary, stated up front rather than in a footnote:** the merchant-level
+layer is validated on **our own generator**. Of the nine datasets in Amazon
+Science's fraud-dataset-benchmark exactly one has a merchant identifier; we
+measured that one and IBM's 24M-transaction set, and
+[neither can evaluate this layer](#we-went-looking-for-public-merchant-data-twice-here-is-what-we-found).
+Public data validates the transaction-level methodology only (ULB PR-AUC 0.731,
+IEEE-CIS 0.460, zero tuning). **"Prevented" here means simulated exposure
+prevented, not revenue recovered.**
+
+---
+
 <details>
 <summary><b>Defense-only — including why the attack generator in <code>src/sim/</code> is not an exception</b></summary>
 

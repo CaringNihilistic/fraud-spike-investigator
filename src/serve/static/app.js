@@ -683,7 +683,7 @@ function Capacity() {
       </p>
       <p class="note">
         <b>And if ₹50 is wrong?</b> Review cost is 5.5% of gross fraud prevented,
-        so net protected value stays positive up to${' '}<b>₹905 per review —
+        so net protected value stays positive up to${' '}<b>₹908 per review —
         18× the assumption</b>. The rupee conclusion is not resting on that
         guess. Staffing is the part that does not follow: 6.69% of the stream
         still has to be worked by people who may not exist.
@@ -718,6 +718,69 @@ function Metric({ k, v, note }) {
   return html`<div class="met">
     <div class="mk">${k}</div><div class="mv">${v}</div>
     ${note ? html`<div class="mn">${note}</div>` : ''}</div>`;
+}
+
+/* ---------- why a merchant layer, and not just a better order model ----------
+   The single most differentiating result we have, and it was buried 600 lines
+   into the README. Each attack was rebuilt with a DIFFERENT entity graph -
+   volume, burst window, amounts and account ageing held constant - and run
+   through the frozen pipeline over 5 seeds. The per-transaction model loses
+   confidence; the merchant-level detector keeps firing. That gap IS the
+   product thesis, and it is a measurement rather than a claim.
+   Numbers are from artifacts_out/topology_generalisation.json. */
+function WhyMerchant() {
+  const rows = [
+    { k: 'Card testing', shape: '3 devices \u2192 25', known: 0.758, unseen: 0.436 },
+    { k: 'IP cluster', shape: '1 IP \u2192 6 rotating', known: 0.872, unseen: 0.612 },
+    { k: 'Device farm', shape: '1 device \u2192 10', known: 0.985, unseen: 0.894 },
+    { k: 'Fraud ring', shape: 'dense \u2192 sparse', known: 0.940, unseen: 0.832 },
+  ];
+  return html`
+    <div class="panel">
+      <h2>Why a merchant layer, and not just a better order model</h2>
+      <p class="note" style=${{ marginTop: 0 }}>
+        We rebuilt every attack with a <b>different entity graph</b> and held volume,
+        burst window, amounts and account ageing constant, then ran the frozen
+        pipeline over 5 seeds. Four of the five new shapes are <b>2.5–10× less
+        concentrated</b> — strictly harder. Reproduce:${' '}
+        <code>python -m src.models.topology_generalisation</code>
+      </p>
+      <div class="tscroll2">
+        <table class="cap">
+          <tr>
+            <th>attack</th><th>graph changed</th>
+            <th>order-model confidence<br/>trained shape</th>
+            <th>unseen shape</th>
+          </tr>
+          ${rows.map((r) => html`<tr key=${r.k}>
+            <td>${r.k}</td>
+            <td class="dim">${r.shape}</td>
+            <td class="mono">${r.known.toFixed(3)}</td>
+            <td class=${'mono ' + (r.unseen < r.known * 0.8 ? 'bad' : '')}>
+              ${r.unseen.toFixed(3)}</td>
+          </tr>`)}
+        </table>
+      </div>
+      <div class="whysplit">
+        <div>
+          <span class="wl">per-transaction model</span>
+          <span class="wv bad">loses confidence</span>
+          <span class="wn">card testing 0.758 → 0.436</span>
+        </div>
+        <div>
+          <span class="wl">merchant-level detector</span>
+          <span class="wv good">22 / 25 → 21 / 25</span>
+          <span class="wn">still fires on the harder shapes</span>
+        </div>
+      </div>
+      <p class="note">
+        <b>Individual orders become ambiguous. The merchant is still visibly under
+        attack.</b> That gap is the whole argument for a layer above per-order
+        scoring. <span class="dim">Account takeover fires only 2/5 even in its
+        trained form here and is reported as weak evidence; the other four
+        families are 5/5.</span>
+      </p>
+    </div>`;
 }
 
 function Pitch() {
@@ -771,7 +834,7 @@ function Pitch() {
         <${Metric} k="attacks detected" v="25 / 25" note="across 5 seeds of the generator" />
         <${Metric} k="false alarms" v="1" note="in 35 non-attack merchant-windows" />
         <${Metric} k="legitimate spikes tested" v="3" note="two of them share entities" />
-        <${Metric} k="net protected value" v="₹8.11L" note="after 948 reviews × ₹50" />
+        <${Metric} k="net protected value" v="₹8.13L" note="after 948 reviews × ₹50" />
         <${Metric} k="precision / recall" v="0.996 / 0.735" note="at the cost-optimal threshold" />
         <${Metric} k="legitimate ₹ wrongly blocked" v="₹2.6K" note="0.024% of legitimate value processed" />
         <${Metric} k="calibration (Brier / ECE)" v="0.0123 / 0.0074" note="measured, not assumed" />
@@ -779,6 +842,7 @@ function Pitch() {
       </div>
     </div>
 
+    <${WhyMerchant} />
     <${CostCurve} />
     <${Capacity} />
 
