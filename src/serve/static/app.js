@@ -63,38 +63,72 @@ function Header({ status, onSpeed, onPause, view, setView }) {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => { onSpeed(v); setTimeout(() => setSpd(null), 1500); }, 350);
   };
+  const done = (s.pct || 0) >= 100;
   return html`
     <header>
-      <div class="brand">
-        <div class="mark">R</div>
-        <div>
-          <h1>Fraud Spike Investigator</h1>
-          <div class="sub">merchant-level detection · entity correlation · policy-gated investigation</div>
+      ${/* Row 1: identity and where you are. Row 2: live state and controls.
+           The status line used to be one monospace string - it read as debug
+           output rather than an instrument panel, so each figure now carries
+           its own label. */''}
+      <div class="hdr-top">
+        <div class="brand">
+          <div class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+                 stroke="currentColor" stroke-width="2.1"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2.6 4.3 5.9v5.5c0 4.6 3.3 8.9 7.7 9.9 4.4-1 7.7-5.3 7.7-9.9V5.9Z" />
+              <path d="M8.1 12.4h2.2l1.4-3.1 1.7 5 1.2-1.9h1.4" />
+            </svg>
+          </div>
+          <div>
+            <h1>Fraud Spike Investigator</h1>
+            <div class="sub">Merchant-level detection · entity correlation · policy-gated investigation</div>
+          </div>
+        </div>
+        <nav class="views">
+          <button class=${'vtab' + (view === 'console' ? ' on' : '')}
+                  onClick=${() => setView('console')}>Live console</button>
+          <button class=${'vtab' + (view === 'pitch' ? ' on' : '')}
+                  onClick=${() => setView('pitch')}>Pitch & architecture</button>
+        </nav>
+        <span class="spacer"></span>
+        ${/* The biggest number on screen is money, not throughput. */''}
+        <div class="hero-inr" title="Fraud prevented minus legitimate revenue impacted minus analyst review cost, costed live with the same constants as the offline report (₹50/review, 7% step-up abandon, 90% of fraud fails step-up).">
+          <span class="hv">${inr((s.economics || {}).net_protected_inr)}</span>
+          <span class="hl">net protected</span>
         </div>
       </div>
-      <nav class="views">
-        <button class=${'vtab' + (view === 'console' ? ' on' : '')}
-                onClick=${() => setView('console')}>Live console</button>
-        <button class=${'vtab' + (view === 'pitch' ? ' on' : '')}
-                onClick=${() => setView('pitch')}>Pitch & architecture</button>
-      </nav>
-      <span class="spacer"></span>
-      ${/* The biggest number on screen is money, not throughput. */''}
-      <div class="hero-inr" title="Fraud prevented minus legitimate revenue impacted minus analyst review cost, costed live with the same constants as the offline report (₹50/review, 7% step-up abandon, 90% of fraud fails step-up).">
-        <span class="hv">${inr((s.economics || {}).net_protected_inr)}</span>
-        <span class="hl">net protected</span>
+
+      <div class="hdr-bar">
+        <div class="stat-chip">
+          <span class="cl">Processed</span>
+          <span class="cv">${(s.processed || 0).toLocaleString()}${' '}
+            <span class="cvd">/ ${(s.total || 0).toLocaleString()}</span></span>
+        </div>
+        <div class=${'stat-chip' + (s.merchants_in_spike ? ' alarm' : '')}>
+          <span class="cl">Under attack</span>
+          <span class="cv">${s.merchants_in_spike || 0}${' '}
+            <span class="cvd">merchants</span></span>
+        </div>
+        <div class=${'stat-chip' + (s.review_pending ? ' warn' : '')}>
+          <span class="cl">Awaiting review</span>
+          <span class="cv">${(s.review_pending || 0).toLocaleString()}${' '}
+            <span class="cvd">cases</span></span>
+        </div>
+        <div class="prog" title=${`${(s.pct || 0).toFixed(0)}% of the test slice replayed`}>
+          <i style=${{ width: Math.min(100, s.pct || 0) + '%' }}></i>
+        </div>
+        <span class="pstate">${done ? 'Replay complete' : `${(s.pct || 0).toFixed(0)}%`}</span>
+        <span class="spacer"></span>
+        <label class="speed">
+          <span class="cl">Speed</span>
+          <input type="range" min="50" max="4000" step="50" value=${spd ?? (s.speed_tps || 200)}
+                 onChange=${(e) => onSlide(+e.target.value)} />
+          <span class="cv sm">${Math.round(spd ?? s.speed_tps ?? 0).toLocaleString()}/s</span>
+        </label>
+        <button class="ghost" onClick=${() => onPause(!s.paused)}>
+          ${s.paused ? '▶  Resume' : '❙❙  Pause'}</button>
       </div>
-      <span class="counter mono">
-        ${`${(s.processed || 0).toLocaleString()} / ${(s.total || 0).toLocaleString()} txns · ${(s.pct || 0).toFixed(0)}%`}
-        ${s.merchants_in_spike ? html`${' · '}<b>${s.merchants_in_spike} under attack</b>` : ''}
-        ${s.review_pending ? html`${' · '}<span style=${{color:'var(--amber)'}}>${s.review_pending} awaiting review</span>` : ''}
-      </span>
-      <label class="sub">speed
-        <input type="range" min="50" max="4000" step="50" value=${spd ?? (s.speed_tps || 200)}
-               onChange=${(e) => onSlide(+e.target.value)} style=${{ width: '120px', marginLeft: '6px' }} />
-        <span class="mono"> ${Math.round(spd ?? s.speed_tps ?? 0)}/s</span>
-      </label>
-      <button onClick=${() => onPause(!s.paused)}>${s.paused ? '▶ resume' : '⏸ pause'}</button>
     </header>`;
 }
 
@@ -243,8 +277,16 @@ function EntityGraph({ merchantId, compact }) {
   if (!graph) return html`<div class="empty">loading…</div>`;
   if (!graph.nodes.length)
     return html`<div class=${'empty' + (compact ? ' empty-compact' : '')}>
-      No shared entities among flagged transactions — every account uses its own
-      device, IP and instrument. This is what legitimate traffic looks like.
+      <div class="eg-mark" aria-hidden="true">
+        <svg viewBox="0 0 60 40" width="112" height="75">
+          ${[[9, 9], [26, 6], [44, 11], [53, 25], [37, 31], [20, 27], [6, 24], [30, 17]]
+            .map(([cx, cy], i) => html`<circle key=${i} cx=${cx} cy=${cy} r="3.1"
+                   fill="#9AA8BD" opacity="0.5" />`)}
+        </svg>
+      </div>
+      <div class="eg-head">No shared entities</div>
+      <div class="eg-sub">Every flagged account uses its own device, IP and card —
+        nothing connects them. This is what legitimate traffic looks like.</div>
     </div>`;
 
   const idx = new Map(graph.nodes.map((n, i) => [n.id, i]));
@@ -273,9 +315,9 @@ function EntityGraph({ merchantId, compact }) {
               <title>${p.n.kind}: ${p.n.label}${p.n.size > 1 ? ` — shared by ${p.n.size} accounts. Hover to highlight its network.` : ''}</title>
             </circle>
             ${hub ? html`
-              <text x=${p.x} y=${p.y + r + 12} text-anchor="middle"
-                    style=${{ paintOrder: 'stroke', stroke: '#F8FAFD', strokeWidth: '3px' }}>
-                ${p.n.label.slice(0, 14)} · ${p.n.size}</text>` : ''}
+              <text x=${p.x} y=${p.y + r + 13} text-anchor="middle"
+                    style=${{ paintOrder: 'stroke', stroke: '#F6F9FD', strokeWidth: '3.5px' }}>
+                ${p.n.size} accounts</text>` : ''}
           </g>`; })}
       </svg>
       ${compact ? '' : html`<div class="legend">
@@ -484,7 +526,7 @@ function Contrast({ merchants }) {
   if (!farm || !sale) return '';
   return html`
     <div class="panel contrast-panel">
-      <h2>same spike, opposite verdict — why volume is not evidence</h2>
+      <h2>Same spike, opposite verdict — why volume is not evidence</h2>
       <div class="note" style=${{ marginTop: 0, marginBottom: '14px' }}>
         Both merchants show a large jump in transaction volume — and the${' '}
         <b>legitimate</b>${' '}one is the busier of the two. A volume-threshold detector
@@ -527,7 +569,7 @@ function CostCurve() {
   const min = Math.min(...SWEEP.map((d) => d.npv)) * 0.985;
   return html`
     <div class="panel">
-      <h2>the false-positive tradeoff, and where we set the dial</h2>
+      <h2>The false-positive tradeoff, and where we set the dial</h2>
       <p class="note" style=${{ marginTop: 0 }}>
         Blocking harder always prevents more fraud. It also destroys more good
         revenue. Every cutoff below was scored on the <b>validation</b> slice
@@ -583,7 +625,7 @@ function Capacity() {
   const f = (n) => n >= 1e5 ? (n / 1e5).toFixed(1) + 'L' : Math.round(n).toLocaleString();
   return html`
     <div class="panel">
-      <h2>would the queue actually be staffable?</h2>
+      <h2>Would the queue actually be staffable?</h2>
       <p class="note" style=${{ marginTop: 0 }}>
         We price an analyst review at ₹50 but never checked whether the analysts
         exist. This is that check. Assumption stated so it can be argued with:${' '}
@@ -625,7 +667,7 @@ function Pitch() {
   return html`
   <div class="pitch">
     <div class="panel">
-      <h2>the problem</h2>
+      <h2>The problem</h2>
       <p class="big">Merchants don't lose money one transaction at a time.${' '}
         <b>They lose it in bursts.</b></p>
       <p>Card-testing waves, device farms, IP clusters, account takeovers, fraud rings.
@@ -641,7 +683,7 @@ function Pitch() {
     </div>
 
     <div class="panel">
-      <h2>architecture</h2>
+      <h2>Architecture</h2>
       <div class="flow">
         <div class="fstep"><b>transaction stream</b><span>replayed test slice, in ts order</span></div>
         <div class="farr">↓</div>
@@ -667,7 +709,7 @@ function Pitch() {
     </div>
 
     <div class="panel">
-      <h2>results — temporal held-out test slice, synthetic data</h2>
+      <h2>Results — temporal held-out test slice, synthetic data</h2>
       <div class="mets">
         <${Metric} k="attacks detected" v="25 / 25" note="across 5 seeds of the generator" />
         <${Metric} k="false alarms" v="0" note="in 35 non-attack merchant-windows" />
@@ -684,7 +726,7 @@ function Pitch() {
     <${Capacity} />
 
     <div class="panel">
-      <h2>we attacked our own evaluation three times</h2>
+      <h2>We attacked our own evaluation three times</h2>
       <p class="note" style=${{ marginTop: 0 }}>Each audit lowered a number we had already
         written down. We published the lower number every time. All three reproduce from
         the repo.</p>
@@ -737,7 +779,7 @@ function Pitch() {
          but it lived only in CLAUDE.md - invisible to anyone who watches the
          demo and never opens the repo. Static content, no new logic. */''}
     <div class="panel">
-      <h2>what broke, and what we did about it</h2>
+      <h2>What broke, and what we did about it</h2>
       <p class="note" style=${{ marginTop: 0 }}>
         <b>26 failures</b> are logged with root causes in the repo. Not "we hit some
         bugs" — each one names what we believed, what measurement contradicted it, and
@@ -812,7 +854,7 @@ function Pitch() {
     </div>
 
     <div class="panel">
-      <h2>what we're not claiming</h2>
+      <h2>What we're not claiming</h2>
       <ul class="lims">
         <li>Data is <b>synthetic</b> and labelled as such everywhere. Simulator parameters are
           design choices, not Razorpay statistics. <b>Nothing here is Razorpay data.</b></li>
@@ -884,19 +926,20 @@ function App() {
           transactions replayed one at a time across ${merchants.length} merchants,
           through the real pipeline — scorer, spike detector, policy engine, review
           queue. ${nAttack > 0 ? html`<b class="bad">${nAttack} of these merchants are
-          under coordinated attack right now.</b>` : ''} Every block and every review
-          below is held for a human to confirm.${' '}<b>Nothing here acts on its own,
-          and the language model cannot authorise anything.</b>
+          under coordinated attack right now.</b>` : ''}
+          <span class="wsub">Every block and every review below is held for a human to
+          confirm. Nothing here acts on its own, and the language model cannot
+          authorise anything.</span>
         </div>
         ${finale ? html`
           <div class="finale-banner">
-            <span>✓ ${finale.message}</span>
-            <span class="why">— volume spiked 6×, the fraud-score rate did not.
-              The detector fires on risk, not traffic.</span>
+            <span class="fv">✓</span>
+            <span><b>${finale.message}</b>${' '}<span class="why">Volume spiked 6×;
+              the fraud-score rate did not. The detector fires on risk, not traffic.</span></span>
           </div>` : ''}
         ${finale ? html`<${Contrast} merchants=${merchants} />` : ''}
         <div class="panel" style=${{ marginBottom: '14px' }}>
-          <h2>merchants ${' '}<span class="sandbox">judge sandbox</span></h2>
+          <h2>Merchants${' '}<span class="sandbox">judge sandbox</span></h2>
           <div class="note" style=${{ marginTop: '-4px', marginBottom: '12px' }}>
             Live replay of a held-out test slice through the real pipeline — not a canned
             animation. <b>Click any merchant</b> to see who is behind its flagged
@@ -921,7 +964,7 @@ function App() {
         </div>
         <div class="grid cols-2" id="detail">
           <div class="panel">
-            <h2>entity network ${sel ? `— ${sel}` : ''}</h2>
+            <h2>Entity network ${sel ? `— ${sel}` : ''}</h2>
             <div class="note" style=${{ marginTop: 0, marginBottom: '10px' }}>
               Who is behind the flagged transactions. Hubs are entities shared by
               multiple accounts; legitimate traffic has none.
@@ -929,15 +972,15 @@ function App() {
             ${sel ? html`<${EntityGraph} merchantId=${sel} />` : html`<div class="empty">select a merchant</div>`}
           </div>
           <div class="panel">
-            <h2>investigation ${sel ? `— ${sel}` : ''}</h2>
+            <h2>Investigation ${sel ? `— ${sel}` : ''}</h2>
             ${sel ? html`<${Investigation} merchantId=${sel}
                 inSpike=${(merchants.find((m) => m.merchant_id === sel) || {}).in_spike} />`
               : html`<div class="empty">select a merchant</div>`}
           </div>
         </div>
         <div class="grid cols-2" style=${{ marginTop: '14px' }}>
-          <div class="panel"><h2>review queue</h2><${ReviewQueue} /></div>
-          <div class="panel"><h2>pipeline events</h2><${Feed} events=${status?.events} /></div>
+          <div class="panel"><h2>Review queue</h2><${ReviewQueue} /></div>
+          <div class="panel"><h2>Pipeline events</h2><${Feed} events=${status?.events} /></div>
         </div>
         </div>`}
       </main>

@@ -142,8 +142,8 @@ def _finale_check():
     verdict = "NOT flagged" if not m11.in_spike else "FLAGGED (regression!)"
     STATE.log_event(
         "finale",
-        f"FLASH SALE m11: {m11.txn_count} txns, "
-        f"{m11.action_mix.get('restrict', 0)} restricts -> {verdict}",
+        f"Flash sale m11 \u2014 {m11.txn_count:,} transactions, "
+        f"{m11.action_mix.get('restrict', 0)} restricted \u2192 {verdict}",
         merchant_id="m11")
 
 
