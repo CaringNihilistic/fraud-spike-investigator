@@ -66,7 +66,7 @@ transaction-stream "you are under attack" investigation with ₹ economics.
   (FLOOR 25 = train legit p99, SATURATE 120 = train fraud p90; train-derived
   ONLY). Also `evaluate_rules()` — deterministic rule SIGNALS, not actions.
 - `src/policy/threshold_sweep.py` — cost-optimizes restrict/step_up cutoffs on
-  the VALIDATION slice only. Adopted (85, 20): step_up 60→20 = +15.82% val NPV.
+  the VALIDATION slice only. Adopted (85, 25): step_up 60→25 = +2.73% val NPV.
   Restrict stays 85 because moving it alone to the best pair's 55 is NOT
   INDEPENDENTLY EVALUABLE — step_up must remain the lower bar, so (55, 60) is
   not a point on the grid at all. Per-parameter 2% adopt margin fixed in
@@ -117,8 +117,8 @@ transaction-stream "you are under attack" investigation with ₹ economics.
 ## Current verified results (test slice, synthetic data)
 Model: XGBoost, selected empirically over LightGBM/CatBoost/LogisticRegression
 on temporal validation (src/models/select_model.py). All 3 GBDTs within the
-0.02 tie margin (LGBM .9308 / Cat .9265 / XGB .9249) → won on the PRE-DECLARED
-speed tie-break (0.27s vs 1.64s vs 7.94s), NOT on raw PR-AUC.
+0.02 tie margin (LGBM .7702 / Cat .7573 / XGB .7625) → won on the PRE-DECLARED
+speed tie-break (0.40s vs 1.85s vs 8.82s), NOT on raw PR-AUC.
 PR-AUC 0.825 | P 0.996 / R 0.735 @ cost-optimal threshold | P@100/@500 = 1.00
 STABILITY: 0.862 +/- 0.024 over 5 SEEDS OF THE SAME GENERATOR (not independent
 worlds - identical scenario definitions). Seed 7, the demo world, is the WORST
@@ -142,7 +142,8 @@ and 0.898 figures are PRE-FIX and appear only where labelled as history.
 SENSITIVITY (entry 26): aged_share is NOT load-bearing across 0.3-0.9.
 Policy cutoffs (85, 25) - step_up cost-optimized on validation (+2.73%).
 Restrict stays 85: moving it alone is NOT INDEPENDENTLY EVALUABLE.
-INR 8.63L prevented, INR 8.11L net protected value (~17x), 948 review cases
+INR 8.61L exposure prevented, INR 8.13L net protected value (~18x), INR 452
+legit revenue impacted on the policy path, 948 review cases
 5/5 attack merchants detected | 25/25 across 5 seeds
 !! 1 FALSE ALARM in 35 non-attack merchant-windows (2.9%, 95% CI 0.1-14.9%)
 - a LEGITIMATE corporate buyer (m4) on seed 11, checked across all 5 seeds. This is NOT 0 any more and must never be quoted as 0.
@@ -167,9 +168,9 @@ now precision 0.654 and INR 187.7K blocked) | full minus the pair 0.7663.
 !! ENTITY SHARING IS NECESSARY, NOT SUFFICIENT. Its collapse under the hard
 negatives is the quantitative twin of entry 16, where the agent reasoned only
 from entity sharing and called a real INR 5.5L takeover legitimate.
-P1b fusion now changes 512/14,160 decisions (3.6%). The trajectory IS the
+P1b fusion now changes 433/14,160 decisions (3.1%). The trajectory IS the
 argument: 0/13,987 on the leaky generator, 3/13,782 after the generator fix,
-512/14,160 after the hard negatives. The value of corroboration scales with how
+433/14,160 after the hard negatives. The value of corroboration scales with how
 much genuine ambiguity the data holds. We kept it when it changed nothing and
 said so; report the change on the same terms. Kept for
 architecture (auditability, reachable fail-safe, headroom for a weaker model),
@@ -633,15 +634,15 @@ explainability — every component must be defensible to a judge in one sentence
    merchant-windows is 2.9%, 95% CI [0.1%, 14.9%]; never quote the point alone.
    THE REJECTION WAS ARGUED BEFORE IT WAS MEASURED, and that was our error.
    The symmetric fix (teach it a legitimate shared IP too) removes the false
-   alarm and on SEED 7 raises NPV to INR 9.44L vs our 8.11L - so this entry
+   alarm and on SEED 7 raises NPV to INR 9.47L vs our 8.13L - so this entry
    used to say we were OVERRIDING our own declared cost rule on failure-severity
    grounds. An outside reviewer pointed out that a win on one seed against a
    failure on another is not a comparison. Correct. Measured across all five
    (src/policy/config4_npv.py):
-     shipped   mean NPV INR 943,276   25/25 attacks
-     rejected  mean NPV INR 869,852   24/25 attacks
+     shipped   mean NPV INR 939,179   25/25 attacks
+     rejected  mean NPV INR 874,988   24/25 attacks
    The advantage was a SEED-7 ARTIFACT. Averaged, the rejected configuration is
-   INR 73,424 WORSE and also loses an attack. There is no money-vs-safety trade;
+   INR 64,192 WORSE and also loses an attack. There is no money-vs-safety trade;
    it is worse on both axes. We only believed otherwise because we compared one
    seed in a project that keeps a five-seed harness to prevent exactly that.
    We still cannot explain WHY corporate-buyer examples destabilise card
@@ -655,7 +656,7 @@ explainability — every component must be defensible to a judge in one sentence
    WHAT ELSE MOVED: entity-sharing-alone collapsed 0.7877 -> 0.3950 and now
    blocks INR 187.7K of legitimate value - which is the point, and makes the
    honest claim "necessary, not sufficient". Fusion went from a no-op to
-   changing 3.6% of decisions. Review load rose 60%. Velocity flipped sign a
+   changing 3.1% of decisions. Review load rose 60%. Velocity flipped sign a
    third time. Every one of those is downstream of the same cause: the dataset
    finally contains genuine ambiguity.
    LESSON: a negative case that cannot fail you is not a test. We shipped
@@ -763,7 +764,7 @@ explainability — every component must be defensible to a judge in one sentence
    new best pair's one-at-a-time point (55, 60) does not exist -> IndexError.
    Now reports "NOT INDEPENDENTLY EVALUABLE" and keeps the conservative
    default. A move we cannot measure in isolation is not evidence FOR making
-   it. Adopted (85, 20).
+   it. Adopted (85, 25).
    (ii)+(iii) leakage_probe.py AND ablation.py both HARDCODED their failing
    conclusions. After the fix they printed "two features reproduce the
    headline" directly above their own output showing they don't. Both verdicts
@@ -774,7 +775,7 @@ explainability — every component must be defensible to a judge in one sentence
    legitimate value processed). Those two FP figures measure different DATASET
    DIFFICULTY, not different system quality: precision 0.994 was purchasable on
    data where two columns partition the label space. We did NOT retune the
-   threshold to recover the FP number - (85, 20) is what the validation sweep
+   threshold to recover the FP number - (85, 25) is what the validation sweep
    adopted, and moving it because we dislike the result would be optimising
    something other than expected cost. We have refused that move four times now
    (expected_action labels, fusion re-weighting, the frozen agent design, this).
@@ -797,3 +798,66 @@ explainability — every component must be defensible to a judge in one sentence
    fix cost 0.036 of headline and bought back the ability to state what the
    number means - plus three bugs that only a re-run could expose.
 
+
+31. WE SHIPPED A POLICY CONSTANT OUR OWN RULE DOES NOT AUTHORISE, AND AN
+   OUTSIDE AUDIT FOUND IT BY READING OUR ARTIFACTS AGAINST OUR PROSE.
+   Handed CLAUDE.md + SUBMISSION.md + the machine-generated result JSONs to an
+   external model with a prompt written to make it hostile. It came back with
+   six documentation findings. FIVE WERE CORRECT. Chasing the sixth - a
+   complaint that CLAUDE.md said policy cutoffs (85, 25) in one place and
+   (85, 20) in another - found something the auditor could not see, because it
+   only had the documents and not the code:
+     src/policy/engine.py          STEP_UP_CUT = 20.0
+     threshold_sweep, re-run       ADOPTED (85, 25)
+   The two disagreed. Re-running the sweep on current data settles which is
+   right, and it is worse than a mismatch:
+     step_up 20  validation NPV 78,714  lift +1.73%  legit impacted INR 1,158
+     step_up 25  validation NPV 79,485  lift +2.73%  legit impacted INR   388
+   Our pre-declared adopt margin is 2%. 20 scores +1.73% - BELOW OUR OWN
+   MARGIN. Under our declared rule the shipped value would not be adopted at
+   all. It was correct once: the sweep chose 20 on the PRE-hard-negative data
+   (+15.82% there), commit 3f2bef5. Then failure-log 29 changed the data and
+   nobody re-ran the sweep. The constant was one dataset generation stale and
+   we never noticed because nothing checks a constant against its own
+   derivation.
+   FIXED: STEP_UP_CUT = 25.0, and every downstream number re-measured rather
+   than edited. It is BETTER ON BOTH AXES - NPV 8.11L -> 8.13L, legit revenue
+   impacted 4,266 -> 452 (-89%), protected-per-rupee 16.7x -> 18.0x, step_up
+   actions 106 -> 25. We did not go looking for a number that improved; we
+   applied the rule and this is what it gave. Had it come out worse we would
+   have shipped it worse, which is the whole point of fixing the rule in
+   advance.
+   THE FIVE DOCUMENTATION FINDINGS, all real, all ours:
+     (a) SUBMISSION.md headline said "False alarms: 0 in every world" while
+         line 51 of the same file said "1 false alarm in 35". The retracted
+         number was still the FIRST thing a judge read. This is the single
+         worst thing in this entry: our differentiator is honest metrics and
+         our headline carried a figure we had publicly retracted.
+     (b) Calibration published as Brier 0.0053 / ECE 0.0033; current values
+         0.0123 / 0.00736. The stale pair is the flattering one.
+     (c) "Fraud INR prevented 8.63L" is fraud_exposure_prevented_inr, not
+         fraud_inr_prevented (7.86L). Two different quantities, one label.
+     (d) The FP figure quoted the classifier's INR 2,575 next to policy-path
+         economics, mixing two measurement paths in one table. README already
+         explained the distinction; SUBMISSION did not.
+     (e) Model-selection figures (.9308/.9265/.9249, 0.27/1.64/7.94s) were
+         pre-hard-negative. Current: .7702/.7625/.7573, 0.40/1.85/8.82s.
+   PLUS ONE THE AUDIT MISSED: SUBMISSION said "5 independent simulated worlds"
+   - a phrase README explicitly corrects, because they are five SEEDS of one
+   generator. We had the correction written down and the uncorrected claim
+   still shipped in the summary doc a judge reads first.
+   ROOT CAUSE, and it is not carelessness: EVERY ONE of these is the same
+   defect as failure-log 26's fourth finding - we re-measure, we update the
+   tables, and the numbers that live somewhere else go stale silently because
+   nothing type-checks English. We wrote that lesson down and then reproduced
+   it across three documents and one policy constant. Writing a lesson in the
+   failure log does not install it.
+   WHAT WOULD ACTUALLY PREVENT IT: a check that reads the artifact JSONs and
+   greps the docs for contradicting figures, run like a test. We are not
+   building it now - the deadline is days away and an untested new script is
+   how you introduce a bug while fixing one - so this stays an OPEN process
+   gap, stated as one rather than dressed up as closed.
+   LESSON: an audit that only reads your documents can still find your code
+   bugs, because a documentation contradiction is often a code contradiction
+   that has surfaced. Five doc findings were cheap to fix; chasing the sixth
+   found a shipped policy value that our own decision rule forbids.

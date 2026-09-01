@@ -3,7 +3,7 @@
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
 [![Tests](https://img.shields.io/badge/tests-72_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![Failures logged](https://img.shields.io/badge/failures_logged-30_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Failures logged](https://img.shields.io/badge/failures_logged-31_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
@@ -59,7 +59,7 @@ model. All of it is pytest-enforced (`tests/test_safety.py`, `tests/test_agent.p
 |---|---|
 | **Attack merchants detected** | **25 / 25** across 5 seeds of the generator |
 | **False alarms** | **1 in 35 non-attack merchant-windows** — a legitimate corporate buyer, on one seed. [Tested against three legitimate spikes, two of which share entities](#the-hard-negative-a-legitimate-merchant-built-to-look-like-an-attack) |
-| **Net protected value** | **₹8.11L** on the held-out test slice, after 948 reviews × ₹50 |
+| **Net protected value** | **₹8.13L** on the held-out test slice, after 948 reviews × ₹50 |
 | **Legitimate ₹ wrongly blocked** | **₹2,575 — 0.024%** of the ₹1.07Cr in legitimate value processed |
 | **Precision / Recall** | **0.996 / 0.735** at the cost-optimal threshold |
 | **Calibration (Brier / ECE)** | **0.0123 / 0.0074** — measured, not assumed |
@@ -152,12 +152,12 @@ The transaction scorer is a **GBDT, selected empirically** — not a fixed libra
 
 | Model | Family | Val PR-AUC | Train time | Inference time |
 |---|---|---|---|---|
-| LightGBM | GBDT | **0.9308** | 1.64s | 0.0085s |
-| CatBoost | GBDT | 0.9265 | 7.94s | 0.0047s |
-| **XGBoost** ← selected | GBDT | 0.9249 | **0.27s** | 0.0064s |
+| LightGBM | GBDT | **0.7702** | 1.85s | 0.0072s |
+| CatBoost | GBDT | 0.7573 | 8.82s | 0.0045s |
+| **XGBoost** ← selected | GBDT | 0.7625 | **0.40s** | 0.0068s |
 | LogisticRegression | linear | 0.9124 | 0.13s | 0.0008s |
 
-**Winner: XGBoost — and the tie-break is what chose it, not the raw metric.** All three GBDTs land inside the 0.02 margin (0.9249–0.9308), so the pre-declared rule fired: pick by speed + maintainability. XGBoost trains ~6x faster than LightGBM and ~29x faster than CatBoost for a PR-AUC difference of 0.0059 — well inside noise for a 6,166-row validation slice. Choosing LightGBM on that gap would be optimizing a rounding error.
+**Winner: XGBoost — and the tie-break is what chose it, not the raw metric.** All three GBDTs land inside the 0.02 margin (0.7573–0.7702), so the pre-declared rule fired: pick by speed + maintainability. XGBoost trains ~4.6x faster than LightGBM and ~22x faster than CatBoost for a PR-AUC difference of 0.0077 — well inside noise for a 6,190-row validation slice. Choosing LightGBM on that gap would be optimizing a rounding error.
 
 This is worth stating plainly because **an earlier version of this table looked completely different** (XGBoost 0.669 / LightGBM 0.656 / CatBoost 0.648 / LogReg 0.511) and XGBoost led on raw PR-AUC. The cause was a methodology bug, not model behavior: the validation slice (days 21–23) originally contained *no attack at all*, only ~0.6% ambient fraud — so validation PR-AUC was measuring "can you rank ambient fraud," not "can you catch an attack," which is what the model is selected to do. Moving one historical device-farm attack into day 22 fixed the slice. The winner survived the change, but the *reason* flipped from "leads on PR-AUC" to "wins the tie-break" — which is exactly why the rule was fixed in advance.
 
@@ -188,11 +188,11 @@ Every test transaction is routed through the actual policy engine (allow / step-
 
 | | |
 |---|---|
-| Fraud exposure prevented | **₹8.63L** |
-| Legitimate revenue impacted | ₹4,266 |
+| Fraud exposure prevented | **₹8.61L** |
+| Legitimate revenue impacted | ₹452 |
 | Human review cost (948 cases × ₹50) | ₹47,400 |
-| **Net protected value** | **₹8.11L** |
-| ₹ protected per ₹ of cost imposed | ~17x |
+| **Net protected value** | **₹8.13L** |
+| ₹ protected per ₹ of cost imposed | ~18x |
 
 **How much does this rest on the ₹50 review cost?** Less than it looks. Review
 cost is 5.5% of gross prevented at ₹50, so the conclusion survives being badly
@@ -213,7 +213,7 @@ rescales the headline. The genuinely open question is the one in
 the fraud amount and nothing else, which is an under-count in a direction that
 *flatters* us, not a knob this table can settle.
 
-(Figures use the validation-optimized step-up cutoff — see Policy thresholds below. Note the two different false-positive figures on this page and why they differ: **₹2,575** is what the *classifier* would block at its threshold; **₹4,266** is what survives to actually impact revenue after the *policy engine* routes most of it to step-up and human review instead of an outright block. Both are real; the first is the honest headline for model quality, the second for system behaviour.)
+(Figures use the validation-optimized step-up cutoff — see Policy thresholds below. Note the two different false-positive figures on this page and why they differ: **₹2,575** is what the *classifier* would block at its threshold; **₹452** is what survives to actually impact revenue after the *policy engine* routes most of it to step-up and human review instead of an outright block. Both are real; the first is the honest headline for model quality, the second for system behaviour.)
 
 This reframes the result from "our model has good metrics" to "our system makes economically sensible risk decisions."
 
@@ -223,13 +223,13 @@ The economics loop originally used `risk_score = p_fraud * 100, confidence = 0.8
 
 `src/policy/fusion.py` replaces it with an explicit, linear, bounded fusion: the calibrated ML probability sets a **floor**, and corroborating context (spike 0.50 / graph 0.30 / rules 0.20, scaled by a 0.6 lift factor) escalates into the headroom above it. Confidence is computed from signal **agreement**, so a high ML score with nothing corroborating comes out *less* confident and routes to a human rather than an automatic restrict.
 
-**Fusion has changed from a no-op into something that does work — and the trajectory is the argument.** On this dataset it changes **512 of 14,160 decisions (3.6%)**.
+**Fusion has changed from a no-op into something that does work — and the trajectory is the argument.** On this dataset it changes **433 of 14,160 decisions (3.1%)**.
 
 | dataset version | decisions changed by fusion |
 |---|---|
 | leaky generator | **0 of 13,987** — literally nothing |
 | generator fixed | 3 of 13,782 (0.02%) |
-| **+ hard negatives** | **512 of 14,160 (3.6%)** |
+| **+ hard negatives** | **433 of 14,160 (3.1%)** |
 
 This is exactly what the architectural argument below predicted, three years' worth of it in three runs: **the value of corroboration scales with how much genuine ambiguity the problem contains.** On data where two features encoded the label there was nothing for it to do. Add merchants whose entity structure is attack-shaped but whose traffic is honest, and the mid-band fills up — which is precisely where a floor-plus-context design earns its keep.
 
@@ -406,7 +406,7 @@ sample, and quoting the point estimate alone would overstate it.
 The symmetric fix is obvious: teach the model that a shared *IP* can be honest
 too. **We measured it rather than reasoning about it**, and the first
 measurement was misleading. On seed 7 it removes the false alarm and raises NPV
-to ₹9.44L against our ₹8.11L — so for a while this section said we were
+to ₹9.47L against our ₹8.13L — so for a while this section said we were
 *overriding* our own cost rule on failure-severity grounds. **An outside
 reviewer pointed out that a win on one seed and a catastrophic failure on
 another is not a comparison.** They were right. Run across all five seeds
@@ -418,7 +418,7 @@ another is not a comparison.** They were right. Run across all five seeds
 | rejected configuration | ₹8,69,852 | 24 / 25 |
 
 **The apparent NPV advantage was a seed-7 artifact.** Averaged properly the
-rejected configuration is **₹73,424 worse** *and* loses an attack — on seed 101
+rejected configuration is **₹64,192 worse** *and* loses an attack — on seed 101
 it drops card-testing detection to a mean score of 0.004. There is no
 money-versus-safety trade here at all; it is simply worse on both axes, and we
 only thought otherwise because we had compared one seed in a project that keeps
@@ -529,7 +529,7 @@ The old value (100% newborn) was a judgement call too. It was just an implicit o
 
 **Cost, as measured at the time:** PR-AUC 0.945 → 0.910 across 5 seeds. Net protected value ₹10.57L → ₹7.95L. Legitimate ₹ wrongly blocked ₹5,901 → ₹21,728. (All four of those figures have since moved again — [the hard negative](#the-hard-negative-a-legitimate-merchant-built-to-look-like-an-attack) made the dataset harder a second time. They are kept here as the cost of *this* fix, measured against what preceded it.) Time-to-detect swapped which scenario we lose (we now win IP cluster, lose the fraud ring). The hourly EWMA detector now misses the account takeover on seed 7, while the streaming detector — the one the product runs — still catches 5/5 in all five seeds.
 
-**Untouched:** 25/25 attacks caught, **0 false alarms in 35 non-attack merchant-windows**, flash sale flagged 0/5, P@100 and P@500 both 1.00. ECE slightly improved. The pipeline's leakage *hygiene* was never in question either — features are still built strictly incrementally from prior events, splits are still on day boundaries, calibration still fits only on days 21–23. This was always a **data-construction** problem, not train/test contamination.
+**Untouched, as measured at that time:** 25/25 attacks caught, **0 false alarms in 35 non-attack merchant-windows** (this became **1 in 35** one generation later, when the hard negatives were added), flash sale flagged 0/5, P@100 and P@500 both 1.00. ECE slightly improved. The pipeline's leakage *hygiene* was never in question either — features are still built strictly incrementally from prior events, splits are still on day boundaries, calibration still fits only on days 21–23. This was always a **data-construction** problem, not train/test contamination.
 
 ### The bugs the re-run exposed
 
@@ -550,8 +550,8 @@ We route on these probabilities — the policy engine reads risk as a function o
 | Metric | Value |
 |---|---|
 | Brier score (calibrated) | **0.0123** |
-| Brier score (raw, uncalibrated) | 0.00647 |
-| Expected calibration error (10 equal-width bins) | **0.0033** |
+| Brier score (raw, uncalibrated) | 0.01468 |
+| Expected calibration error (10 equal-width bins) | **0.00736** |
 
 Isotonic calibration measurably helps (Brier 0.01468 → 0.0123). **But the reliability curve is near-bimodal:** 13,612 of 14,160 test transactions fall in [0.0, 0.1], leaving a few hundred spread across the middle. Calibration is measurably worse than before the hard negatives (ECE 0.0031 → 0.0074) — the merchants that sit near the boundary are exactly the ones a calibrator finds hardest. Two consequences we state rather than hide: (1) the low ECE is dominated by the two extreme bins and says little about the middle of the range, where the bins are visibly off — the [0.3, 0.4] bin observes a 0.571 fraud rate against a predicted 0.333, on n=21; (2) that bimodality is the calibration-side signature of the same separability documented in the leakage self-audit — a problem this cleanly separated does not produce a well-spread probability distribution.
 
@@ -656,7 +656,7 @@ The 85/60 restrict/step-up cutoffs were hand-set against the old `p*100` scale a
 | Grid best (pair) | 55 | 20 | ₹79,952 |
 | **Adopted** | **85** (unchanged) | **20** | — |
 
-**Only step-up moved.** Lowering it 60 → 20 is worth **+15.82%** validation NPV on its own. The restrict cut stayed at 85 for a reason worth stating precisely: the grid requires `step_up < restrict`, so moving restrict alone to the best pair's 55 while step-up sits at the baseline 60 **is not a valid policy at all** — that point does not exist on the grid. The per-parameter rule therefore reports it as **not independently evaluable**, and the conservative incumbent stands. A move we cannot measure in isolation is not evidence for making it.
+**Only step-up moved.** Lowering it 60 → 25 is worth **+2.73%** validation NPV on its own, which clears the pre-declared 2% margin. (It was 20 for one dataset generation — the value the sweep adopted *before* the hard negatives. On current data 20 is worth only +1.73%, below our own margin, so shipping it was a rule violation we caught late. Failure-log 31.) The restrict cut stayed at 85 for a reason worth stating precisely: the grid requires `step_up < restrict`, so moving restrict alone to the best pair's 55 while step-up sits at the baseline 60 **is not a valid policy at all** — that point does not exist on the grid. The per-parameter rule therefore reports it as **not independently evaluable**, and the conservative incumbent stands. A move we cannot measure in isolation is not evidence for making it.
 
 *(This is where the rule earned its keep, and where it crashed. The original implementation assumed every one-at-a-time move was a grid point and raised `IndexError` when it wasn't. Worse, the first fix handled it in the print path but not the JSON write — so the console printed a correct verdict while `threshold_sweep_decision.json` silently kept the previous run's numbers. Both are fixed; the artifact now records `restrict_not_independently_evaluable: true`.)*
 
@@ -873,5 +873,5 @@ Ordered by how much they should discount the results.
 9. **The agent gets the cause right 8/13 times** and on quiet merchants has twice contradicted its own evidence (asserting account takeover while citing zero new-device and zero geo-mismatch rates). It is advisory only and cannot act — that separation is tested — but the reasoning quality is the weakest part of the system. **If you run the demo yourself you will probably see this live on m3:** it reads "all 183 flagged txns use distinct payment methods" and concludes "no testing pattern", when a fresh instrument on every transaction *is* the card-testing signature. The `flagged_distinct_instruments_per_txn` field is directionally ambiguous — ~0.08 means reuse, ~1.0 means novelty, and the tool never says which way means what. Logged as failure-log 22 and deliberately left unfixed: the design is frozen after run D, coaching the prompt is against our own standing rule, and changing the tool would invalidate the eval it is measured by.
 10. **Risk fusion changes almost no decisions.** Retained for architecture (auditability, a reachable fail-safe path, headroom for a weaker model), not for metrics.
 11. **The account-takeover scenario is diffuse by nature**; it is caught primarily at transaction level (p≈0.97 per txn) and only weakly at merchant-spike level. **The two detector paths now disagree on it:** the `StreamingSpikeDetector` — the fast path the product actually runs, and the one the 25/25 figure is measured on — catches it in all five seeds, while the hourly EWMA slow path misses it on seed 7. Before the generator fix both paths caught it. We report the split rather than quoting only the path that succeeds.
-12. **We tried four training-data configurations before settling.** That number belongs next to every result on this page. We stopped at the one whose behaviour we could explain rather than the one that scored best — the best-scoring configuration reached ₹9.44L net protected value and zero false alarms, and we rejected it because it silently lost card-testing detection on one seed. There is no pre-declared rule for training-data composition the way there is for cutoffs, so that was a judgment call.
+12. **We tried four training-data configurations before settling.** That number belongs next to every result on this page. We stopped at the one whose behaviour we could explain rather than the one that scored best — the best-scoring configuration reached ₹9.47L net protected value on that seed and zero false alarms, and we rejected it because it silently lost card-testing detection on one seed. There is no pre-declared rule for training-data composition the way there is for cutoffs, so that was a judgment call.
 13. **Not production hardened.** Single process, no persistence (state is lost on restart), no idempotency on repeated transactions. The serving layer has a shared-key gate on every mutating endpoint, but that is a single-tenant gate, not identity — an analyst override carries no attributable actor, which a real deployment would need.

@@ -35,9 +35,17 @@ RESTRICT_CUT = 85.0   # unchanged. The sweep's best PAIR wants 55, but moving
 #                       bar), so that move is NOT INDEPENDENTLY EVALUABLE under
 #                       the per-parameter rule. A move we cannot measure alone is
 #                       not evidence for making it: the conservative cut stands.
-STEP_UP_CUT = 20.0    # was 60.0, hand-set against the old p*100 scale.
-#                       Cost-optimized on validation (days 21-23): +15.82% net
-#                       protected value. Catches fraud the 60 cut allowed through.
+STEP_UP_CUT = 25.0    # was 60.0, hand-set against the old p*100 scale.
+#                       Cost-optimized on validation (days 21-23): +2.73% net
+#                       protected value, which clears the pre-declared 2% adopt
+#                       margin. It was 20.0 for one generation: the sweep chose
+#                       that on the PRE-hard-negative data (+15.82% there), the
+#                       data then changed under failure-log 29, and nobody re-ran
+#                       the sweep. On current data 20.0 is worth only +1.73% -
+#                       BELOW our own adopt margin - so the shipped constant was
+#                       a value our declared rule does not authorise. 25.0 is
+#                       also better on both axes here (NPV 79,485 vs 78,714;
+#                       legit impacted INR 388 vs 1,158). See failure-log 31.
 LOW_CONFIDENCE_CUT = 0.4
 
 

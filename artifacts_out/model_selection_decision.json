@@ -9,29 +9,29 @@
       "model": "LogisticRegression",
       "family": "linear",
       "val_pr_auc": 0.7149,
-      "train_time_s": 0.06,
-      "inference_time_s": 0.0007
+      "train_time_s": 0.075,
+      "inference_time_s": 0.0006
     },
     {
       "model": "XGBoost",
       "family": "GBDT",
       "val_pr_auc": 0.7625,
-      "train_time_s": 0.352,
-      "inference_time_s": 0.0073
+      "train_time_s": 0.402,
+      "inference_time_s": 0.0068
     },
     {
       "model": "LightGBM",
       "family": "GBDT",
       "val_pr_auc": 0.7702,
-      "train_time_s": 1.58,
-      "inference_time_s": 0.0074
+      "train_time_s": 1.85,
+      "inference_time_s": 0.0072
     },
     {
       "model": "CatBoost",
       "family": "GBDT",
       "val_pr_auc": 0.7573,
-      "train_time_s": 9.076,
-      "inference_time_s": 0.0041
+      "train_time_s": 8.818,
+      "inference_time_s": 0.0045
     }
   ]
 }
