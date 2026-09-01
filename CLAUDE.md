@@ -200,6 +200,10 @@ changes without a new held-out set, or the number stops meaning anything.
 Run: `python -m src.models.select_model && python -m src.policy.threshold_sweep
 && python -m src.models.train && python -m src.models.ablation`
 Self-audit: `python -m src.models.leakage_probe` (adversarial eval integrity)
+Docs-vs-artifacts: `python -m src.audit.verify_submission` (exits non-zero if
+a documented headline disagrees with the artifact that produced it; also
+checks engine.py's cutoffs against threshold_sweep_decision.json. Run it
+BEFORE claiming any number is current - entry 31)
 Config 4 NPV: `python -m src.policy.config4_npv` (the REJECTED training-data
 configuration, measured over 5 seeds rather than argued about - it is worse on
 both NPV and attack detection, and stays reachable via HIST_CORPORATE_BUYER)
@@ -229,7 +233,7 @@ rate 0.273 vs our 0.70-0.93. Run BEFORE modelling, never after)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (80 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (90 pass, no network needed)
 REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
 random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
 Methodology transfers; the 0.898 does NOT. NEGATIVE RESULT (entry 24): our
@@ -871,10 +875,36 @@ explainability — every component must be defensible to a judge in one sentence
    it across three documents and one policy constant. Writing a lesson in the
    failure log does not install it.
    WHAT WOULD ACTUALLY PREVENT IT: a check that reads the artifact JSONs and
-   greps the docs for contradicting figures, run like a test. We are not
-   building it now - the deadline is days away and an untested new script is
-   how you introduce a bug while fixing one - so this stays an OPEN process
-   gap, stated as one rather than dressed up as closed.
+   greps the docs for contradicting figures, run like a test.
+   NOW CLOSED - src/audit/verify_submission.py, `python -m
+   src.audit.verify_submission`, exits non-zero when a documented headline
+   disagrees with the artifact that produced it. Three check kinds: CLAIMS (a
+   number must equal its artifact field), RETIRED (a retracted phrasing must
+   not appear unless the line marks itself history, and every exemption is
+   PRINTED), and CODE (a shipped constant must equal the decision artifact that
+   adopted it - this entry's own bug, which no documentation check could see).
+   Deliberately a REGISTRY, not a number scraper: this repo carries ~22
+   superseded figures on purpose, and a scraper would flag them all and create
+   pressure to delete our own history.
+   VALIDATED AGAINST THIS REPOSITORY'S PAST, because a checker that passes
+   today proves nothing. Pointed at the docs from 5ae3a4a - before this entry's
+   corrections - it flags 10 problems including the retracted "0 in every
+   world" headline and the Brier 0.0053 an external audit found by hand.
+   AND IT IMMEDIATELY FOUND ONE MORE, in a table BOTH audits missed: README's
+   config-3-vs-4 comparison still read INR 9,43,276 / 8,69,852 while the
+   artifact said 939,179 / 874,988 - with the corrected INR 64,192 gap stated
+   in the paragraph directly beneath it. Sixth instance of this defect.
+   THE CHECKER'S OWN BUGS ARE THE INTERESTING PART. Five, during construction:
+   a precision/recall pattern that could not cross a table pipe; a Brier
+   pattern that matched the deliberately-listed uncalibrated row; a PR-AUC
+   pattern matching one of five phrasings; an exemption ordering that skipped
+   CURRENT figures merely because the line also mentioned history; and worst,
+   the "0 false alarms" pattern required the words adjacent when the real text
+   splits them across table cells - so the check written for the single most
+   important retracted claim silently matched NOTHING. Only running it against
+   the real pre-fix document exposed that. Hence the "claim not found" report:
+   a pattern that rots makes the checker blind, and blindness must fail loudly
+   rather than pass quietly.
    LESSON: an audit that only reads your documents can still find your code
    bugs, because a documentation contradiction is often a code contradiction
    that has surfaced. Five doc findings were cheap to fix; chasing the sixth

@@ -2,7 +2,7 @@
 
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
-[![Tests](https://img.shields.io/badge/tests-80_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/tests-90_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
 [![Failures logged](https://img.shields.io/badge/failures_logged-33_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
@@ -127,7 +127,7 @@ python -m src.models.seed_stability  # re-run the pipeline across 5 worlds (~6 m
 python -m src.models.real_data_check # same recipe on REAL data (needs a Kaggle download)
 python -m src.agent.eval             # 13-case agent eval, 3 held-out (needs ANTHROPIC_API_KEY)
 python run_demo.py                   # dashboard + live replay -> http://127.0.0.1:8000
-python -m pytest tests/ -q           # safety invariants (80 tests)
+python -m pytest tests/ -q           # safety invariants (90 tests)
 ```
 
 ## Demo — what to watch
@@ -414,8 +414,8 @@ another is not a comparison.** They were right. Run across all five seeds
 
 | | mean NPV over 5 seeds | attacks caught |
 |---|---|---|
-| **shipped configuration** | **₹9,43,276** | **25 / 25** |
-| rejected configuration | ₹8,69,852 | 24 / 25 |
+| **shipped configuration** | **₹9,39,179** | **25 / 25** |
+| rejected configuration | ₹8,74,988 | 24 / 25 |
 
 **The apparent NPV advantage was a seed-7 artifact.** Averaged properly the
 rejected configuration is **₹64,192 worse** *and* loses an attack — on seed 101
@@ -868,8 +868,67 @@ run_demo.py     one-command demo: train -> serve -> replay
 tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 no-fire, fusion floor/bounds, agent gate/audit/read-only,
                 serving side-effect-freedom, analyst allowlist, write-auth
-                gate, .env loader) - 80 tests
+                gate, .env loader) - 90 tests
 ```
+
+## The repository refuses to ship a stale headline
+
+Six times now, we have re-measured something, updated the tables, and left a
+number stale in a sentence somewhere else. Two external audits found instances
+we had missed. Our own failure log diagnosed the cause precisely — *nothing
+checks documented English against the artifact it came from* — and then carried
+it as an **open** gap.
+
+It is closed:
+
+```
+$ python -m src.audit.verify_submission
+PASS - 29 documented headline figures across 2 files match their artifacts,
+no retracted phrasing is unlabelled, and the shipped policy cutoffs equal the
+decision that adopted them.
+```
+
+Three kinds of check, and the third is the one that matters most:
+
+| Check | What it catches |
+|---|---|
+| **CLAIMS** | a documented number that no longer equals its artifact field |
+| **RETIRED** | a retracted phrasing appearing without a history label |
+| **CODE** | **a shipped constant that no longer equals the decision that adopted it** |
+
+That last one is [failure 31](CLAUDE.md) in a single assertion: `engine.py`
+shipped `STEP_UP_CUT = 20.0` while the validation sweep had adopted `25`. **No
+documentation check could ever have seen it** — both files were internally
+consistent, and only comparing code to artifact reveals the gap.
+
+**It is a registry, not a number scraper**, and that is deliberate. This
+repository contains roughly **22 superseded figures on purpose** — `0.9344`,
+`₹10.57L`, `0.945` — because retracted results stay visible with their history.
+A scraper would flag every one and create pressure to delete exactly the honesty
+the project is built on. So superseded figures are allowed when the line marks
+itself as history, and **every exemption is printed rather than applied
+silently**.
+
+**Validated against our own past, because a checker that passes today proves
+nothing.** Pointed at the docs from commit `5ae3a4a` — before the failure-31
+corrections — it flags **10 problems**, including the retracted `**0** in every
+world` headline and the `Brier 0.0053` an external auditor had found by hand.
+
+**And building it immediately found a sixth instance that both audits missed:**
+the config-3-vs-4 table still read ₹9,43,276 / ₹8,69,852 against an artifact
+saying 939,179 / 874,988 — with the corrected ₹64,192 gap written in the
+paragraph directly beneath it.
+
+**The checker's own bugs are the honest part.** Five during construction, the
+worst being that the pattern for `0 false alarms` required the words adjacent
+when the real text splits them across table cells — so the check written for the
+single most important retracted claim **silently matched nothing**. Only running
+it against the real pre-fix document exposed that. Hence the *"claim not found"*
+report: a pattern that rots makes the checker blind, and blindness has to fail
+loudly rather than pass quietly. Guarded by `tests/test_sharing_sweep.py`'s
+sibling, `tests/test_verify_submission.py` (10 tests).
+
+---
 
 ## We went looking for public merchant data. Twice. Here is what we found.
 
