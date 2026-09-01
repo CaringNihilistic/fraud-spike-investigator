@@ -428,7 +428,7 @@ function ReviewQueue() {
     finally { setBusy(null); }
   };
 
-  const cases = (data?.cases || []).slice().reverse().slice(0, 40);
+  const cases = (data?.cases || []).slice(0, 40);   // server ranks; do not re-sort
   if (!cases.length) return html`<div class="empty">Review queue empty.</div>`;
   return html`
     <div>
@@ -437,6 +437,11 @@ function ReviewQueue() {
           <b style=${{ color: 'var(--amber)' }}>${data.pending} pending</b>
           ${` of ${data.total_cases ?? data.cases.length} total cases. `}
           Every restrict and review requires a human — the system holds, it does not act alone.
+          <br />Worked in order of${' '}<b>expected loss</b>${' '}(₹ × calibrated
+          probability), because the analyst runs out of time before the queue runs out
+          of cases. We shipped arrival order first; at 50 cases worked that put${' '}
+          <b>5%</b>${' '}of the queue's fraud value in front of a human instead of${' '}
+          <b>45%</b>.
         </div>
         <button class=${'chip sm' + (pendingOnly ? ' active' : '')}
                 style=${{ marginLeft: 'auto' }}
@@ -445,13 +450,15 @@ function ReviewQueue() {
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>#</th><th>merchant</th><th>₹</th><th>risk</th>
-            <th>system</th><th>analyst</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>merchant</th><th>₹</th>
+            <th title="Amount × calibrated probability — what this case is worth working">₹ at stake</th>
+            <th>risk</th><th>system</th><th>analyst</th><th></th></tr></thead>
           <tbody>${cases.map((c) => html`
             <tr key=${c.case_id} class=${c.overridden ? 'overridden' : ''}>
               <td class="mono">${c.case_id}</td>
               <td class="mono">${c.merchant_id}</td>
               <td class="mono">${inr(c.amount_inr)}</td>
+              <td class="mono"><b>${inr(c.expected_loss_inr)}</b></td>
               <td class="mono" style=${{ color: riskColor(c.risk_score) }}>${c.risk_score.toFixed(0)}</td>
               <td><span class=${'tag ' + c.system_action}>${c.system_action}</span></td>
               <td>${c.analyst_action
@@ -776,7 +783,7 @@ function Pitch() {
           </div>
         </div>
       </div>
-      <p class="note"><b>27 failures</b> are logged with root causes in the repo. Every one was
+      <p class="note"><b>28 failures</b> are logged with root causes in the repo. Every one was
         caught by measuring a claim, not by re-reading code. Two of them were our own audit
         tools hardcoding their failing verdicts — instruments that structurally could not
         report a pass.</p>
@@ -788,7 +795,7 @@ function Pitch() {
     <div class="panel">
       <h2>What broke, and what we did about it</h2>
       <p class="note" style=${{ marginTop: 0 }}>
-        <b>27 failures</b> are logged with root causes in the repo. Not "we hit some
+        <b>28 failures</b> are logged with root causes in the repo. Not "we hit some
         bugs" — each one names what we believed, what measurement contradicted it, and
         what changed. Five that a judge should see:
       </p>

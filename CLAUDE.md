@@ -77,7 +77,11 @@ transaction-stream "you are under attack" investigation with ₹ economics.
   `verify_evidence.py` = traceability checker: every number in evidence[] must
   be findable in a tool output the agent actually received.
 - `src/serve/` — P3 dashboard. `state.py` = in-memory pipeline state (single
-  writer = replay thread, RLock-guarded). `MerchantState.signature()` describes
+  writer = replay thread, RLock-guarded). The review queue is ranked by EXPECTED
+  LOSS (amount x calibrated p), never by arrival or by risk_score — the sort key
+  is a policy decision under a capacity constraint, is returned on the wire as
+  `ordering`, and is pytest-locked. `ReviewCase.p_fraud` exists for exactly this
+  and is kept separate from `risk_score` on purpose. `MerchantState.signature()` describes
   the SHAPE of a merchant's flagged traffic by COUNTING entities ("3 devices
   shared by 60 accounts"), never by inferring and never from `scenario` — it is
   what the card shows when no LLM is running, and it is test-locked against
@@ -197,6 +201,9 @@ changes without a new held-out set, or the number stops meaning anything.
 Run: `python -m src.models.select_model && python -m src.policy.threshold_sweep
 && python -m src.models.train && python -m src.models.ablation`
 Self-audit: `python -m src.models.leakage_probe` (adversarial eval integrity)
+Queue order: `python -m src.policy.queue_order` (what the review queue's sort
+key is worth; arrival order cost 45%->5% of fraud value at 50 cases worked, and
+ranking by risk_score measured WORSE than arrival - it is not rupees)
 Ablation CIs: `python -m src.models.ablation_ci` (paired bootstrap, 2,000
 resamples, so the table's deltas carry intervals rather than bare points)
 Generator sensitivity: `python -m src.models.aged_share_sensitivity` (is the
@@ -205,7 +212,7 @@ sweep reproduces the leak when it should)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (64 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (66 pass, no network needed)
 REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
 random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
 Methodology transfers; the 0.898 does NOT. NEGATIVE RESULT (entry 24): our
@@ -552,6 +559,40 @@ explainability — every component must be defensible to a judge in one sentence
    and the failure looks like an unrelated design flaw. Assert on the guard's
    observable outcome, not on the field it happens to read.
 
+
+
+28. THE REVIEW QUEUE WAS SORTED BY ARRIVAL TIME.
+   Found by reviewing a competitor who caught the same class of bug in their
+   own queue (they sorted by probability while everything else was denominated
+   in money). Ours was worse: `snapshot_queue` returned cases in insert order
+   and the dashboard reversed them, so an analyst worked the MOST RECENT cases.
+   No relationship to money at all.
+   A queue only matters if the analyst runs out of time before it runs out of
+   cases - ours yields 578 on a 13,782-txn slice, so it always does. The ORDER
+   is therefore a policy decision worth as much as the threshold, and we had
+   never made one.
+   MEASURED (src/policy/queue_order.py), share of the queue's INR 744,217 of
+   fraud value put in front of an analyst:
+     cases worked      arrival    by risk    by expected loss
+     50                   5.3%       4.2%              45.0%
+     240                 64.9%      24.4%              81.5%
+   THE OBVIOUS FIX WOULD HAVE MADE IT WORSE. Ranking by risk_score is BELOW
+   arrival order at every capacity. Fusion's risk_score is an escalation scale,
+   not a probability: high scores cluster on cheap card-testing txns while the
+   expensive account-takeover cases score lower. Multiplying rupees by it is a
+   category error, so expected loss uses the CALIBRATED p - which is why
+   ReviewCase carries p_fraud separately from risk_score.
+   FIXED: ranked by expected loss, the wire cap now takes the TOP 200 by rank
+   rather than the last 200 by arrival (capping by arrival would have hidden
+   exactly the cases the ranking exists to surface), `ordering` is returned on
+   the wire, and two tests lock it.
+   CAVEAT WE REPORT RATHER THAN HIDE: arrival order looks respectable at 240+
+   cases because this slice's biggest attacks fall near its end, so "newest
+   first" accidentally surfaces them. That would not survive production. The
+   low-capacity rows are the ones that generalise.
+   LESSON: we costed the threshold, the cutoffs, the FN price and the review
+   rate, and never once asked what ORDER the resulting queue should be worked
+   in. An operational policy sitting in a list comprehension is still a policy.
 
 27. THE ONE CALLER-SUPPLIED STRING THAT REACHED THE MODEL'S PROMPT.
    Prompted by reviewing a competitor that documents a prompt-injection

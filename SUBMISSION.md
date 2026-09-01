@@ -18,7 +18,7 @@
 | **Calibration** | Brier **0.0053**, ECE **0.0033** — measured, not assumed |
 | **Real public data**, same pipeline, zero tuning | ULB (284k txns): **PR-AUC 0.731** vs 0.0017 random · IEEE-CIS (590k txns): **0.460** vs 0.035 random |
 | **LLM safety** | **0/13** policy violations · **0/13** unsafe actions · the LLM cannot authorize anything — pytest-enforced |
-| **Engineering** | **64 tests**, no network or credentials needed · one-command demo · **27 logged failures** with root causes |
+| **Engineering** | **66 tests**, no network or credentials needed · one-command demo · **28 logged failures** with root causes |
 
 Evaluation is temporal throughout — day-boundary splits, never random. Model selection, threshold tuning and calibration all happen on a validation slice; the test slice is read once, at the end. Every number above reproduces from a clean clone.
 
@@ -34,7 +34,7 @@ The hardest part of the problem is not catching attacks — it's **not crying wo
 
 ## 2. Build quality
 
-One command runs it: `python run_demo.py` (trains, serves, replays 13,782 transactions through the real pipeline). **64 tests pass with no network and no credentials.**
+One command runs it: `python run_demo.py` (trains, serves, replays 13,782 transactions through the real pipeline). **66 tests pass with no network and no credentials.**
 
 | Metric — temporal held-out test slice, synthetic data (labeled as such) | Value |
 |---|---|
@@ -75,7 +75,7 @@ Leakage-safe incremental features (every feature computed from prior events only
 
 ## 4. Failure recovery
 
-**27 logged failures** in `CLAUDE.md`, every one caught by *measuring a claim* rather than re-reading code. The five that matter most:
+**28 logged failures** in `CLAUDE.md`, every one caught by *measuring a claim* rather than re-reading code. The six that matter most:
 
 1. **The agent got a ₹5.5L attack completely wrong — and it changed nothing.** On a live run, Claude labelled merchant m2 (a real account takeover) as `legitimate_traffic` / `allow` at **0.95 confidence**. Its evidence was factually correct ("29 customers, 29 devices, 29 IPs, zero shared entities") and the conclusion was exactly wrong. Root cause was a *tool gap*: account takeover means established customers on new devices, and no tool exposed that. **The system restricted 68 transactions and queued 8 for human review anyway, because the LLM was never in the decision path.** This is the architecture's central claim, demonstrated under a real failure rather than asserted. Closed by adding evidence — a seventh tool exposing new-device / geo-mismatch / amount-vs-own-average / account-age against the non-flagged base rate — **not by coaching the prompt**, which is sha256-identical across all five eval runs.
 
@@ -85,7 +85,8 @@ Leakage-safe incremental features (every feature computed from prior events only
 
 4. **A silent LangGraph bug that looked like a bad model.** An undeclared `stop_reason` state key was dropped by LangGraph, so `route()` never saw `tool_use` and **every** investigation fell through to the fallback. Caught only because a test asserted on the audit log's *tool sequence*, not the final output.
 
-5. **A dashboard metric that would have undermined the demo.** `peak_risk_ever` came out 100 for all 12 merchants — including the flash sale — because every merchant has one ambient-fraud transaction. It would have displayed "peak 100/100" on the card whose entire purpose is showing *no attack*. Removed; peak flagged-rate (93% vs 3%) and z-score (5.8 vs 1.1) discriminate properly.
+5. **The review queue was sorted by arrival time.** A queue only matters if the analyst runs out of time first — ours yields 578 cases — so the order is a policy decision, and we had not made one. Ranking by **expected loss** (amount × calibrated probability) puts **45%** of the queue's fraud value in front of a human in the first 50 cases against **5.3%** for arrival order. The obvious fix would have been worse: ranking by risk score scores *below arrival* at every capacity, because fusion's scale is not rupees.
+6. **A dashboard metric that would have undermined the demo.** `peak_risk_ever` came out 100 for all 12 merchants — including the flash sale — because every merchant has one ambient-fraud transaction. It would have displayed "peak 100/100" on the card whose entire purpose is showing *no attack*. Removed; peak flagged-rate (93% vs 3%) and z-score (5.8 vs 1.1) discriminate properly.
 
 **Runtime failure recovery:** ML down → rules + human review. LLM down, timing out, or uncredentialed → deterministic templated report → human review, never a block. Low confidence → escalate. The LLM was never in the decision path, so disabling it changes no decision — pytest-enforced.
 

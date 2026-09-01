@@ -2,8 +2,8 @@
 
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
-[![Tests](https://img.shields.io/badge/tests-64_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![Failures logged](https://img.shields.io/badge/failures_logged-27_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Tests](https://img.shields.io/badge/tests-66_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Failures logged](https://img.shields.io/badge/failures_logged-28_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
@@ -90,7 +90,7 @@ python -m src.models.seed_stability  # re-run the pipeline across 5 worlds (~6 m
 python -m src.models.real_data_check # same recipe on REAL data (needs a Kaggle download)
 python -m src.agent.eval             # 13-case agent eval, 3 held-out (needs ANTHROPIC_API_KEY)
 python run_demo.py                   # dashboard + live replay -> http://127.0.0.1:8000
-python -m pytest tests/ -q           # safety invariants (64 tests)
+python -m pytest tests/ -q           # safety invariants (66 tests)
 ```
 
 ## Demo — what to watch
@@ -272,6 +272,42 @@ The profile pair now scores **0.5997 against the full set's 0.8981** — a gap o
 *A retracted claim, kept visible on purpose.* An earlier version of this section reported a dramatic stage-2 **collapse** (PR-AUC 0.55 → 0.23, legit ₹ blocked 6x) and explained it as "velocity alone is a trap." That was an artifact, not a finding: with no attack in the calibration slice, isotonic calibration had almost nothing to fit and produced degenerate score plateaus. Once validation contained a real attack (see Model selection), the effect shrank to −0.03 — a mild regression, not a collapse. A follow-up diagnostic on the top-200 scored transactions initially seemed to confirm the story (18 flash-sale transactions ranked as top fraud risk under the velocity-only model), but that too dissolved under scrutiny: the top-200 sits entirely inside a ~447-transaction tie-plateau where every score is exactly 1.0, so its composition was decided by row order. Re-ranking the same plateau by raw model score gives **zero** flash-sale transactions and precision 1.000 for all three variants. The feature slicing was verified correct (a clean 6/6/10 partition of all 22 features), so there was no bug to fix — the diagnostic simply could not support the claim. Both the original finding and its retraction are left here because "we chased a dramatic result and it did not survive" is the honest version of this table. **And it has a third act:** after the generator fix (see the leakage self-audit), the same step turned *positive* and significant. A claim we published, retracted, and then had to revise a second time in the other direction — which is what it looks like when the measurement, not the narrative, decides.
 
 Reproduce: `python -m src.models.ablation` → writes `artifacts_out/ablation_table.csv`.
+
+## What order should the queue be worked in?
+
+A review queue only matters if the analyst runs out of time before it runs out
+of cases — ours produces 578 cases on a 13,782-transaction slice, so it always
+will. Under that constraint the **order** is a policy decision worth as much as
+the threshold, and ours was never chosen: the serving layer appended cases as
+they arrived and the dashboard showed the newest first. Arrival order has no
+relationship to money at all.
+
+Measured (`python -m src.policy.queue_order`) — share of the queue's ₹744,217
+of fraud value put in front of an analyst, by how many cases they get through:
+
+| cases worked | arrival *(what we shipped)* | by risk score | **by expected loss** |
+|---|---|---|---|
+| 50 | 5.3% | 4.2% | **45.0%** |
+| 100 | 10.0% | 9.3% | **60.2%** |
+| 240 *(one analyst-day)* | 64.9% | 24.4% | **81.5%** |
+| 400 | 82.2% | 41.5% | **94.1%** |
+
+**The obvious fix would have made it worse.** Ranking by risk score — the first
+thing anyone reaches for — is *below arrival order at every capacity*. Fusion's
+`risk_score` is an escalation scale, not a probability: high scores cluster on
+cheap card-testing transactions while the expensive account-takeover cases score
+lower. Multiplying rupees by it would be a category error, so expected loss uses
+the **calibrated** probability instead: `amount × p`.
+
+Now ranked, and the sort key is on the wire (`ordering: expected_loss_desc`) and
+pytest-locked, because it is policy rather than presentation.
+
+**One honest caveat about that table.** Arrival order looks respectable at 240+
+cases for a reason that would not survive production: the biggest attacks in
+this slice happen to fall near its end, so "newest first" accidentally surfaces
+them. The low-capacity rows — 5.3% against 45.0% — are the ones that generalise.
+
+---
 
 ## Leakage self-audit (we broke our own headline — then fixed it)
 
@@ -606,7 +642,7 @@ run_demo.py     one-command demo: train -> serve -> replay
 tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 no-fire, fusion floor/bounds, agent gate/audit/read-only,
                 serving side-effect-freedom, analyst allowlist, write-auth
-                gate, .env loader) - 64 tests
+                gate, .env loader) - 66 tests
 ```
 
 ## Honest limitations

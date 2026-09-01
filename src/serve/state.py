@@ -170,6 +170,10 @@ class ReviewCase:
     ts: int
     amount_inr: float
     risk_score: float
+    # The CALIBRATED probability, kept separately from risk_score on purpose.
+    # risk_score is fusion's escalation scale, not a probability - multiplying
+    # rupees by it would be a category error. Expected loss needs the real one.
+    p_fraud: float
     confidence: float
     system_action: str
     reason: str
@@ -179,8 +183,14 @@ class ReviewCase:
     analyst_action: str | None = None
     analyst_note: str | None = None
 
+    @property
+    def expected_loss_inr(self) -> float:
+        """Rupees at stake: what this case is worth working."""
+        return self.amount_inr * self.p_fraud
+
     def to_dict(self) -> dict:
         return {"case_id": self.case_id, "merchant_id": self.merchant_id, "ts": self.ts,
+                "expected_loss_inr": round(self.expected_loss_inr, 2),
                 "amount_inr": round(self.amount_inr, 2),
                 "risk_score": round(self.risk_score, 1), "confidence": self.confidence,
                 "system_action": self.system_action, "reason": self.reason,
@@ -264,7 +274,8 @@ class PipelineState:
                 self.review_queue.append(ReviewCase(
                     case_id=self._next_case_id, merchant_id=row["merchant_id"],
                     ts=int(row["ts"]), amount_inr=float(row["amount"]),
-                    risk_score=risk or 0.0, confidence=confidence,
+                    risk_score=risk or 0.0, p_fraud=float(row["p"]),
+                    confidence=confidence,
                     system_action=action.value, reason=reason,
                     customer_id=row["customer_id"], device_id=row["device_id"]))
                 self._next_case_id += 1
@@ -344,16 +355,30 @@ class PipelineState:
                             f"flagged transactions"}
 
     def snapshot_queue(self, pending_only: bool = False) -> dict:
-        """Recent cases plus TRUE totals. The row list is capped for the wire,
-        but the counts must come from the full queue — the header and the
-        queue panel quoting two different numbers reads as a bug on screen."""
+        """The queue in the order it should be WORKED, plus TRUE totals.
+
+        Ranked by expected loss (amount x calibrated probability), because an
+        analyst runs out of time before the queue runs out of cases and the
+        order is therefore a policy decision, not a display detail. We shipped
+        arrival order first, which has no relationship to money; measured, that
+        cost 45% -> 5% of the queue's fraud value at 50 cases worked (see
+        src/policy/queue_order.py). Ranking by risk_score alone measured WORSE
+        than arrival - fusion's scale is not rupees.
+
+        The row list is capped for the wire, but the cap now takes the TOP
+        cases by rank rather than the most recent, and the counts still come
+        from the full queue - the header and the panel quoting two different
+        numbers reads as a bug on screen."""
         with self._lock:
-            q = [c.to_dict() for c in self.review_queue]
+            ranked = sorted(self.review_queue,
+                            key=lambda c: c.expected_loss_inr, reverse=True)
+            q = [c.to_dict() for c in ranked]
             pending_total = sum(1 for c in q if c["analyst_action"] is None)
             if pending_only:
                 q = [c for c in q if c["analyst_action"] is None]
-            return {"cases": q[-200:], "total_cases": len(self.review_queue),
-                    "pending_total": pending_total}
+            return {"cases": q[:200], "total_cases": len(self.review_queue),
+                    "pending_total": pending_total,
+                    "ordering": "expected_loss_desc"}
 
     def economics(self) -> dict:
         """Net protected value so far. Same formula as train.py step 7."""

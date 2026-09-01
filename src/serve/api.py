@@ -190,7 +190,10 @@ def review_queue(pending_only: bool = False):
     # computed over the FULL queue, not the 200-row wire cap - the header and
     # this panel must never quote different numbers.
     return {"cases": q["cases"], "pending": q["pending_total"],
-            "total_cases": q["total_cases"]}
+            "total_cases": q["total_cases"],
+            # The sort key is a policy decision, so it is stated on the wire
+            # rather than left implicit in whatever order the rows arrive.
+            "ordering": q["ordering"]}
 
 
 @app.post("/api/review-queue/{case_id}/decision", dependencies=WRITE)

@@ -292,3 +292,47 @@ def test_a_two_account_coincidence_is_not_reported_as_a_hub(client):
                if x["merchant_id"] == "nat")["signature"]
     assert sig["hubs"] == 0
     assert "shared by 2 accounts" not in sig["text"]
+
+
+# --- queue ordering is a policy decision, not a display detail ---------------
+# An analyst runs out of time before the queue runs out of cases, so the sort
+# key decides how much fraud value a human actually sees. See failure-log 28
+# and src/policy/queue_order.py for what arrival order cost.
+
+def test_queue_is_ranked_by_expected_loss_not_arrival(client):
+    """A cheap near-certain case must not outrank an expensive likely one."""
+    # small amount, very high probability -> low expected loss
+    STATE.record_txn(
+        {"merchant_id": "q", "ts": 1, "p": 0.99, "amount": 100.0,
+         "customer_id": "c1", "device_id": "d1", "ip": "i1", "instrument_id": "p1"},
+        risk=99.0, confidence=0.9, action=Action.RESTRICT, reason="t",
+        spiking=False, spike_ts=None)
+    # large amount, lower probability -> HIGHER expected loss, arrives later
+    STATE.record_txn(
+        {"merchant_id": "q", "ts": 2, "p": 0.60, "amount": 90_000.0,
+         "customer_id": "c2", "device_id": "d2", "ip": "i2", "instrument_id": "p2"},
+        risk=88.0, confidence=0.9, action=Action.RESTRICT, reason="t",
+        spiking=False, spike_ts=None)
+
+    body = client.get("/api/review-queue").json()
+    assert body["ordering"] == "expected_loss_desc"
+    cases = [c for c in body["cases"] if c["merchant_id"] == "q"]
+    assert cases[0]["amount_inr"] == 90_000.0          # the expensive one leads
+    assert cases[0]["expected_loss_inr"] == 54_000.0   # 90,000 x 0.60
+    assert cases[1]["expected_loss_inr"] == 99.0       # 100 x 0.99
+
+
+def test_the_wire_cap_keeps_the_top_cases_not_the_newest(client):
+    """The list is capped at 200 for the wire. Capping by arrival would hide
+    exactly the cases the ranking exists to surface."""
+    for i in range(230):
+        STATE.record_txn(
+            {"merchant_id": "cap", "ts": 1 + i, "p": 0.9, "amount": float(i + 1),
+             "customer_id": f"c{i}", "device_id": f"d{i}", "ip": f"i{i}",
+             "instrument_id": f"p{i}"},
+            risk=95.0, confidence=0.9, action=Action.REVIEW, reason="t",
+            spiking=False, spike_ts=None)
+    cases = client.get("/api/review-queue").json()["cases"]
+    assert len(cases) == 200
+    top = [c for c in cases if c["merchant_id"] == "cap"][0]
+    assert top["amount_inr"] == 230.0    # the largest, not the most recent
