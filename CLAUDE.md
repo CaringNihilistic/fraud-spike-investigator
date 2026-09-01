@@ -216,7 +216,13 @@ LEGITIMATE entity sharing start firing us? swept 0-100% over 5 seeds through the
 frozen pipeline, with a real device farm as a POSITIVE CONTROL - 3/60 legit
 merchant-seeds fire, all at >=80% sharing, INR 0 restricted; control 5/5 at
 0.959. The first run was WRONG - see entry 32)
-Merchant-data testability: `python -m src.models.merchant_data_check` (asks
+Merchant-data testability: `python -m src.models.merchant_data_check` (now
+checks BOTH Sparkov and IBM TabFormer under one criterion, and tests two things:
+CONCENTRATION (any window at an attack-like fraud rate?) and REACHABILITY (can
+any merchant pack 30 txns into the detector's 6h span guard?). Sparkov fails
+both, TabFormer passes reachability and fails concentration. Neither is
+testable. The first TabFormer run said TESTABLE and was a pandas datetime64[us]
+bug - see entry 33. Old note follows; it asks
 whether a public set can evaluate the MERCHANT layer at all; Sparkov has the
 merchant column and still cannot - 0 evaluable merchant-hour windows, max fraud
 rate 0.273 vs our 0.70-0.93. Run BEFORE modelling, never after)
@@ -923,3 +929,58 @@ explainability — every component must be defensible to a judge in one sentence
    DIRECTION we could reason about. A harness bug that produced a plausible
    curve would have shipped. The defence is not vigilance, it is the control
    row - build the thing that must fire, then believe the things that do not.
+
+33. THE HARNESS BUG THAT ARRIVED DISGUISED AS GOOD NEWS.
+   Both audits' surviving objection is that the merchant layer is validated
+   only on a world we authored. So we went looking properly this time rather
+   than asserting: Amazon Science's fraud-dataset-benchmark - the field's
+   curated standard - carries NINE datasets, and exactly ONE (Sparkov) has a
+   merchant identifier at all. Outside it, IBM TabFormer
+   (ealtman2019/credit-card-transactions) has 24M transactions, 100,343
+   merchants and a real merchant id. It is IBM-generated rather than real, but
+   it is not OURS, which is the half of "self-authored synthetic world" it can
+   actually remove. Downloaded it and ran the testability check first.
+   IT CAME BACK TESTABLE. 204,006 evaluable merchant-hour windows, 77 of them
+   at an attack-like fraud rate, and 5,074 merchants able to satisfy the
+   detector's 6h span guard - against Sparkov's 0/0/0. That is precisely the
+   result we wanted: a public dataset that can finally evaluate the merchant
+   layer, found days before a deadline.
+   IT WAS WRONG. pandas 3 returns datetime64[us] from to_datetime(dict(...)),
+   not the [ns] we assumed, so `ts.astype("int64") // 10**9` divided
+   MICROSECONDS by a billion and compressed 29 years of data into 11 days.
+   With time squashed 1000x every merchant looks like a burst, which is exactly
+   why the span guard appeared satisfiable and the windows appeared dense.
+   CORRECTED, the answer inverts and gets more interesting than Sparkov's:
+     span                        11 days -> 10,650 days
+     merchants clearing 6h guard   5,074 -> 29 of 20,702
+     max merchant-day fraud rate   1.000 -> 0.417
+     windows at attack-like rate      77 -> 0
+   TabFormer FAILS on concentration while PASSING reachability - the opposite
+   shape to Sparkov, which fails both. So it is not a speed problem and not a
+   size problem: 97,512 of its 100,343 merchants carry ZERO fraud and the rest
+   average ~10 fraud txns spread across 29 years. Fraud per compromised CARD
+   10.81 vs per merchant 10.51. Stolen cards spent across many merchants, once
+   more, from a completely different generator.
+   WHAT CAUGHT IT, and this is the uncomfortable part: NEITHER CRITERION DID.
+   Both happily consumed the compressed timestamps and returned TESTABLE. What
+   caught it was an internal consistency check with nothing to do with the
+   verdict - a dataset documented as spanning 1991-2020 reporting 11 days.
+   Sparkov acted as the control without being designed as one: it carries a
+   native unix_time column with no conversion, and its numbers came back
+   bit-identical to an ad-hoc check run earlier, which localised the fault to
+   the TabFormer loader rather than the criterion.
+   THIS IS THE SECOND HARNESS ARTIFACT IN TWO EXPERIMENTS (see entry 32), and
+   the more dangerous of the pair. Entry 32's bug produced an ABSURD curve -
+   false alarms falling as sharing rose - so it argued with us. This one
+   produced exactly the finding we were hoping for. A harness bug that flatters
+   you is not caught by scrutiny, because you are not applying any.
+   NOT FIXED BY VIGILANCE, and we will not pretend otherwise. The rule we can
+   actually keep: assert a loaded dataset's own documented shape - row count,
+   date range, label prevalence - BEFORE measuring anything with it, and fail
+   loudly on mismatch. The check now derives its firing preconditions from the
+   shipped StreamingSpikeDetector rather than restating them, so at least the
+   criterion cannot drift from the thing it checks.
+   NET RESULT: the limitation is unchanged but far better evidenced. Nine
+   benchmark datasets, one merchant identifier; that one plus IBM's 24M set
+   both measured, both unable to evaluate this layer, for two DIFFERENT
+   structural reasons. It is not that we did not look.

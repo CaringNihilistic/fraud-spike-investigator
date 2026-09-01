@@ -3,7 +3,7 @@
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
 [![Tests](https://img.shields.io/badge/tests-80_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![Failures logged](https://img.shields.io/badge/failures_logged-32_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Failures logged](https://img.shields.io/badge/failures_logged-33_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
@@ -871,49 +871,81 @@ tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 gate, .env loader) - 80 tests
 ```
 
-## We went looking for public merchant data. Here is what we found.
+## We went looking for public merchant data. Twice. Here is what we found.
 
 The standing limitation is that the merchant-level layer — the part this product
-*is* — has only ever been tested on data we generated. The stated reason used to
-be *"neither public dataset we evaluated has a merchant column"*, which is an
+*is* — has only ever been tested on data we generated. The old phrasing was
+*"neither public dataset we evaluated has a merchant column"*, which is an
 argument from absence and invites the obvious reply: **then go and find one that
 does.**
 
-So we did. `kartik2112/fraud-detection` (Sparkov) has a `merchant` column, card
-IDs and timestamps — everything the spike detector needs. **We ran the
-testability check before writing any modelling code**, because discovering
-afterwards that a test could not have worked is how you publish an invalid null
-(that is failure-log 24, on IEEE-CIS).
+**Start with what the field itself considers the standard set.**
+[Amazon Science's fraud-dataset-benchmark](https://github.com/amazon-science/fraud-dataset-benchmark)
+curates **nine** fraud datasets. Exactly **one** of them carries a merchant
+identifier at all:
 
-| | Sparkov | our attack merchants |
-|---|---|---|
-| Evaluable merchant-**hour** windows (≥10 txns) | **0** | routine |
-| Highest fraud rate, any merchant-day | **0.273** | **0.70 – 0.93** |
-| Merchant windows at an attack-like rate | **0** | every attack |
-| Worst-affected merchant | 49 fraud txns over **538 days**, max 2/day | 100–180 in a **2–6 hour** window |
+| Merchant identifier | Datasets |
+|---|---|
+| **Yes — 1** | Sparkov (1.3M txns) |
+| **No — 8** | IEEE-CIS, ULB Credit Card, Fraud ecommerce, Twitter Bots, Malicious URLs, Fake Job Posting, Vehicle Loan, IP Blocklist |
 
-**There is nothing there to detect.** Fraud is spread almost evenly — median
-merchant fraud rate 0.32%, max 2.57%, and only **14 of 693** merchants escape it
-entirely.
+We tested that one, and then went outside the benchmark for a second:
+**IBM TabFormer** (24M transactions, 100,343 merchants, a real merchant id).
+TabFormer is IBM-generated rather than real — but it is *not ours*, which is the
+half of "self-authored synthetic world" it can actually remove.
 
-The reason is structural, and it is the part worth keeping:
+**We ran a testability check before writing any modelling code**, because
+discovering afterwards that a test could not have worked is how you publish an
+invalid null (failure-log 24). The check asks two things, and the second is the
+one that is easy to forget:
+
+1. **Concentration** — does any evaluable merchant window actually reach an
+   attack-like fraud rate?
+2. **Reachability** — can any merchant pack 30 transactions into the detector's
+   6-hour span guard? A dataset too slow for that **cannot make our detector fire
+   whatever the fraud looks like**, so a clean result there measures our own guard.
+
+| | Sparkov | IBM TabFormer | our attack merchants |
+|---|---|---|---|
+| Merchants | 693 | 100,343 | 12 |
+| Merchants clearing the 6h span guard | **0 of 693** | **29 of 20,702** | routine |
+| Max fraud rate, any merchant-day | **0.273** | **0.417** | **0.70 – 0.93** |
+| Windows at an attack-like rate | **0** | **0** | every attack |
+| Merchants with zero fraud | 14 of 693 | **97,512 of 100,343** | — |
+
+**Neither can evaluate this layer, and they fail differently — which is the
+interesting part.** Sparkov fails both bars: its fastest merchant needs 19.3
+hours to accumulate 30 transactions, against a 6-hour guard. TabFormer *passes*
+reachability and fails on concentration. So this is not a speed problem and not
+a size problem. The structural tell is identical in both:
 
 ```
-7,506 fraud transactions
-  9.8 per compromised CARD        <- the phenomenon being modelled
- 11.1 per affected merchant, across 693 merchants
+Sparkov      9.8 fraud txns per compromised CARD   vs  11.1 per merchant
+TabFormer   10.8 fraud txns per compromised CARD   vs  10.5 per merchant
 ```
 
 **Public card-fraud datasets model stolen cards spent across many merchants.
-This product models merchants under coordinated attack.** Those are different
-loss classes. A merchant column is necessary to test our layer and nowhere near
-sufficient — the data also has to contain the burst structure, and none of the
-three public datasets we have now examined does.
+This product models merchants under coordinated attack.** Different loss classes
+— now shown from two independent generators.
 
-So the honest limitation is narrower and better evidenced than before: **it is
-not that we did not look.** It is that the loss class this product addresses is
-not represented in the public data we can reach, and closing it properly needs a
-PSP's own traffic. Reproduce: `python -m src.models.merchant_data_check`.
+So the honest limitation is narrower and much better evidenced: **it is not that
+we did not look.** Nine benchmark datasets, one merchant identifier; that one
+plus IBM's 24M-transaction set, both measured, both structurally unable to
+answer the question. Closing it needs a PSP's own traffic.
+
+**One thing we got wrong on the way, because it matters more than the result.**
+The first TabFormer run came back **TESTABLE** — 5,074 merchants clearing the
+span guard and 77 attack-rate windows. It was a bug in our loader: pandas 3
+returns `datetime64[us]`, not `[ns]`, so dividing by `10**9` compressed 29 years
+into 11 days and made every merchant look like a burst. **Neither criterion
+caught it** — both consumed the compressed timestamps happily. What caught it was
+a dataset documented as spanning 1991–2020 reporting an 11-day span.
+[Failure-log 33](CLAUDE.md) has the full account, including the part we cannot
+fix by being careful: this bug produced *exactly the answer we were hoping for*,
+and a harness bug that flatters you is not caught by scrutiny, because none is
+being applied.
+
+Reproduce: `python -m src.models.merchant_data_check`.
 
 ---
 
@@ -925,7 +957,7 @@ Ordered by how much they should discount the results.
 
 2. **~~Our simulator encodes the label into two features.~~ FIXED — and here is what the fix cost.** `customer_age_days` + `amount_dev_ratio` alone used to reach 0.9328 against the full model's 0.9344. Attack accounts are now aged realistically and fraud amounts are fraud-type dependent, which dropped the proxy pair to **0.5997** against a full-set **0.8981**. The cost at the time: PR-AUC 0.945 → 0.910 over five seeds, net protected value ₹10.57L → ₹7.95L, legitimate ₹ wrongly blocked ₹5,901 → ₹21,728. (Superseded again by limitation 6.) See [Leakage self-audit](#leakage-self-audit-we-broke-our-own-headline-then-fixed-it). The residual limitation is narrower but real: **we fixed the two proxies we found. We have not proven there are no others** — a negative result from an adversarial test is only ever as strong as the test.
 3. **Our entity graph is unvalidated on public data; the two public datasets we evaluated (ULB `creditcardfraud`, IEEE-CIS) do not expose the persistent entity relationships required to directly test this claim.** Neither exposes the persistent account/device/IP relationships the layer operates on — IEEE-CIS `DeviceInfo` is a device *type* ("Windows" is 40.2% of rows), not a fingerprint, and it has no account identifier, so "one device across fifty accounts" is inexpressible ([Real-data check](#real-data-check--our-recipe-someone-elses-data)). We ran the experiment anyway and publish the rows, but we do not present them as evidence for or against the hypothesis, because the experiment does not measure it. What *is* independently supported: Vesta's own entity-counting features are the single largest contributor to real-data performance (+0.352), so the concept has outside support even though our implementation of it is untested on real traffic. Closing this properly needs data with real entity resolution — realistically, a PSP's own.
-4. **The merchant-level system — the actual product — is validated only on synthetic data, and we now know why that is hard to fix.** ULB and IEEE-CIS have no merchant column at all. A third dataset (Sparkov) does, and [we measured that it still cannot test this layer](#we-went-looking-for-public-merchant-data-here-is-what-we-found): zero evaluable merchant-hour windows, and a maximum fraud rate of 0.273 against the 0.70–0.93 our attacks reach. Public card-fraud data models *stolen cards spent across merchants*; this models *merchants under attack*. Methodology transfers at transaction level (ULB PR-AUC 0.731, IEEE-CIS 0.460, zero tuning); the product claim does not, and closing it properly needs a PSP's own traffic rather than another Kaggle download. What we *can* do inside our own data is stop sampling the false-positive boundary at three points and sweep it: [legitimate entity sharing 0→100%](#three-points-are-not-a-distribution--so-we-swept-the-continuum) fires nothing below 80% concentration, 3 of 60 merchant-seeds above it, and restricts ₹0 either way.
+4. **The merchant-level system — the actual product — is validated only on synthetic data, and we now know why that is hard to fix.** Of the **nine** datasets in Amazon Science's fraud-dataset-benchmark, exactly **one** (Sparkov) has a merchant identifier. We measured that one and IBM's 24M-transaction TabFormer set, and [neither can evaluate this layer](#we-went-looking-for-public-merchant-data-twice-here-is-what-we-found) — Sparkov because no merchant can pack 30 transactions into the detector's 6-hour window (**0 of 693**, fastest 19.3h), TabFormer because its fraud is never concentrated (**max merchant-day rate 0.417**, zero attack-rate windows, **97,512 of 100,343** merchants carrying no fraud at all). Public card-fraud data models *stolen cards spent across merchants*; this models *merchants under attack*. Methodology transfers at transaction level (ULB PR-AUC 0.731, IEEE-CIS 0.460, zero tuning); the product claim does not, and closing it properly needs a PSP's own traffic rather than another Kaggle download. What we *can* do inside our own data is stop sampling the false-positive boundary at three points and sweep it: [legitimate entity sharing 0→100%](#three-points-are-not-a-distribution--so-we-swept-the-continuum) fires nothing below 80% concentration, 3 of 60 merchant-seeds above it, and restricts ₹0 either way.
 5. **Data is synthetic throughout** (simulator parameters like "0.7%→5% fraud" are design choices, not Razorpay statistics). The simulator explicitly wires shared entities across accounts — fraud rings only exist in a graph if you construct them.
 6. **~~One legitimate-spike scenario.~~ Now three — and one of them still breaks us.** The flash sale used to be the only benign event tested, and it shares no entities, so it never exercised the entity layer at all. There are now also a corporate buyer (shared office IP) and a shared payment kiosk (shared device), both built from established customers so that entity sharing is the only difference from ordinary traffic. **The kiosk broke the system on first contact and was fixed; the corporate buyer still false-alarms on one seed in five and is deliberately unfixed** — [the symmetric fix costs an entire attack class](#the-hard-negative-a-legitimate-merchant-built-to-look-like-an-attack). Festival sales, product launches and marketing campaigns remain untested, and the EWMA baseline still has no seasonality term.
 7. **The review queue may not be staffable — and the load just went up 60%.** 66.9 cases per 1,000 transactions is 6.69% of the stream, up from 41.9 before the hard negatives: teaching the model that shared devices can be honest made it more cautious everywhere. At 1M transactions/day that is roughly 279 full-time analysts rather than 175. Net protected value stays positive up to **₹905 per review — 18× our ₹50 assumption** (table above), so the economics are not resting on that guess. Staffing is the part that does not follow: 4.19% of the stream still has to be worked by people who may not exist. We price analyst time at ₹50/case but never ask whether the analysts exist; at PSP volume that is a headcount question, and the honest answer is that the restrict/review cutoffs would have to be re-swept against a capacity constraint, not only against cost.
