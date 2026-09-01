@@ -2,36 +2,36 @@
   "winner": "XGBoost",
   "tie_margin": 0.02,
   "notes": [
-    "Top GBDTs are within 0.02 PR-AUC of each other (LightGBM=0.7737, XGBoost=0.7636, CatBoost=0.7607) -> tie-break rule applies: selected by speed + maintainability -> XGBoost (fastest train time, single-file model artifact, no external compiler toolchain)."
+    "Top GBDTs are within 0.02 PR-AUC of each other (LightGBM=0.7702, XGBoost=0.7625, CatBoost=0.7573) -> tie-break rule applies: selected by speed + maintainability -> XGBoost (fastest train time, single-file model artifact, no external compiler toolchain)."
   ],
   "table": [
     {
       "model": "LogisticRegression",
       "family": "linear",
-      "val_pr_auc": 0.7146,
+      "val_pr_auc": 0.7149,
       "train_time_s": 0.06,
-      "inference_time_s": 0.0009
+      "inference_time_s": 0.0007
     },
     {
       "model": "XGBoost",
       "family": "GBDT",
-      "val_pr_auc": 0.7636,
-      "train_time_s": 0.219,
-      "inference_time_s": 0.0053
+      "val_pr_auc": 0.7625,
+      "train_time_s": 0.352,
+      "inference_time_s": 0.0073
     },
     {
       "model": "LightGBM",
       "family": "GBDT",
-      "val_pr_auc": 0.7737,
-      "train_time_s": 2.212,
-      "inference_time_s": 0.0083
+      "val_pr_auc": 0.7702,
+      "train_time_s": 1.58,
+      "inference_time_s": 0.0074
     },
     {
       "model": "CatBoost",
       "family": "GBDT",
-      "val_pr_auc": 0.7607,
-      "train_time_s": 6.18,
-      "inference_time_s": 0.0037
+      "val_pr_auc": 0.7573,
+      "train_time_s": 9.076,
+      "inference_time_s": 0.0041
     }
   ]
 }
