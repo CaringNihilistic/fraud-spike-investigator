@@ -150,6 +150,14 @@ legit revenue impacted on the policy path, 948 review cases
 It is 1 because the symmetric fix costs an entire attack class - see entry 29.
 Flash sale flagged 0/5. Three legitimate spikes are now tested, two of which
 share entities; the flash sale alone never exercised the entity layer at all.
+TOPOLOGY GENERALISATION (entry 34): attacks rebuilt with DIFFERENT entity
+graphs, everything else matched, frozen pipeline, 5 seeds. known 22/25 detected
+vs unseen 21/25; 4 of the 5 unseen variants are 2.5-10x LESS concentrated, i.e.
+harder, and all four were still caught 5/5. Mean flagged rate inside the attack
+0.815 -> 0.709 (card testing 0.758 -> 0.436, ip cluster 0.872 -> 0.612): the
+merchant layer holds while the TRANSACTION scorer loses confidence. ATO control
+is weak (2/5 even known) - both its rows are weak evidence and we did NOT tune
+the window until it fired.
 CONTINUUM SWEEP (entry 32): those three are POINTS, so the boundary was swept -
 legitimate sharing 0-100% through one entity, 5 seeds, frozen pipeline, real
 device farm as positive control. Nothing fires below 80% concentration (40/40
@@ -215,6 +223,13 @@ resamples, so the table's deltas carry intervals rather than bare points)
 Generator sensitivity: `python -m src.models.aged_share_sensitivity` (is the
 aged_share choice load-bearing? no - and there is a control proving the
 sweep reproduces the leak when it should)
+Topology generalisation: `python -m src.models.topology_generalisation` (does
+detection survive a change of attack SHAPE? each attack rebuilt with a different
+entity graph, volume/window/amounts/ageing matched, frozen pipeline, 5 seeds,
+known shapes as positive control. known 22/25 vs unseen 21/25 detected, but mean
+flagged rate 0.815 -> 0.709 - the MERCHANT layer holds while the TRANSACTION
+scorer degrades. ATO control is weak (2/5 known) and both its rows are weak
+evidence; say so. See entry 34)
 Sharing sensitivity: `python -m src.models.sharing_sensitivity` (where does
 LEGITIMATE entity sharing start firing us? swept 0-100% over 5 seeds through the
 frozen pipeline, with a real device farm as a POSITIVE CONTROL - 3/60 legit
@@ -233,7 +248,7 @@ rate 0.273 vs our 0.70-0.93. Run BEFORE modelling, never after)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (90 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (117 pass, no network needed)
 REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
 random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
 Methodology transfers; the 0.898 does NOT. NEGATIVE RESULT (entry 24): our
@@ -1014,3 +1029,52 @@ explainability — every component must be defensible to a judge in one sentence
    benchmark datasets, one merchant identifier; that one plus IBM's 24M set
    both measured, both unable to evaluate this layer, for two DIFFERENT
    structural reasons. It is not that we did not look.
+
+34. WE ASKED WHETHER THE DETECTOR KNOWS FRAUD OR ONLY OUR DRAWINGS.
+   Two audits converged on the same objection and neither could be answered by
+   more documentation: our five attacks are five TOPOLOGIES, and the model had
+   only ever been tested against the shapes it was trained on. If detection
+   collapses when the graph changes while the crime does not, then every
+   merchant-level number in this repo is a fact about the generator.
+   Built src/models/topology_generalisation.py. Each attack appears twice with
+   transaction count, burst window, amount distribution, account ageing and
+   fraud prevalence MATCHED; the only difference is who shares what with whom.
+   Frozen pipeline, 5 seeds, and the known shapes rebuilt with FRESH entity ids
+   as a positive control - so nothing is recognised by identity, only by form.
+     card testing   3 dev / 2 ip     ->  25 dev / 20 ip   60 -> 7.2 txn/dev
+     device farm    1 dev, 50 acct   ->  10 dev / 6 ip    130 -> 13
+     ip cluster     40 acct on 1 ip  ->  6 rotating ips   6x diluted
+     fraud ring     dense 15x4       ->  sparse 30x2of20  30 -> 12
+     takeover       25 unique dev    ->  5 shared proxies CONCENTRATED
+   FOUR OF THE FIVE UNSEEN VARIANTS ARE STRICTLY HARDER (2.5-10x less entity
+   concentration, which is the signal the detector leans on). A test asserts
+   this rather than trusting it, because a suite of secretly-easier variants
+   would make a survival result meaningless.
+   RESULT: known 22/25 detected, unseen 21/25. All four harder variants still
+   5/5. But the mean flagged rate INSIDE the attack falls 0.815 -> 0.709, and
+   on the two families whose fan-out was removed it falls much further - card
+   testing 0.758 -> 0.436, ip cluster 0.872 -> 0.612.
+   THE GAP IS THE FINDING, not the headline count. The per-transaction model
+   clearly IS partly recognising shape: it loses confidence when the graph
+   changes. The merchant-level layer fires anyway. That is this project's own
+   thesis appearing as a measurement rather than an argument - the case for a
+   merchant layer is precisely that it survives what per-order scoring finds
+   ambiguous, and here we can watch that happen.
+   WHAT WE DID NOT DO: tune anything until it fired. The account-takeover
+   control fires only 2/5 even in its KNOWN form, because ATO is diffuse by
+   construction - ~75 fraud txns over 22 hours never reaches a rate-in-a-window
+   bar on a merchant doing 200/day. Compressing its window would have produced
+   a clean 5/5 and measured nothing. Both ATO rows are reported as WEAK
+   EVIDENCE and the verdict names them itself.
+   LIMIT WE STATE FIRST: each variant degrades ONE signature and keeps the
+   others - card testing still burns a novel instrument per transaction, the
+   farm still shares instruments. A real adversary would degrade several at
+   once, and this does not simulate that. Five topologies, one variant each,
+   our generator, 5 seeds.
+   THE HARNESS BUG THIS TIME WAS TRIVIAL AND THAT IS WORTH RECORDING TOO: the
+   verdict string had seven format specifiers and six arguments, so the run
+   crashed AFTER printing a complete and correct table. Third harness fault in
+   three experiments (32, 33, 34) - but the first that could not corrupt a
+   result, because it failed loudly at the point of reporting rather than
+   quietly at the point of measuring. That is the difference between a bug that
+   costs five minutes and one that nearly shipped a false finding.
