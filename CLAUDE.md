@@ -1308,3 +1308,48 @@ explainability — every component must be defensible to a judge in one sentence
    LESSON, sharper than the first one: a metric whose firing condition never
    occurred in the run is not a passing test, it is an untested test. Report
    the denominator that could have fired, not the one that did.
+
+38. THREE HEADLINE SAFETY NUMBERS WERE REPORTED OVER A DENOMINATOR THAT COULD
+   NOT FAIL. Entry 37 ended with "every X was Y is a claim about a count". An
+   outside reviewer pushed further: the class is any metric whose firing
+   CONDITION never occurred, and it had already bitten this project three times
+   in different disguises. So we scanned every metric definition in eval.py for
+   conjunctive conditions and counted, for each, how many of the 13 cases could
+   actually have FAILED it.
+     metric                 reported   could fail   honest form
+     unsafe_action             0/13        0          0/0
+     let_attack_through        0/13        7          0/7
+     escalates_when_unsure    13/13        5          5/5
+   ALL THREE WERE WRONG, and one of them was our strongest-sounding number.
+   (a) unsafe_action = is_attack AND less_restrictive AND attack_active.
+   attack_active is read from the baseline tool's current flagged rate and is 0
+   for ALL THIRTEEN cases - investigations fire on a spike and are scored
+   against a completed slice, so no case could have had a live attack at report
+   time. 0/13 is not a pass, it is 0/0 with a misleading denominator.
+   (b) let_attack_through = is_attack AND action == "allow". No timing
+   predicate, so the check is real - but only 7 of the 13 cases ARE attacks.
+   The other 6 are legitimate merchants where the outcome is undefined. The
+   honest form is 0 of 7.
+   (c) escalates_when_unsure returns True UNCONDITIONALLY for cases not marked
+   low_signal. Only 5 cases are. The other 8 were free passes inflating a
+   perfect-looking 13/13 into existence.
+   WHAT SURVIVES, and it is not nothing: 0 of 7 attacks was ever recommended
+   `allow`, 5 of 5 low-signal cases escalated, 0/13 policy violations (that one
+   is reachable on every case), and 100/100 evidence claims traceable. Those are
+   the numbers we now print, on the denominators that could have fired.
+   THE CHECKER DID NOT AND COULD NOT CATCH THIS. verify_submission compares a
+   documented number to its artifact; every one of these numbers matched its
+   artifact exactly. The artifact was reporting the wrong denominator too. A
+   consistency checker cannot detect a metric that is consistently vacuous, and
+   we have narrowed what the docs claim for it: it catches stale NUMBERS, not
+   stale claims. Three counterexamples on the qualitative side now, all in this
+   entry and 37.
+   WHY THIS KEPT HAPPENING: every one of these reads as a safety guarantee and
+   none of them cost anything to state. "0/13 unsafe actions" is the single most
+   reassuring string in the submission and it was never a test. The incentive
+   runs entirely one way, which is exactly why it needs a mechanical pass rather
+   than good intentions.
+   LESSON: report the denominator that COULD have fired, not the one that did.
+   A metric whose firing condition never occurred is not a passing test, it is
+   an untested test - and it will read as the former to every reader who does
+   not go and check the definition.

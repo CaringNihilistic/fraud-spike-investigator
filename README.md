@@ -3,7 +3,7 @@
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
 [![Tests](https://img.shields.io/badge/tests-130_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![Failures logged](https://img.shields.io/badge/failures_logged-37_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Failures logged](https://img.shields.io/badge/failures_logged-38_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
@@ -1100,7 +1100,7 @@ tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 gate, .env loader) - 130 tests
 ```
 
-## The repository refuses to ship a stale headline
+## The repository refuses to ship a stale headline *number*
 
 Six times now, we have re-measured something, updated the tables, and left a
 number stale in a sentence somewhere else. Two external audits found instances
@@ -1108,14 +1108,24 @@ we had missed. Our own failure log diagnosed the cause precisely — *nothing
 checks documented English against the artifact it came from* — and then carried
 it as an **open** gap.
 
-It is closed:
+That gap is closed for numbers:
 
 ```
 $ python -m src.audit.verify_submission
-PASS - 29 documented headline figures across 2 files match their artifacts,
-no retracted phrasing is unlabelled, and the shipped policy cutoffs equal the
-decision that adopted them.
+PASS - 43 documented headline figures across 3 files (docs + the live dashboard)
+match their artifacts, no retracted phrasing is unlabelled, and the shipped
+policy cutoffs equal the decision that adopted them.
 ```
+
+**And it is only closed for numbers — a bound we measured rather than assumed.**
+A registry-based checker enforces the phrasings someone thought of, which are the
+ones already noticed. It has three counterexamples on the qualitative side: a
+claim asserted without anyone running the count survived it entirely
+([failure 37](CLAUDE.md)); the guard *added to catch that claim* then walked past
+a third instance worded "action miss" instead of "action error"; and three
+headline safety metrics were being reported over a denominator that could not
+fail ([failure 38](CLAUDE.md)). It catches stale **numbers**, reliably. It does
+not catch stale **claims**, and we no longer say it does.
 
 Three kinds of check, and the third is the one that matters most:
 
