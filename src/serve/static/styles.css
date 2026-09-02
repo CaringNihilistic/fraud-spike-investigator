@@ -332,6 +332,43 @@ tr.overridden td { background: #FFFAEB; }
 .whysplit .wn { font-size: 12px; color: var(--dim); }
 @media (max-width: 760px) { .whysplit { grid-template-columns: 1fr; } }
 
+/* ---------- keyboard focus ----------
+   There was not one :focus rule in this stylesheet. Every interactive surface
+   here is reachable by tab now, so every one has to SHOW that it is. */
+.mcard:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+.chip:focus-visible,
+.vtab:focus-visible {
+  outline: 3px solid var(--rzp-blue);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+header .vtab:focus-visible { outline-color: #8CC5FF; }
+
+/* ---------- the three-step summary ----------
+   Replaced a 105-word paragraph. Same claim, taken in at a glance. */
+.wsteps { display: flex; align-items: stretch; gap: 14px; flex-wrap: wrap; }
+.wstep { display: flex; flex-direction: column; gap: 2px; min-width: 150px; flex: 1; }
+.wstep .n {
+  font-size: 26px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05;
+  font-variant-numeric: tabular-nums; color: var(--text);
+}
+.wstep .n.bad { color: var(--red); }
+.wstep .n.good { color: var(--green); }
+.wstep .l { font-size: 12.5px; color: var(--dim); line-height: 1.45; }
+.wsteps .arr { align-self: center; color: var(--faint); font-size: 18px; }
+.wmore { margin-top: 12px; border-top: 1px solid var(--line-soft); padding-top: 9px; }
+.wmore summary {
+  cursor: pointer; font-size: 12.5px; color: var(--rzp-blue-deep); font-weight: 600;
+  list-style: none;
+}
+.wmore summary::-webkit-details-marker { display: none; }
+.wmore summary::before { content: "▸ "; }
+.wmore[open] summary::before { content: "▾ "; }
+.wmore p { font-size: 13px; color: var(--dim); line-height: 1.6; margin: 8px 0 0; }
+@media (max-width: 700px) { .wsteps .arr { display: none; } }
+
 /* light scrollbars so the recording doesn't show chunky OS bars */
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }

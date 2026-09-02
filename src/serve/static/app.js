@@ -199,8 +199,18 @@ function MerchantCard({ m, selected, onSelect }) {
   // difference between "0.0%" reading as a contradiction and reading as news.
   const cooled = m.in_spike && (d.current_rate || 0) < (d.baseline_rate || 0);
 
+  // Selecting a merchant is the console's primary interaction and it used to be
+  // a bare clickable container: unreachable by keyboard, invisible to a screen reader,
+  // and with no focus ring anywhere in the stylesheet. An analyst tool that can
+  // only be driven by mouse is not finished.
+  const activate = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(m.merchant_id); }
+  };
   return html`
-    <div class=${cls} onClick=${() => onSelect(m.merchant_id)}>
+    <div class=${cls} role="button" tabIndex=${0} aria-pressed=${!!selected}
+         aria-label=${`merchant ${m.merchant_id}, ${m.in_spike ? 'under attack' : 'normal'}`}
+         onKeyDown=${activate}
+         onClick=${() => onSelect(m.merchant_id)}>
       <div class="top">
         <span class="mid">${m.merchant_id}</span>
         ${m.in_spike
@@ -401,7 +411,9 @@ function Investigation({ merchantId, inSpike }) {
                  purpose: an API key on a public host would let any visitor spend
                  credits. Everything else you see is live. Run it locally with
                  ${' '}<span class="mono">python run_demo.py</span>${' '}and an
-                 ANTHROPIC_API_KEY to see investigations, or watch the pitch video.`
+                 ANTHROPIC_API_KEY to see investigations. The eval that scored this
+                 agent — 13 cases, live, on de-labelled data — is in the repo under
+                 ${' '}<span class="mono">artifacts_out/agent_eval.csv</span>.`
           : inSpike === false
             ? 'No spike -> no investigation. The agent only runs when the detector fires, so quiet merchants cost zero analyst time and zero tokens.'
             : 'No investigation yet — these fire automatically when the spike detector trips.'}
@@ -564,6 +576,39 @@ function ContrastSide({ m, tone, headline, sub }) {
       <div class="stat"><span class="k">transactions restricted</span>
         <span class="v" style=${{ color: restricts ? 'var(--red)' : 'var(--green)' }}>${restricts}</span></div>
       <div class="side-graph"><${EntityGraph} merchantId=${m.merchant_id} compact=${true} /></div>
+    </div>`;
+}
+
+/* ---------- the contrast that actually tests the thesis ----------
+   The flash-sale panel below compares volume, and volume is the EASY case: m11
+   gives every account its own device and IP, so it could never have failed us
+   (failure-log 29 says exactly that). The kiosk is the hard one - 25 real
+   customers through ONE terminal, which is a device farm's signature drawn by
+   honest traffic, and it scored 0.972 against a real farm's 0.985 before we
+   fixed the training distribution. It also lands on day 26, so unlike the flash
+   sale it is visible DURING the replay rather than only at the end. */
+function EntityContrast({ merchants }) {
+  const farm = merchants.find((m) => m.merchant_id === 'm5');
+  const kiosk = merchants.find((m) => m.merchant_id === 'm10');
+  if (!farm || !kiosk || (kiosk.txn_count || 0) < 100) return '';
+  return html`
+    <div class="panel contrast-panel">
+      <h2>Same entity signature, opposite verdict</h2>
+      <div class="note" style=${{ marginTop: 0, marginBottom: '14px' }}>
+        Both merchants funnel many accounts through very few devices — the shape this
+        whole system escalates on. One is a device farm. One is a shop counter where
+        real customers pay through a shared terminal.${' '}
+        <b>Entity sharing is necessary evidence, not sufficient evidence</b>, and this
+        is the pair that proves we mean it: the honest one once scored 0.972 against
+        the farm's 0.985 and had to be fixed.
+      </div>
+      <div class="contrast">
+        <${ContrastSide} m=${farm} tone="bad" headline="attack · restricted"
+          sub="Device farm — a few devices driving dozens of throwaway accounts." />
+        <div class="vs">vs</div>
+        <${ContrastSide} m=${kiosk} tone="good" headline="legitimate · untouched"
+          sub="Shared kiosk — 25 real customers, one terminal, their own cards." />
+      </div>
     </div>`;
 }
 
@@ -1070,17 +1115,38 @@ function App() {
       <main>
         ${view === 'pitch' ? html`<${Pitch} />` : html`<div>
         ${booting ? html`<${Booting} status=${status} />` : html`<div class="watching">
-          <b>What you are watching:</b> ${(status?.total || 0).toLocaleString()}${' '}
-          transactions replayed one at a time across ${merchants.length} merchants,
-          through the real pipeline — scorer, spike detector, policy engine, review
-          queue. ${nAttack > 0 ? html`<b class="bad">${nAttack} of these merchants are
-          under coordinated attack right now.</b>` : ''}
-          <span class="wsub">Three of them are legitimate spikes, and two of those
-          share entities — a corporate office on one IP, and a shop counter where
-          everyone pays through the same terminal. Both carry an attack's exact
-          signature. <b>None of the three is restricted.</b> Every block and every
-          review below is held for a human to confirm; nothing here acts on its own,
-          and the language model cannot authorise anything.</span>
+          ${/* 105 words of prose used to sit here - in the position a reader
+               looks at first and reads least. The claim is now three numbers
+               taken in at a glance; the full argument is one click away and
+               unchanged, not deleted. */''}
+          <div class="wsteps">
+            <div class="wstep">
+              <span class="n">${(status?.total || 0).toLocaleString()}</span>
+              <span class="l">transactions replayed through the real pipeline</span>
+            </div>
+            <span class="arr" aria-hidden="true">\u2192</span>
+            <div class="wstep">
+              <span class=${'n ' + (nAttack ? 'bad' : '')}>${nAttack}</span>
+              <span class="l">merchants under coordinated attack</span>
+            </div>
+            <span class="arr" aria-hidden="true">\u2192</span>
+            <div class="wstep">
+              <span class="n good">3</span>
+              <span class="l">legitimate spikes \u2014 <b>none restricted</b></span>
+            </div>
+          </div>
+          <details class="wmore">
+            <summary>what that actually means</summary>
+            <p>Every transaction is scored, fed to the merchant-level spike detector
+            and routed through the policy engine \u2014 scorer, detector, policy, review
+            queue. Nothing here is a recording.</p>
+            <p>Two of the three legitimate spikes <b>share entities</b>: a corporate
+            office on one IP, and a shop counter where everyone pays through the same
+            terminal. Both carry an attack's exact signature and neither is restricted
+            \u2014 that is the hard part, not the attacks.</p>
+            <p>Every block and every review is held for a human to confirm. Nothing
+            acts on its own, and the language model cannot authorise anything.</p>
+          </details>
         </div>`}
         ${finale ? html`
           <div class="finale-banner">
@@ -1088,6 +1154,7 @@ function App() {
             <span><b>${finale.message}</b>${' '}<span class="why">Volume spiked 6×;
               the fraud-score rate did not. The detector fires on risk, not traffic.</span></span>
           </div>` : ''}
+        <${EntityContrast} merchants=${merchants} />
         ${finale ? html`<${Contrast} merchants=${merchants} />` : ''}
         <div class="panel" style=${{ marginBottom: '14px' }}>
           <h2>Merchants${' '}<span class="sandbox">judge sandbox</span></h2>
