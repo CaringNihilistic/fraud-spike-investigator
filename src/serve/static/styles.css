@@ -389,6 +389,26 @@ header .vtab:focus-visible { outline-color: #8CC5FF; }
 .qsplit .wn { font-size: 12px; color: var(--dim); }
 @media (max-width: 760px) { .qsplit { grid-template-columns: 1fr; } }
 
+/* ---------- hand-rolled SVG charts ----------
+   Recessive grid and axes, 2px lines, 9px markers, native <title> for hover.
+   Every chart keeps its table underneath: that is the accessible view, and it
+   is why no chart here needs to carry a value on every point. */
+.chart { margin: 12px 0 4px; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.cgrid { stroke: var(--line); stroke-width: 1; }
+.cax { fill: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+.clab { fill: var(--dim); font-size: 11.5px; }
+.cval { fill: var(--text); font-size: 11.5px; font-weight: 700;
+        font-variant-numeric: tabular-nums; }
+.cln { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.cdot { stroke: var(--card); stroke-width: 2; }
+.clegend {
+  display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px;
+  font-size: 12px; color: var(--dim);
+}
+.clegend span { display: inline-flex; align-items: center; gap: 6px; }
+.clegend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
 /* light scrollbars so the recording doesn't show chunky OS bars */
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }

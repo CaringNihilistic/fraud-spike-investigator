@@ -644,16 +644,22 @@ function Contrast({ merchants }) {
    artifacts_out/threshold_sweep.csv. Hardcoded here because artifacts_out is
    gitignored, so a fresh deployment has no CSV to read - same convention the
    metric tiles above already use. Values are the validation slice. */
+/* Validation-slice sweep at restrict=85, from artifacts_out/threshold_sweep.csv
+   (python -m src.policy.threshold_sweep). Hardcoded because artifacts_out is
+   gitignored and a fresh deploy has no CSV to read.
+   This table was a dataset generation stale and marked step-up 20 as ADOPTED -
+   the value failure-log 31 showed our own 2% margin does not authorise. On
+   current data 25 is both the best point AND the only one clearing the margin. */
 const SWEEP = [
-  { cut: 20, npv: 79147, legit: 336 },
-  { cut: 25, npv: 76756, legit: 257 },
-  { cut: 30, npv: 76756, legit: 257 },
-  { cut: 40, npv: 76756, legit: 257 },
-  { cut: 50, npv: 76756, legit: 257 },
-  { cut: 55, npv: 76756, legit: 257 },
-  { cut: 60, npv: 68339, legit: 0 },
-  { cut: 70, npv: 66685, legit: 0 },
-  { cut: 80, npv: 66685, legit: 0 },
+  { cut: 20, npv: 78714, legit: 1159 },
+  { cut: 25, npv: 79485, legit: 388 },
+  { cut: 30, npv: 77354, legit: 208 },
+  { cut: 40, npv: 77373, legit: 108 },
+  { cut: 50, npv: 77373, legit: 108 },
+  { cut: 55, npv: 77373, legit: 108 },
+  { cut: 60, npv: 77373, legit: 108 },
+  { cut: 70, npv: 71931, legit: 0 },
+  { cut: 80, npv: 71931, legit: 0 },
 ];
 
 function CostCurve() {
@@ -671,7 +677,7 @@ function CostCurve() {
       <div class="curve">
         ${SWEEP.map((d) => {
           const w = 100 * (d.npv - min) / (max - min);
-          const on = d.cut === 20, old = d.cut === 60;
+          const on = d.cut === 25, old = d.cut === 60;
           return html`
           <div class=${'crow' + (on ? ' on' : '') + (old ? ' old' : '')} key=${d.cut}>
             <div class="cc">step-up ≥ ${d.cut}</div>
@@ -686,11 +692,17 @@ function CostCurve() {
         <span>bar = net protected value</span>
         <span>right column = legitimate ₹ wrongly impacted</span>
       </div>
-      <p>Moving the step-up cutoff from 60 to 20 is worth <b>+15.8%</b> net
-        protected value — and it does cost legitimate revenue that the old cut
-        did not touch at all (₹0 → ₹336). We took that trade because step-up is
-        friction, not a block: a real customer completes an OTP. We would not
-        take it for the${' '}<i>restrict</i> cutoff, and we didn't.</p>
+      <p>Moving the step-up cutoff from 60 to 25 is worth <b>+2.73%</b> net
+        protected value, which clears the 2% margin we fixed in advance — and it
+        costs legitimate revenue the old cut barely touched (₹108 → ₹388). We took
+        that trade because step-up is friction, not a block: a real customer
+        completes an OTP. We would not take it for the${' '}<i>restrict</i>${' '}
+        cutoff, and we didn't.</p>
+      <p class="note"><b>This panel used to show 20.</b> The sweep chose 20 on the
+        data before the hard negatives, the data changed underneath it, and nobody
+        re-ran the sweep. On current data 20 is worth only <b>+1.73%</b> —
+        <i>below our own adopt margin</i> — so the shipped constant was a value our
+        declared rule did not authorise. Failure-log 31.</p>
       <p class="note"><b>What the flat run in the middle actually means.</b> Net
         protected value is <i>identical</i> across a wide band because no
         validation transaction scores there. Our pre-declared "adopt the best
@@ -789,6 +801,16 @@ function QueueOrder() {
         the threshold \u2014 and we had never made one: cases came out in arrival order.
         Reproduce:${' '}<code>python -m src.policy.queue_order</code>
       </p>
+      <${LineChart}
+        xs=${rows.map((r) => r.n)}
+        series=${[
+          { name: 'by expected loss', color: '#027A48', vals: rows.map((r) => 100 * r.best / total) },
+          { name: 'arrival order', color: '#0B72E7', vals: rows.map((r) => 100 * r.arrival / total), dash: '5 4' },
+          { name: 'by risk score', color: '#B54708', vals: rows.map((r) => 100 * r.risk / total) },
+        ]}
+        yMax=${100} yFmt=${(v) => v.toFixed(0) + '%'}
+        xFmt=${(v) => v + ' cases'}
+        label="share of the queue's fraud value seen, by ordering strategy" />
       <div class="tscroll2">
         <table class="cap">
           <tr>
@@ -837,6 +859,74 @@ function Metric({ k, v, note }) {
     ${note ? html`<div class="mn">${note}</div>` : ''}</div>`;
 }
 
+/* ---------- chart primitives ----------
+   Hand-rolled SVG. This app has no build step and loads nothing from a CDN, so
+   a charting library is not an option - the same constraint that makes the
+   entity graph 30 lines of hand-rolled force layout.
+   Every chart here keeps its table underneath rather than replacing it: the
+   table IS the accessible view, and the numbers stay copyable.
+   Series colours were validated with the dataviz palette checker (lightness
+   band, chroma floor, CVD separation, normal-vision floor, contrast) rather
+   than chosen by eye. */
+function LineChart({ xs, series, yMax, yFmt, xFmt, height, label }) {
+  const W = 720, H = height || 230, P = { l: 58, r: 14, t: 12, b: 32 };
+  const lo = Math.min(...xs), hi = Math.max(...xs);
+  const px = (v) => P.l + (W - P.l - P.r) * (hi === lo ? 0.5 : (v - lo) / (hi - lo));
+  const py = (v) => H - P.b - (H - P.t - P.b) * Math.max(0, Math.min(1, v / yMax));
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * yMax);
+  return html`
+    <div class="chart">
+      <svg viewBox=${`0 0 ${W} ${H}`} role="img" aria-label=${label || 'chart'}>
+        ${ticks.map((t) => html`<g key=${'t' + t}>
+          <line class="cgrid" x1=${P.l} x2=${W - P.r} y1=${py(t)} y2=${py(t)} />
+          <text class="cax" x=${P.l - 9} y=${py(t) + 4} text-anchor="end">${yFmt(t)}</text>
+        </g>`)}
+        ${xs.map((v) => html`<text class="cax" key=${'x' + v} x=${px(v)} y=${H - 11}
+                                   text-anchor="middle">${xFmt ? xFmt(v) : v}</text>`)}
+        ${series.map((s) => html`<g key=${s.name}>
+          <polyline class="cln" style=${{ stroke: s.color }}
+                    stroke-dasharray=${s.dash || 'none'}
+                    points=${xs.map((v, i) => `${px(v)},${py(s.vals[i])}`).join(' ')} />
+          ${xs.map((v, i) => html`<circle key=${'p' + v} cx=${px(v)} cy=${py(s.vals[i])}
+                    r="4.5" class="cdot" style=${{ fill: s.color }}>
+            <title>${s.name} · ${xFmt ? xFmt(v) : v} · ${yFmt(s.vals[i])}</title>
+          </circle>`)}
+        </g>`)}
+      </svg>
+      <div class="clegend">
+        ${series.map((s) => html`<span key=${s.name}>
+          <i style=${{ background: s.color }}></i>${s.name}</span>`)}
+      </div>
+    </div>`;
+}
+
+/* Two states per row, joined by a line: the DROP is the quantity being read,
+   and a slope shows a drop far better than two bars side by side. */
+function SlopeChart({ rows, aLabel, bLabel, aColor, bColor, yMax, yFmt, label }) {
+  const W = 720, H = 230, P = { l: 118, r: 118, t: 16, b: 30 };
+  const xa = P.l, xb = W - P.r;
+  const py = (v) => H - P.b - (H - P.t - P.b) * Math.max(0, Math.min(1, v / yMax));
+  return html`
+    <div class="chart">
+      <svg viewBox=${`0 0 ${W} ${H}`} role="img" aria-label=${label || 'chart'}>
+        <line class="cgrid" x1=${xa} x2=${xa} y1=${P.t} y2=${H - P.b} />
+        <line class="cgrid" x1=${xb} x2=${xb} y1=${P.t} y2=${H - P.b} />
+        <text class="cax" x=${xa} y=${H - 10} text-anchor="middle">${aLabel}</text>
+        <text class="cax" x=${xb} y=${H - 10} text-anchor="middle">${bLabel}</text>
+        ${rows.map((r) => html`<g key=${r.k}>
+          <line class="cln" style=${{ stroke: bColor, opacity: .55 }}
+                x1=${xa} y1=${py(r.a)} x2=${xb} y2=${py(r.b)} />
+          <circle cx=${xa} cy=${py(r.a)} r="5" class="cdot" style=${{ fill: aColor }}>
+            <title>${r.k} · ${aLabel} · ${yFmt(r.a)}</title></circle>
+          <circle cx=${xb} cy=${py(r.b)} r="5" class="cdot" style=${{ fill: bColor }}>
+            <title>${r.k} · ${bLabel} · ${yFmt(r.b)}</title></circle>
+          <text class="clab" x=${xa - 11} y=${py(r.a) + 4} text-anchor="end">${r.k}</text>
+          <text class="cval" x=${xb + 11} y=${py(r.b) + 4}>${yFmt(r.b)}</text>
+        </g>`)}
+      </svg>
+    </div>`;
+}
+
 /* ---------- why a merchant layer, and not just a better order model ----------
    The single most differentiating result we have, and it was buried 600 lines
    into the README. Each attack was rebuilt with a DIFFERENT entity graph -
@@ -862,6 +952,11 @@ function WhyMerchant() {
         concentrated</b> — strictly harder. Reproduce:${' '}
         <code>python -m src.models.topology_generalisation</code>
       </p>
+      <${SlopeChart} rows=${rows.map((r) => ({ k: r.k, a: r.known, b: r.unseen }))}
+        aLabel="shape it trained on" bLabel="shape it has never seen"
+        aColor="#0B72E7" bColor="#D92D20" yMax=${1}
+        yFmt=${(v) => v.toFixed(3)}
+        label="per-transaction model confidence falls when the entity graph changes" />
       <div class="tscroll2">
         <table class="cap">
           <tr>

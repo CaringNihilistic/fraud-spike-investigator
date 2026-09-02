@@ -25,7 +25,8 @@ THREE KINDS OF CHECK:
   2. RETIRED     a retracted phrasing must not appear unless the line marks
                  itself as history. Exemptions are PRINTED, never silent - a
                  hidden exemption would reintroduce the bug it prevents.
-  3. CODE        a shipped constant must equal the decision artifact that
+  3. CODE        a shipped constant - in Python OR in the dashboard's JS -
+                 must equal the decision artifact that
                  derived it. Catches failure-log 31, which no documentation
                  check could have seen: engine.py shipped STEP_UP_CUT = 20.0
                  while the validation sweep adopted 25.
@@ -240,6 +241,23 @@ def check_code() -> list[str]:
                 f"      threshold_sweep_decision.json adopted {adopted}\n"
                 f"      the shipped policy does not match the rule that chose it "
                 f"(this is exactly failure-log 31)")
+
+    # The dashboard draws its own "adopted" marker on the cost panel, and it
+    # went a whole dataset generation stale - showing step-up 20, the value
+    # failure-log 31 established our rule does not authorise, on the page a
+    # judge sees first. Neither doc check could see it: the number lives in a
+    # JS comparison, not in prose.
+    js = Path(DASHBOARD).read_text(encoding="utf-8")
+    m = re.search(r"const on = d\.cut === (\d+)", js)
+    if not m:
+        problems.append(
+            f"{DASHBOARD}: the cost panel's adopted-cutoff marker was not found "
+            f"- the pattern has rotted, which is itself a failure")
+    elif float(m.group(1)) != float(d["adopted_step_up_cut"]):
+        problems.append(
+            f"{DASHBOARD}  cost panel marks step-up {m.group(1)} as adopted\n"
+            f"      threshold_sweep_decision.json adopted {d['adopted_step_up_cut']}\n"
+            f"      the running demo is telling a judge we shipped a cutoff we did not")
     return problems
 
 
