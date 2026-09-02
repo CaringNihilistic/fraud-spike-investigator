@@ -336,3 +336,63 @@ def test_the_wire_cap_keeps_the_top_cases_not_the_newest(client):
     assert len(cases) == 200
     top = [c for c in cases if c["merchant_id"] == "cap"][0]
     assert top["amount_inr"] == 230.0    # the largest, not the most recent
+
+
+# ---------------------------------------------------------------------------
+# STATE.reset() - what makes the hosted replay loop possible.
+#
+# The hosted demo runs on a free instance that sleeps after 15 minutes, so
+# every visitor used to trigger a cold boot and therefore see a LIVE replay:
+# the 86-second wait was the only thing making the demo look live. Keeping the
+# instance warm removes the wait and would otherwise leave every visitor
+# looking at a FINISHED replay. Hence the loop, and hence this.
+# ---------------------------------------------------------------------------
+
+def test_reset_clears_everything_the_replay_accumulated():
+    _seed_txn(mid="m1", action=Action.RESTRICT, spiking=True)
+    _seed_txn(mid="m2", action=Action.REVIEW)
+    STATE.finished = True
+    assert STATE.merchants and STATE.review_queue and STATE.processed
+
+    STATE.reset()
+
+    assert STATE.merchants == {}, "a stale merchant would carry a spike into the next pass"
+    assert STATE.review_queue == []
+    assert STATE.processed == 0
+    assert STATE.finished is False
+    assert STATE.prevented_inr == 0.0 and STATE.impacted_inr == 0.0
+    assert STATE.review_cases == 0
+    assert STATE._next_case_id == 1, "case ids must restart or they climb forever"
+
+
+def test_reset_keeps_the_viewers_own_controls_and_the_slice_size():
+    """speed and paused belong to whoever is watching; yanking the slider back
+    mid-view is a bug, not a reset. `total` describes the slice, not the pass -
+    clearing it makes the progress bar read 0/0."""
+    STATE.total = 14160
+    STATE.speed = 725.0
+    STATE.paused = True
+
+    STATE.reset()
+
+    assert STATE.speed == 725.0
+    assert STATE.paused is True
+    assert STATE.total == 14160
+
+
+def test_reset_lets_a_second_pass_produce_the_same_numbers():
+    """The point of the loop: pass two must look like pass one, not like pass
+    one plus pass two."""
+    _seed_txn(mid="m1", amount=5000.0, p=0.9, action=Action.RESTRICT)
+    first = (STATE.processed, STATE.prevented_inr, len(STATE.review_queue))
+    STATE.reset()
+    _seed_txn(mid="m1", amount=5000.0, p=0.9, action=Action.RESTRICT)
+    assert (STATE.processed, STATE.prevented_inr, len(STATE.review_queue)) == first
+
+
+def test_reset_does_not_replace_the_lock():
+    """Callers hold a reference to it; swapping it would silently unguard
+    every writer that captured the old one."""
+    lock = STATE._lock
+    STATE.reset()
+    assert STATE._lock is lock

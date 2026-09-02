@@ -223,6 +223,38 @@ class PipelineState:
         self.impacted_inr = 0.0
         self.review_cases = 0
 
+    def reset(self, keep_speed: bool = True):
+        """Clear everything the replay accumulates, so it can run again.
+
+        Exists for the hosted demo. On a free instance that sleeps after 15
+        minutes, every visitor used to trigger a cold boot and therefore see a
+        LIVE replay - the cold start was, perversely, the only thing making the
+        demo look live. Keeping the instance warm removes the 86s wait and
+        would leave every visitor looking at a FINISHED replay instead. So the
+        replay loops, and this is what makes a second pass possible.
+
+        `speed` and `paused` survive by default: they are the viewer's own
+        controls, and yanking the slider back mid-view would be a bug.
+        The lock is never replaced - callers hold references to it.
+        """
+        with self._lock:
+            speed, paused = self.speed, self.paused
+            self.merchants.clear()
+            self.review_queue.clear()
+            self.events.clear()
+            self.audit.clear()
+            self.processed = 0
+            self.started_at = None
+            self.finished = False
+            self._next_case_id = 1
+            self.prevented_inr = 0.0
+            self.impacted_inr = 0.0
+            self.review_cases = 0
+            if keep_speed:
+                self.speed, self.paused = speed, paused
+            # `total` is deliberately NOT cleared: it describes the slice, not
+            # the pass, and blanking it makes the progress bar jump to 0/0.
+
     # ---------------------------------------------------------- writes
     def merchant(self, mid: str) -> MerchantState:
         if mid not in self.merchants:

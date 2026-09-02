@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -44,6 +45,14 @@ def main():
                          "Required on PaaS hosts (Render/Railway/Fly), which kill a "
                          "service that has not bound its port within a short window - "
                          "and on a shared-CPU free instance, training first can exceed it.")
+    ap.add_argument("--loop", action="store_true",
+                    help="replay on repeat instead of stopping when the slice ends. "
+                         "For the hosted demo: a free instance that is kept warm "
+                         "never cold-boots, so without this every visitor would "
+                         "arrive at a FINISHED replay. Trains once, streams many.")
+    ap.add_argument("--loop-pause", type=float, default=20.0,
+                    help="seconds to hold the finished board before restarting, so "
+                         "the final totals are readable (default 20)")
     args = ap.parse_args()
 
     STATE.speed = args.speed
@@ -55,12 +64,30 @@ def main():
     print("=" * 68)
     print("  Training the model and scoring the test slice (~20s)...")
 
+    def _replay_forever(scored, ctx):
+        """Replay, show the finished board for a beat, reset, replay again.
+
+        Only the REPLAY repeats - prepare() is not called again, so the model
+        is trained exactly once. Each pass streams the same slice through the
+        real fusion -> policy path, so 'not a canned animation' still holds:
+        the decisions are recomputed every time, not replayed from a recording.
+        """
+        while True:
+            replay.run(scored, ctx, investigate_enabled=not args.no_agent)
+            time.sleep(args.loop_pause)   # let the totals actually be read
+            replay.INVESTIGATED.clear()   # else investigations never re-fire
+            STATE.reset()
+            STATE.log_event("system", "replay restarting")
+
     def _prepare_and_replay():
         scored, ctx = replay.prepare()
         api_mod.set_context(ctx)
         STATE.total = len(scored)
         print(f"  Ready. Replaying {len(scored):,} transactions at {args.speed:.0f}/sec")
-        replay.run(scored, ctx, investigate_enabled=not args.no_agent)
+        if args.loop:
+            _replay_forever(scored, ctx)
+        else:
+            replay.run(scored, ctx, investigate_enabled=not args.no_agent)
 
     if args.defer_prepare:
         # Port first, training second. The dashboard polls /api/status and
@@ -74,9 +101,12 @@ def main():
         scored, ctx = replay.prepare()
         api_mod.set_context(ctx)
         STATE.total = len(scored)
-        threading.Thread(
-            target=lambda: replay.run(scored, ctx, investigate_enabled=not args.no_agent),
-            daemon=True).start()
+        # Both branches go through the same runner. An earlier version wired
+        # --loop into the deferred path only, so it silently did nothing
+        # locally - the flag parsed, printed no error, and just never looped.
+        _run = (lambda: _replay_forever(scored, ctx)) if args.loop else \
+               (lambda: replay.run(scored, ctx, investigate_enabled=not args.no_agent))
+        threading.Thread(target=_run, daemon=True).start()
         print(f"  Ready. Dashboard: {url}")
         print(f"  Replaying {len(scored):,} transactions at {args.speed:.0f}/sec")
     print("  Watch for: attack merchants spike -> investigation fires ->")
