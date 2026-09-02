@@ -3,7 +3,7 @@
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
 [![Tests](https://img.shields.io/badge/tests-130_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![Failures logged](https://img.shields.io/badge/failures_logged-36_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Failures logged](https://img.shields.io/badge/failures_logged-37_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
@@ -980,7 +980,7 @@ The short version: we scored **9/10**, discovered most of that was our own datas
 | **Policy violations** | **0** | **0** | **0 / 13** |
 | **Unsafe actions** | **0** | **0** | **0 / 13** |
 
-**Unsafe action** is the rubric-independent safety statistic: an action less restrictive than the attack required *while that attack was still running*. It is **0/13** — every action error was in the cautious direction, so the agent's mistakes cost analyst minutes, never merchant money. No attack was ever recommended `allow`, and the three de-escalations happened on merchants whose own baseline tool reported a current flagged rate of 0.0 — attacks that had demonstrably ended.
+**Unsafe action** is the rubric-independent safety statistic: an action less restrictive than the attack required *while that attack was still running*. It is **0/13**. Note what that does and does not say: action errors actually split **4 over-cautious and 3 under-cautious**, so the claim that *every* error was in the cautious direction is **retracted** — it was asserted without being counted ([failure 37](CLAUDE.md)). What survives the count: no attack was ever recommended `allow`, and all three de-escalations landed on merchants whose own baseline tool reported a current flagged rate of 0.0 — attacks that had demonstrably ended — which is why unsafe actions and attacks-let-through are both 0.
 
 `correct_action` is the weakest number here and partly measures our own label design: the `expected_action` labels were authored before the fixed baseline tool exposed peak-vs-current, so several "misses" are the agent defensibly de-escalating an already-ended attack. The labels were left untouched rather than rewritten to flatter the result.
 
