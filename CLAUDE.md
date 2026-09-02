@@ -200,6 +200,14 @@ P2 agent eval (LIVE Claude Haiku 4.5, DE-LABELLED data, run D = FINAL):
 5/13 are NOT distinguishable at this sample size. EVERY conclusion drawn from
 the agent eval - including the run A->B->C->D progression, whose deltas are
 noisier than the table implies - is a small-sample result and must say so.
+ACTION ERRORS BY DIRECTION (entry 37): 4 over-cautious, 3 UNDER-cautious. The
+claim that every action error was cautious is RETRACTED - it was never counted.
+All 3 de-escalations landed on attacks already ENDED (attack_active_at_end is 0
+for every case), which is why unsafe actions and attacks-let-through are 0.
+CAUSE-MISS TAXONOMY (entry 37): 2 genuine reasoning failures (quiet_merchant_a,
+holdout_quiet - both concluded ATO while their own evidence recorded no new
+device and no geo mismatch), 2 declined-to-conclude at confidence 0.35-0.40,
+1 label-adjacent (card testing -> fraud ring; both attacks, both escalate).
 8/13 correct cause (2/3 held-out), 100/100 evidence claims traceable,
 escalates-when-unsure 13/13, policy violations 0/13, UNSAFE ACTIONS 0/13
 (no attack ever got `allow`; all de-escalations were on attacks whose current
@@ -213,6 +221,12 @@ changes without a new held-out set, or the number stops meaning anything.
 Run: `python -m src.models.select_model && python -m src.policy.threshold_sweep
 && python -m src.models.train && python -m src.models.ablation`
 Self-audit: `python -m src.models.leakage_probe` (adversarial eval integrity)
+Agent failure taxonomy: `python -m src.audit.agent_failure_taxonomy` (analysis
+ONLY of the frozen run D - no re-run, no prompt/tool/label change. What KIND of
+wrong the agent is: 2 genuine reasoning failures, 2 declined-to-conclude, 1
+label-adjacent. Also counts action errors by DIRECTION on the engine's own
+ladder: 4 over-cautious, 3 UNDER-cautious - which retracts the
+every-error-was-cautious claim, see entry 37)
 Docs-vs-artifacts: `python -m src.audit.verify_submission` (exits non-zero if
 a documented headline disagrees with the artifact that produced it; also
 checks engine.py's cutoffs against threshold_sweep_decision.json. Run it
@@ -1202,3 +1216,56 @@ explainability — every component must be defensible to a judge in one sentence
    sharing; the first probe of a DIFFERENT axis found a false alarm in two runs
    out of five. The number of negatives was never the point - the number of
    DIRECTIONS was.
+
+37. WE ASSERTED A SAFETY STATISTIC WITHOUT EVER COUNTING IT, AND IT WAS WRONG.
+   SUBMISSION.md said, of the frozen agent eval: "Every action error was in the
+   cautious direction - the agent's mistakes cost analyst minutes, never
+   merchant money." README said the same thing in a sentence that then went on
+   to describe "the three de-escalations", contradicting itself in its own
+   paragraph. Nobody had counted.
+   Counted now (src/audit/agent_failure_taxonomy.py), on the severity ladder the
+   policy engine itself defines - decide() maps rising risk to ALLOW -> STEP_UP
+   -> REVIEW -> RESTRICT and validate_recommendation() degrades to REVIEW while
+   never escalating, which places REVIEW below RESTRICT:
+     over-cautious   4   quiet_merchant_a/c/d, holdout_quiet   allow -> review
+     under-cautious  3   card_testing  restrict -> review
+                         ip_cluster    restrict -> step_up
+                         account_takeover  review -> step_up
+   THREE OF SEVEN ACTION ERRORS WERE IN THE UNSAFE DIRECTION. The claim is
+   RETRACTED in SUBMISSION.md and README.md rather than softened.
+   WHAT IS ACTUALLY TRUE is a weaker statement and we now make only that one:
+   all three de-escalations landed on attacks whose burst had ALREADY ENDED -
+   attack_active_at_end is 0 for every case in this run - which is why
+   unsafe_actions is 0/13 and attacks_let_through is 0. The policy engine
+   restricted those merchants anyway, because the LLM is not in the decision
+   path. That is the architecture's claim doing its job, and it is worth more
+   than the tidy sentence we had.
+   ALSO PRODUCED: a taxonomy of the 5 cause misses, because "8/13" says nothing
+   about what KIND of wrong the agent is.
+     genuine reasoning failure   2   quiet_merchant_a, holdout_quiet
+     declined to conclude        2   quiet_merchant_c, quiet_merchant_d
+     label adjacency             1   card_testing -> fraud_ring
+   The two genuine failures are the same failure twice: both concluded
+   account_takeover on a legitimate merchant while their OWN evidence line
+   recorded no new device and no geo mismatch - the two defining ATO markers,
+   which the seventh tool exists specifically to expose (entry 16). On
+   holdout_quiet the report names ATO in the same breath as "No new devices or
+   geo mismatches for any flagged customer". It contradicted evidence it had
+   received, on held-out data.
+   WE DID NOT MAKE THE TAXONOMY COME OUT CLEAN. A five-case taxonomy in which
+   every miss is harmless is visibly self-serving, and the two genuine failures
+   are recorded as genuine.
+   ONE TOOLING BUG, caught before publication: the citation key for
+   quiet_merchant_a was "3", which matched the baseline sentence rather than the
+   overspend line the stated reason rests on. A citation that does not support
+   its claim is the same defect as no citation - fixed to "own historical
+   average". This is the class the pre-declared rollback rule names: roll back
+   for a harness fault, never for an unwelcome answer.
+   NOTHING WAS RE-RUN. Run D is frozen: no prompt, tool, case or label changed,
+   and no ML artifact was touched. This entry counts results that had been
+   sitting in artifacts_out/eval_runs/run_D_final/ since the run was frozen.
+   LESSON: the false claim survived three external audits and our own
+   docs-vs-artifacts checker, because the checker verifies numbers that ARE
+   written down against their artifacts - and this was a qualitative assertion
+   with no number attached. "Every X was Y" is a claim about a count. If nobody
+   ran the count, it is not a finding, it is a hope.

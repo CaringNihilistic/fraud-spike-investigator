@@ -93,7 +93,11 @@ class Retired:
 # past. Keeping retracted numbers visible is the point of the failure log.
 HISTORY_MARKERS = (
     "pre-fix", "PRE-FIX", "as measured at that time", "one generation later",
-    "one dataset generation", "failure-log", "failure 3", "historical",
+    # "failure 3" used to live here and was far too loose: it matched any line
+    # citing failure-log 3x, so a line saying "[failure 37]" auto-exempted itself.
+    # A tampering test caught it silently exempting the very claim failure-log 37
+    # retracts. "failure-log" alone is the marker; the bare citation is not.
+    "one dataset generation", "failure-log", "historical",
     "earlier versions", "used to", "we retract", "RETRACT", "was wrong",
     "previously", "before the hard negatives", "old generator", "at that time",
     "as measured at the time", "the fix cost", "have since moved", "FIXED",
@@ -104,6 +108,7 @@ HISTORY_MARKERS = (
 def build_claims() -> list[Claim]:
     e, m, c = art("economics.json"), art("metrics.json"), art("config4_npv.json")
     cc = art("cost_curve.json")
+    ft = art("agent_failure_taxonomy.json")
     s = art("seed_stability.json")
     lakh = lambda v: v / 1e5  # noqa: E731
     return [
@@ -137,6 +142,18 @@ def build_claims() -> list[Claim]:
         Claim("config3 mean NPV",
               r"shipped configuration\*{0,2}\s*\|\s*\*{0,2}₹([\d,]+)",
               c["config3_shipped_mean_npv"], 1.0, files=("README.md",)),
+        # Counted in failure-log 37, after the docs asserted for weeks that EVERY
+        # action error was cautious without anyone running the count.
+        Claim("action errors over-cautious",
+              r"(\d+) over-cautious",
+              ft["action_errors"]["over_cautious"], 0.1),
+        Claim("action errors under-cautious",
+              r"(\d+) under-cautious",
+              ft["action_errors"]["under_cautious"], 0.1),
+        Claim("genuine reasoning failures",
+              r"\*\*(\d+) are genuine reasoning failures\*\*",
+              ft["taxonomy_counts"]["genuine_reasoning_failure"], 0.1,
+              files=("SUBMISSION.md",)),
         Claim("dashboard net protected value (L)",
               r'k="net protected value" v="\u20b9([\d.]+)L"',
               lakh(e["net_protected_value_inr"]), 0.006, files=(DASHBOARD,)),
@@ -161,6 +178,12 @@ def build_retired() -> list[Retired]:
                 exempt=("not five independent", "not independent", "seeds, not")),
         Retired("old step-up cutoff", r"\(85,\s*20\)",
                 "the validation sweep adopts (85, 25); 20 is below our own 2% margin"),
+        # The claim retracted in failure-log 37. It survived three external audits
+        # and this checker, because it carried no number for the checker to verify.
+        Retired("every action error was cautious",
+                r"[Ee]very action error was in the cautious direction",
+                "counted in failure-log 37: 4 over-cautious, 3 UNDER-cautious",
+                exempt=("retracted", "was wrong")),
     ]
 
 
