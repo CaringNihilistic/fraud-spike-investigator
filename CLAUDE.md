@@ -1269,3 +1269,42 @@ explainability — every component must be defensible to a judge in one sentence
    written down against their artifacts - and this was a qualitative assertion
    with no number attached. "Every X was Y" is a claim about a count. If nobody
    ran the count, it is not a finding, it is a hope.
+
+   ---- entry 37, continued: what the QUANTIFIER SWEEP then found ----
+   The lesson above ("every X was Y is a claim about a count") implies a cheap
+   pass: grep the docs for universal quantifiers - every, all, never, always,
+   no case, not one - and for each ask whether anyone ran the count. Fifteen
+   minutes, no code. It found two more things immediately.
+   (a) A THIRD INSTANCE OF THE SAME RETRACTED CLAIM, in README: "Every action
+   miss in run D is in the cautious direction." Our new guard walked straight
+   past it, because the guard's pattern matched only the SUBMISSION wording -
+   "action error" not "action miss", "was in the" not "is in the", and the real
+   line has markdown bold inside the phrase. A guard narrower than the claim it
+   guards is the blindness failure-log 31 warns about, committed in the guard
+   written to prevent this exact claim. Broadened, and validated against the
+   pre-fix docs where it now catches all THREE instances rather than two.
+   (b) unsafe_actions 0/13 IS VACUOUS IN RUN D, and this is the bigger find.
+   eval.py defines it as: is_attack AND less_restrictive AND attack_active.
+   attack_active is read from the merchant baseline tool's
+   current_flagged_rate_last_30_txns, and it is 0 FOR ALL THIRTEEN CASES -
+   every investigation fires on a spike and is scored against a completed
+   slice, so no case could ever have had a live attack at report time. The
+   metric had NO OPPORTUNITY TO FIRE. 0/13 is therefore a property of when the
+   eval snapshots, not of what the agent did, and it is one of the
+   strongest-sounding numbers in the submission.
+   WHAT SURVIVES, and it is the part that was always the real claim:
+   let_attack_through is 0 and that check does NOT depend on timing - it is
+   is_attack AND action == "allow" - so "no attack was ever recommended allow"
+   is a genuine measurement. And the policy engine restricted those merchants
+   regardless, because the LLM is not in the decision path. That is the
+   architecture doing the containing, which is what we should have been leading
+   with all along rather than a metric that could not have failed.
+   WE ALMOST REPLACED A RETRACTED CLAIM WITH A VACUOUS ONE. The first fix for
+   this entry led with "all three de-escalations landed on attacks that had
+   already ended" - true, and worthless as a defence, because ALL THIRTEEN
+   cases did. An outside reviewer caught it in the same shape as the original
+   error. The docs now lead with the architectural fact and state the
+   vacuity out loud rather than banking the number.
+   LESSON, sharper than the first one: a metric whose firing condition never
+   occurred in the run is not a passing test, it is an untested test. Report
+   the denominator that could have fired, not the one that did.

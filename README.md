@@ -980,7 +980,9 @@ The short version: we scored **9/10**, discovered most of that was our own datas
 | **Policy violations** | **0** | **0** | **0 / 13** |
 | **Unsafe actions** | **0** | **0** | **0 / 13** |
 
-**Unsafe action** is the rubric-independent safety statistic: an action less restrictive than the attack required *while that attack was still running*. It is **0/13**. Note what that does and does not say: action errors actually split **4 over-cautious and 3 under-cautious**, so the claim that *every* error was in the cautious direction is **retracted** — it was asserted without being counted ([failure 37](CLAUDE.md)). What survives the count: no attack was ever recommended `allow`, and all three de-escalations landed on merchants whose own baseline tool reported a current flagged rate of 0.0 — attacks that had demonstrably ended — which is why unsafe actions and attacks-let-through are both 0.
+**Unsafe action** is the rubric-independent safety statistic: an action less restrictive than the attack required *while that attack was still running*. It is **0/13 — and in this run that number is vacuous**, which we would rather state than bank. `unsafe_action` is defined as de-escalating *while an attack is still running*, and `attack_active_at_end` is **0 for all 13 cases**: every investigation fires on a spike and is scored against a completed slice, so the metric had no opportunity to fire. It is a property of when the eval snapshots, not of the agent's judgment.
+
+What is *not* vacuous: **`attacks_let_through` is 0** — that check does not depend on timing, and no attack was ever recommended `allow`. And action errors actually split **4 over-cautious / 3 under-cautious**, so the claim that every error was cautious is **retracted** ([failure 37](CLAUDE.md)). **The thing that contains the damage is the architecture, not the agent:** the policy engine restricted those merchants regardless, because the LLM is not in the decision path.
 
 `correct_action` is the weakest number here and partly measures our own label design: the `expected_action` labels were authored before the fixed baseline tool exposed peak-vs-current, so several "misses" are the agent defensibly de-escalating an already-ended attack. The labels were left untouched rather than rewritten to flatter the result.
 
@@ -1008,7 +1010,7 @@ The de-labelling is provably a pure relabelling: **all 16 ML metrics were bit-id
 
 ### Why correct_action fell while correct_cause rose
 
-Every action miss in run D is in the **cautious** direction. Not one case allowed an attack through.
+**Action misses in run D split 4 over-cautious / 3 under-cautious** — the "all cautious" phrasing that used to sit here is retracted ([failure 37](CLAUDE.md)); it was asserted three separate times in these docs and never counted. **Not one case allowed an attack through**, and that one *is* a real measurement — `let_attack_through` does not depend on when the eval snapshots.
 
 | Case | A → B → C → D | Expected |
 |---|---|---|

@@ -180,8 +180,12 @@ def build_retired() -> list[Retired]:
                 "the validation sweep adopts (85, 25); 20 is below our own 2% margin"),
         # The claim retracted in failure-log 37. It survived three external audits
         # and this checker, because it carried no number for the checker to verify.
+        # Deliberately loose. The first version matched only one phrasing and
+        # walked past a THIRD instance worded "Every action miss in run D is in
+        # the **cautious** direction" - a guard narrower than the claim it guards
+        # is the blindness failure-log 31 warns about.
         Retired("every action error was cautious",
-                r"[Ee]very action error was in the cautious direction",
+                r"[Ee]very action (error|miss)[^.\n]{0,40}?\*{0,2}cautious",
                 "counted in failure-log 37: 4 over-cautious, 3 UNDER-cautious",
                 exempt=("retracted", "was wrong")),
     ]
