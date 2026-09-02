@@ -319,7 +319,12 @@ def main():
     elif surge.fired.any():
         seeds_hit = sorted(int(s) for s in surge[surge.fired].seed)
         verdict = (
-            "A LEGITIMATE MARKETING SURGE FIRES THE DETECTOR, on %d of %d seeds (%s). "
+            "A LEGITIMATE MARKETING SURGE FIRES THE DETECTOR - marginally, and the "
+            "PROPORTION carries more than the seed count: it flags %.1f-%.1f%% of its "
+            "transactions against the control's %.0f-%.0f%%, so the model is nowhere "
+            "near confusing the two classes. It crosses the rate-in-window bar on %d "
+            "of %d seeds (%s), and n=5 cannot separate 2/5 from 1/5 - the same caveat "
+            "we apply to the n=13 agent eval. "
             "This is a real false-alarm mode and the pre-registered response is to "
             "publish it as one, not to patch it: adding a marketing surge to training "
             "under deadline is the failure-log 29 move, it invalidates the frozen "
@@ -328,7 +333,9 @@ def main():
             "vs %.1f days), so this is not the label proxy from failure-log 21 - a wave "
             "of first-seen devices and novel instruments is enough on its own. "
             "Legitimate INR restricted: %s."
-            % (len(seeds_hit), len(surge), ", ".join("seed %d" % s for s in seeds_hit),
+            % (100 * surge.flagged_rate_event.min(), 100 * surge.flagged_rate_event.max(),
+               100 * ctl.flagged_rate_event.min(), 100 * ctl.flagged_rate_event.max(),
+               len(seeds_hit), len(surge), ", ".join("seed %d" % s for s in seeds_hit),
                surge.median_age_days.median(), ctl.median_age_days.median(),
                format(surge.legit_inr_impacted.sum(), ",.0f")))
     else:
@@ -358,7 +365,9 @@ def main():
             "No systematic penalty: the cold-start defaults in builder.py are neutral "
             "where it matters (geo_mismatch 0, is_new_device_for_customer 0, "
             "amount_dev_ratio 1.0 with no history), and only the first-seen device/IP "
-            "flags fire - which the warm twin carries too.")))
+            "flags fire - which the warm twin carries too. This is a VALID null, not "
+            "the dataset-cannot-express-it kind in entries 24/30/33: the test could "
+            "have fired, against an identical warm twin, and did not.")))
 
     print("=== verdict ===\n" + verdict + "\n\n" + cold_note)
     tab.to_csv(OUT / "growth_negatives.csv", index=False)

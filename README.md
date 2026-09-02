@@ -38,7 +38,8 @@ known form here and is reported as weak evidence — the other four families are
 | | |
 |---|---|
 | Attack merchants detected | **25 / 25** across 5 seeds |
-| False alarms | **1 in 35** non-attack merchant-windows (2.9%, 95% CI 0.1–14.9%) |
+| False alarms, **entity-sharing** negatives | **1 in 35** non-attack merchant-windows (2.9%, 95% CI 0.1–14.9%) |
+| False alarms, **growth** negatives | A second axis, probed later, [**fires**](#the-negative-set-was-one-axis-wide-and-the-first-probe-of-a-second-axis-found-a-false-alarm) — a legitimate signup wave flags 0.6–13.9% of its transactions (2 of 5 seeds) and restricts ₹2,914. Not covered by the row above |
 | Net protected value | **₹8.13L** simulated, after 948 reviews × ₹50 |
 | Precision / Recall | **0.996 / 0.735** at the cost-optimal threshold |
 | Legitimate merchants built to look like attacks | **3**, two sharing entities — plus a **0→100% sharing sweep** |
@@ -99,7 +100,8 @@ model. All of it is pytest-enforced (`tests/test_safety.py`, `tests/test_agent.p
 | | |
 |---|---|
 | **Attack merchants detected** | **25 / 25** across 5 seeds of the generator |
-| **False alarms** | **1 in 35 non-attack merchant-windows** — a legitimate corporate buyer, on one seed. [Tested against three legitimate spikes, two of which share entities](#the-hard-negative-a-legitimate-merchant-built-to-look-like-an-attack) |
+| **False alarms** (entity-sharing negatives) | **1 in 35 non-attack merchant-windows** — a legitimate corporate buyer, on one seed. [Three legitimate spikes, two sharing entities](#the-hard-negative-a-legitimate-merchant-built-to-look-like-an-attack) |
+| **False alarms** (growth negatives) | **A different axis fires.** A legitimate signup wave flags 0.6–13.9% of its transactions against an attack's 65–94%, and enters spike state on 2 of 5 seeds — [₹2,914 restricted](#the-negative-set-was-one-axis-wide-and-the-first-probe-of-a-second-axis-found-a-false-alarm). The row above does not cover this |
 | **Net protected value** | **₹8.13L** on the held-out test slice, after 948 reviews × ₹50 |
 | **Legitimate ₹ wrongly blocked** | **₹2,575 — 0.024%** of the ₹1.07Cr in legitimate value processed |
 | **Precision / Recall** | **0.996 / 0.735** at the cost-optimal threshold |
@@ -675,8 +677,12 @@ a test asserts the degeneracy. `customer_age_days` is the feature with a
 documented history of being a label proxy ([failure 21](CLAUDE.md)); the easy
 version of this test gives the surge aged accounts, passes, and proves nothing.
 
-**It fires.** 150 brand-new customers, every one with their own device, IP and
-card — **zero entity sharing**:
+**It fires — marginally, and the proportion says more than the seed count.** The
+surge flags **0.6–13.9%** of its transactions against the control's **65–94%**: the
+model is nowhere near confusing the two classes. It crosses the detector's
+rate-in-window bar on **2 of 5 seeds**, and *n=5 cannot separate 2/5 from 1/5 or
+3/5* — the same caveat we apply to the n=13 agent eval. 150 brand-new customers,
+every one with their own device, IP and card — **zero entity sharing**:
 
 | seed | flagged of 180 | fired | restricted | legit ₹ |
 |---|---|---|---|---|
@@ -693,11 +699,8 @@ rows while every newcomer brings a genuinely new one. A wave of first-seen
 devices plus one novel instrument per transaction pushes a handful of rows over
 0.5, and the detector's rate-in-window rule does the rest.
 
-**Proportion matters, so here it is:** the surge flags **0.6–13.9%** of its
-transactions against the control's **65–94%**. The model is nowhere near
-confident — this is a marginal fire, not a confusion. But **₹2,914 of legitimate
-revenue was restricted**, the same order as our ₹2,575 headline false-positive
-figure. Not academic.
+**₹2,914 of legitimate revenue was restricted** — the same order as our ₹2,575
+headline false-positive figure, so a marginal fire is still not an academic one.
 
 **We are not patching it.** Adding a marketing surge to training is the
 [failure 29](CLAUDE.md) move: it invalidates the frozen evaluation and needs a
@@ -707,9 +710,12 @@ fresh held-out set to mean anything. It is a logged limitation and a v2 item.
 non-attack merchant-windows behind the "1 in 35" headline. **It does not change
 that number** — it adds a failure mode that number never covered.
 
-**The other half came back clean, and that is worth as much.** A brand-new
-merchant with no history scores **+0.0006** against an identical warm twin — no
-cold-start penalty at all. We read `builder.py` before assuming a scenario
+**The other half came back clean — and it is a *valid* null.** Failure-logs 24,
+30 and 33 are all cases where a null measured the **dataset** rather than the
+system, because the quantity could not be expressed. This is the opposite: the
+test could have fired — same detector, same cutoffs, an identical **warm twin**
+as the comparison, only the presence of history differing — and it did not. A
+brand-new merchant scores **+0.0006** against that twin: no cold-start penalty. We read `builder.py` before assuming a scenario
 problem, and the reason is in the defaults: a new customer emits `geo_mismatch`
 0, `is_new_device_for_customer` 0, `amount_dev_ratio` 1.0. The architecture does
 not need a cold-start rule.

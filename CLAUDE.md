@@ -1185,9 +1185,14 @@ explainability — every component must be defensible to a judge in one sentence
    SCOPE, said plainly: this is a NEW scenario, not part of the 35 non-attack
    merchant-windows behind the "1 in 35" headline. It does not change that
    figure; it adds a failure mode that figure never covered.
-   THE OTHER HALF CAME BACK CLEAN, and that is worth as much. A brand-new
-   merchant with no history scores +0.0006 against an identical warm twin -
-   no cold-start penalty at all. The hypothesis was that history-dependent
+   THE OTHER HALF CAME BACK CLEAN, and it is a VALID null - which is a
+   distinction this project has spent a lot of words on. Entries 24, 30 and 33
+   are all cases where a null measured the DATASET rather than the system: the
+   quantity could not be expressed, so no result was possible either way. This
+   one is the opposite. The test COULD have fired - it uses the same detector,
+   the same cutoffs and an identical WARM TWIN as the comparison, with only the
+   presence of history differing - and it did not. A brand-new merchant with no
+   history scores +0.0006 against that twin: no cold-start penalty at all. The hypothesis was that history-dependent
    features would default to "unusual" and punish new merchants systematically;
    reading builder.py first showed why they do not (a new customer emits
    geo_mismatch 0, is_new_device_for_customer 0, amount_dev_ratio 1.0), and the
