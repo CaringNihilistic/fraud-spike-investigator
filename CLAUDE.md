@@ -241,6 +241,12 @@ known shapes as positive control. known 22/25 vs unseen 21/25 detected, but mean
 flagged rate 0.815 -> 0.709 - the MERCHANT layer holds while the TRANSACTION
 scorer degrades. ATO control is weak (2/5 known) and both its rows are weak
 evidence; say so. See entry 34)
+Growth negatives: `python -m src.models.growth_negatives` (the OTHER axis of
+legitimate behaviour - sudden growth, not shared infrastructure. A marketing
+surge of 150 brand-new customers with ZERO entity sharing FIRES on 2/5 seeds and
+restricts INR 2,914; age was held degenerate against card testing on purpose, so
+the cause is is_first_seen_device 0.83 vs the attack's 0.02. NOT patched - see
+entry 36. Cold-start merchant scores +0.0006 vs a warm twin: no penalty)
 Sharing sensitivity: `python -m src.models.sharing_sensitivity` (where does
 LEGITIMATE entity sharing start firing us? swept 0-100% over 5 seeds through the
 frozen pipeline, with a real device farm as a POSITIVE CONTROL - 3/60 legit
@@ -259,7 +265,7 @@ rate 0.273 vs our 0.70-0.93. Run BEFORE modelling, never after)
 Real data: `python -m src.models.real_data_check` (ULB/IEEE via Kaggle; data/ is
 gitignored and NEVER committed - competition terms, publish metrics not data)
 Demo: `python run_demo.py` (one command; ~60s replay at default 250 txn/s)
-Tests: `python -m pytest tests/ -q` (124 pass, no network needed)
+Tests: `python -m pytest tests/ -q` (130 pass, no network needed)
 REAL-DATA, same recipe, no tuning: ULB creditcardfraud PR-AUC 0.731 (vs 0.0017
 random, ROC 0.974) | IEEE-CIS PR-AUC 0.460 (vs 0.0350 random, ROC 0.888).
 Methodology transfers; the 0.898 does NOT. NEGATIVE RESULT (entry 24): our
@@ -1134,3 +1140,60 @@ explainability — every component must be defensible to a judge in one sentence
    have now shipped a hardcoded conclusion that their own numbers contradicted,
    and every one was written by someone who believed the conclusion was
    obviously true. It is obvious right up until the data changes underneath it.
+
+36. A LEGITIMATE MARKETING SURGE FIRES THE DETECTOR, AND AGE WAS NOT THE REASON.
+   An outside audit found the narrowest part of our negative set: every
+   legitimate merchant we had except the flash sale is an ENTITY-SHARING case
+   (corporate IP, kiosk device, and a 0-100% sweep of that same axis). We had
+   tested "shared infrastructure looks like fraud" exhaustively and "sudden
+   legitimate growth looks like fraud" not at all - and the second is the more
+   common real-world false alarm.
+   Built src/models/growth_negatives.py. CRITERIA PRE-REGISTERED IN THE MODULE
+   AND COMMITTED BEFORE THE RUN (commit b2a2d86), because this was the
+   experiment most likely to produce a mild ambiguous result three days from a
+   deadline - exactly when "that is within tolerance" gets tempting.
+   BUILT SO customer_age_days COULD NOT BE THE ANSWER. The surge draws account
+   ages from the SAME mixture as card testing, so age is statistically
+   degenerate between them (median 40.6 vs 43.2 days) and a test asserts it.
+   The easy version of this experiment gives the surge aged accounts, passes,
+   and proves only that the model can use the other 21 features.
+   IT FIRES. 2 of 5 seeds, on a merchant with ZERO entity sharing - every one of
+   150 newcomers with their own device, IP and card:
+     seed   hot of 180   fired   restricted   legit INR
+        7           13     yes            1         785
+       11           25     yes            2       2,129
+       23            4      no            0           0
+       42            1      no            0           0
+      101            4      no            0           0
+     control        ~130   5/5      94-144 restricted, flagged 0.65-0.94
+   THE MECHANISM, and it is sharper than "it false-alarms sometimes". Mean
+   is_first_seen_device is 0.83 on the surge against 0.02 on the card-testing
+   control - the legitimate wave maxes that feature out HIGHER THAN THE ATTACK
+   DOES, because card testing reuses three devices and stops looking new after
+   the first few rows while every newcomer brings a genuinely new one. A wave of
+   first-seen devices plus one novel instrument per transaction is enough to push
+   a handful of rows over 0.5, and the streaming detector's rate-in-window rule
+   does the rest.
+   PROPORTION MATTERS AND WE STATE IT: the surge flags 0.6-13.9% of its
+   transactions against the control's 65-94%. The model is nowhere near
+   confident; it is a marginal fire, not a confusion. But INR 2,914 of
+   legitimate revenue was restricted across the sweep, which is the same order
+   as the INR 2,575 headline false-positive figure, so it is not academic.
+   NOT PATCHED, per the pre-registration. Adding a marketing surge to training
+   is the failure-log 29 move: it invalidates the frozen evaluation and needs a
+   fresh held-out set to mean anything. It is a logged limitation and a v2 item.
+   SCOPE, said plainly: this is a NEW scenario, not part of the 35 non-attack
+   merchant-windows behind the "1 in 35" headline. It does not change that
+   figure; it adds a failure mode that figure never covered.
+   THE OTHER HALF CAME BACK CLEAN, and that is worth as much. A brand-new
+   merchant with no history scores +0.0006 against an identical warm twin -
+   no cold-start penalty at all. The hypothesis was that history-dependent
+   features would default to "unusual" and punish new merchants systematically;
+   reading builder.py first showed why they do not (a new customer emits
+   geo_mismatch 0, is_new_device_for_customer 0, amount_dev_ratio 1.0), and the
+   measurement confirms it. The architecture does not need a cold-start rule.
+   LESSON: our negative set was one axis wide and we could not see it from
+   inside. Three legitimate merchants and a 60-point sweep all probed entity
+   sharing; the first probe of a DIFFERENT axis found a false alarm in two runs
+   out of five. The number of negatives was never the point - the number of
+   DIRECTIONS was.

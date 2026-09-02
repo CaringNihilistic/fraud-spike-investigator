@@ -2,8 +2,8 @@
 
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
-[![Tests](https://img.shields.io/badge/tests-124_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![Failures logged](https://img.shields.io/badge/failures_logged-35_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Tests](https://img.shields.io/badge/tests-130_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Failures logged](https://img.shields.io/badge/failures_logged-36_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
@@ -168,7 +168,7 @@ python -m src.models.seed_stability  # re-run the pipeline across 5 worlds (~6 m
 python -m src.models.real_data_check # same recipe on REAL data (needs a Kaggle download)
 python -m src.agent.eval             # 13-case agent eval, 3 held-out (needs ANTHROPIC_API_KEY)
 python run_demo.py                   # dashboard + live replay -> http://127.0.0.1:8000
-python -m pytest tests/ -q           # safety invariants (124 tests)
+python -m pytest tests/ -q           # safety invariants (130 tests)
 ```
 
 ## Demo — what to watch
@@ -657,6 +657,68 @@ Reproduce: `python -m src.policy.cost_curve`
 
 ---
 
+### The negative set was one axis wide, and the first probe of a second axis found a false alarm
+
+Every legitimate merchant here except the flash sale is an **entity-sharing**
+case — a corporate office on one IP, a kiosk on one device, and a 0→100% sweep of
+that same axis. So we had tested *"shared infrastructure looks like fraud"*
+exhaustively and *"sudden legitimate growth looks like fraud"* not at all. An
+outside audit named that gap; this is what happened when we probed it.
+
+**Criteria were pre-registered and committed before the run** (`b2a2d86`),
+because this was the experiment most likely to produce a mild ambiguous result
+close to a deadline.
+
+**Built so account age could not be the answer.** The surge draws its account
+ages from the *same mixture* as card testing — median **40.6 vs 43.2 days**, and
+a test asserts the degeneracy. `customer_age_days` is the feature with a
+documented history of being a label proxy ([failure 21](CLAUDE.md)); the easy
+version of this test gives the surge aged accounts, passes, and proves nothing.
+
+**It fires.** 150 brand-new customers, every one with their own device, IP and
+card — **zero entity sharing**:
+
+| seed | flagged of 180 | fired | restricted | legit ₹ |
+|---|---|---|---|---|
+| 7 | 13 | **yes** | 1 | ₹785 |
+| 11 | 25 | **yes** | 2 | ₹2,129 |
+| 23 · 42 · 101 | 4 · 1 · 4 | no | 0 | ₹0 |
+| **control** (real card testing) | ~130 | **5 / 5** | 94–144 | — |
+
+**The mechanism is sharper than "it sometimes false-alarms."** Mean
+`is_first_seen_device` is **0.83 on the legitimate surge against 0.02 on the
+attack** — the honest wave maxes that feature out *higher than card testing
+does*, because the attack reuses three devices and stops looking new after a few
+rows while every newcomer brings a genuinely new one. A wave of first-seen
+devices plus one novel instrument per transaction pushes a handful of rows over
+0.5, and the detector's rate-in-window rule does the rest.
+
+**Proportion matters, so here it is:** the surge flags **0.6–13.9%** of its
+transactions against the control's **65–94%**. The model is nowhere near
+confident — this is a marginal fire, not a confusion. But **₹2,914 of legitimate
+revenue was restricted**, the same order as our ₹2,575 headline false-positive
+figure. Not academic.
+
+**We are not patching it.** Adding a marketing surge to training is the
+[failure 29](CLAUDE.md) move: it invalidates the frozen evaluation and needs a
+fresh held-out set to mean anything. It is a logged limitation and a v2 item.
+
+**Scope, stated plainly:** this is a *new* scenario, not one of the 35
+non-attack merchant-windows behind the "1 in 35" headline. **It does not change
+that number** — it adds a failure mode that number never covered.
+
+**The other half came back clean, and that is worth as much.** A brand-new
+merchant with no history scores **+0.0006** against an identical warm twin — no
+cold-start penalty at all. We read `builder.py` before assuming a scenario
+problem, and the reason is in the defaults: a new customer emits `geo_mismatch`
+0, `is_new_device_for_customer` 0, `amount_dev_ratio` 1.0. The architecture does
+not need a cold-start rule.
+
+Reproduce: `python -m src.models.growth_negatives` · construction guarded by
+`tests/test_growth_negatives.py` (6 tests).
+
+---
+
 ## What order should the queue be worked in?
 
 A review queue only matters if the analyst runs out of time before it runs out
@@ -1027,7 +1089,7 @@ run_demo.py     one-command demo: train -> serve -> replay
 tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 no-fire, fusion floor/bounds, agent gate/audit/read-only,
                 serving side-effect-freedom, analyst allowlist, write-auth
-                gate, .env loader) - 124 tests
+                gate, .env loader) - 130 tests
 ```
 
 ## The repository refuses to ship a stale headline
@@ -1175,7 +1237,7 @@ Ordered by how much they should discount the results.
 
 2. **~~Our simulator encodes the label into two features.~~ FIXED — and here is what the fix cost.** `customer_age_days` + `amount_dev_ratio` alone used to reach 0.9328 against the full model's 0.9344. Attack accounts are now aged realistically and fraud amounts are fraud-type dependent, which dropped the proxy pair to **0.5997** against a full-set **0.8981**. The cost at the time: PR-AUC 0.945 → 0.910 over five seeds, net protected value ₹10.57L → ₹7.95L, legitimate ₹ wrongly blocked ₹5,901 → ₹21,728. (Superseded again by limitation 6.) See [Leakage self-audit](#leakage-self-audit-we-broke-our-own-headline-then-fixed-it). The residual limitation is narrower but real: **we fixed the two proxies we found. We have not proven there are no others** — a negative result from an adversarial test is only ever as strong as the test.
 3. **Our entity graph is unvalidated on public data; the two public datasets we evaluated (ULB `creditcardfraud`, IEEE-CIS) do not expose the persistent entity relationships required to directly test this claim.** Neither exposes the persistent account/device/IP relationships the layer operates on — IEEE-CIS `DeviceInfo` is a device *type* ("Windows" is 40.2% of rows), not a fingerprint, and it has no account identifier, so "one device across fifty accounts" is inexpressible ([Real-data check](#real-data-check--our-recipe-someone-elses-data)). We ran the experiment anyway and publish the rows, but we do not present them as evidence for or against the hypothesis, because the experiment does not measure it. What *is* independently supported: Vesta's own entity-counting features are the single largest contributor to real-data performance (+0.352), so the concept has outside support even though our implementation of it is untested on real traffic. Closing this properly needs data with real entity resolution — realistically, a PSP's own.
-4. **The merchant-level system — the actual product — is validated only on synthetic data, and we now know why that is hard to fix.** Of the **nine** datasets in Amazon Science's fraud-dataset-benchmark, exactly **one** (Sparkov) has a merchant identifier. We measured that one and IBM's 24M-transaction TabFormer set, and [neither can evaluate this layer](#we-went-looking-for-public-merchant-data-twice-here-is-what-we-found) — Sparkov because no merchant can pack 30 transactions into the detector's 6-hour window (**0 of 693**, fastest 19.3h), TabFormer because its fraud is never concentrated (**max merchant-day rate 0.417**, zero attack-rate windows, **97,512 of 100,343** merchants carrying no fraud at all). Public card-fraud data models *stolen cards spent across merchants*; this models *merchants under attack*. Methodology transfers at transaction level (ULB PR-AUC 0.731, IEEE-CIS 0.460, zero tuning); the product claim does not, and closing it properly needs a PSP's own traffic rather than another Kaggle download. What we *can* do inside our own data is stop sampling the false-positive boundary at three points and sweep it: [legitimate entity sharing 0→100%](#three-points-are-not-a-distribution--so-we-swept-the-continuum) fires nothing below 80% concentration, 3 of 60 merchant-seeds above it, and restricts ₹0 either way.
+4. **The merchant-level system — the actual product — is validated only on synthetic data, and we now know why that is hard to fix.** Of the **nine** datasets in Amazon Science's fraud-dataset-benchmark, exactly **one** (Sparkov) has a merchant identifier. We measured that one and IBM's 24M-transaction TabFormer set, and [neither can evaluate this layer](#we-went-looking-for-public-merchant-data-twice-here-is-what-we-found) — Sparkov because no merchant can pack 30 transactions into the detector's 6-hour window (**0 of 693**, fastest 19.3h), TabFormer because its fraud is never concentrated (**max merchant-day rate 0.417**, zero attack-rate windows, **97,512 of 100,343** merchants carrying no fraud at all). Public card-fraud data models *stolen cards spent across merchants*; this models *merchants under attack*. Methodology transfers at transaction level (ULB PR-AUC 0.731, IEEE-CIS 0.460, zero tuning); the product claim does not, and closing it properly needs a PSP's own traffic rather than another Kaggle download. A second axis of legitimate behaviour — sudden growth rather than shared infrastructure — [fires the detector on 2 of 5 seeds](#the-negative-set-was-one-axis-wide-and-the-first-probe-of-a-second-axis-found-a-false-alarm), which is a logged limitation rather than a fixed one. What we *can* do inside our own data is stop sampling the false-positive boundary at three points and sweep it: [legitimate entity sharing 0→100%](#three-points-are-not-a-distribution--so-we-swept-the-continuum) fires nothing below 80% concentration, 3 of 60 merchant-seeds above it, and restricts ₹0 either way.
 5. **Data is synthetic throughout** (simulator parameters like "0.7%→5% fraud" are design choices, not Razorpay statistics). The simulator explicitly wires shared entities across accounts — fraud rings only exist in a graph if you construct them.
 6. **~~One legitimate-spike scenario.~~ Now three — and one of them still breaks us.** The flash sale used to be the only benign event tested, and it shares no entities, so it never exercised the entity layer at all. There are now also a corporate buyer (shared office IP) and a shared payment kiosk (shared device), both built from established customers so that entity sharing is the only difference from ordinary traffic. **The kiosk broke the system on first contact and was fixed; the corporate buyer still false-alarms on one seed in five and is deliberately unfixed** — [the symmetric fix costs an entire attack class](#the-hard-negative-a-legitimate-merchant-built-to-look-like-an-attack). Festival sales, product launches and marketing campaigns remain untested, and the EWMA baseline still has no seasonality term.
 7. **The review queue may not be staffable — and the load just went up 60%.** 66.9 cases per 1,000 transactions is 6.69% of the stream, up from 41.9 before the hard negatives: teaching the model that shared devices can be honest made it more cautious everywhere. At 1M transactions/day that is roughly 279 full-time analysts rather than 175. Net protected value stays positive up to **₹908 per review — 18× our ₹50 assumption** (table above), so the economics are not resting on that guess. Staffing is the part that does not follow: 4.19% of the stream still has to be worked by people who may not exist. We price analyst time at ₹50/case but never ask whether the analysts exist; at PSP volume that is a headcount question, and the honest answer is that the restrict/review cutoffs would have to be re-swept against a capacity constraint, not only against cost.
