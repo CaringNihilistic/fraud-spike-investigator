@@ -759,6 +759,78 @@ function Capacity() {
     </div>`;
 }
 
+/* ---------- what order should the queue be worked in? ----------
+   The Capacity panel above says an analyst cannot work every case. This one
+   says which cases to work, and it is the only place in the product where the
+   OBVIOUS answer was measurably wrong: ranking by risk_score is WORSE than
+   working the queue in arrival order, because fusion's risk_score is an
+   escalation scale rather than a probability - high scores pile up on cheap
+   card-testing transactions while the expensive takeover cases sit lower.
+   Expected loss uses the CALIBRATED probability, which is why ReviewCase
+   carries p_fraud separately from risk_score.
+   Numbers from artifacts_out/queue_order.json (python -m src.policy.queue_order).
+   Hardcoded like the other pitch panels because artifacts_out is gitignored, so
+   a fresh deployment has no CSV to read. */
+function QueueOrder() {
+  const total = 825379.12;
+  const rows = [
+    { n: 50, arrival: 47161, risk: 44909, best: 390306 },
+    { n: 100, arrival: 82211, risk: 80444, best: 521948 },
+    { n: 240, arrival: 571384, risk: 343263, best: 676982 },
+    { n: 400, arrival: 595015, risk: 678208, best: 765603 },
+  ];
+  const pct = (v) => (100 * v / total).toFixed(1) + '%';
+  return html`
+    <div class="panel">
+      <h2>Which 50 cases should the analyst work first?</h2>
+      <p class="note" style=${{ marginTop: 0 }}>
+        The queue holds <b>948 cases</b> carrying${' '}<b>${inr(total)}</b>${' '}of fraud.
+        Nobody works all of them, so the ORDER is a policy decision worth as much as
+        the threshold \u2014 and we had never made one: cases came out in arrival order.
+        Reproduce:${' '}<code>python -m src.policy.queue_order</code>
+      </p>
+      <div class="tscroll2">
+        <table class="cap">
+          <tr>
+            <th>cases worked</th>
+            <th>arrival order<br/><span class="dim">what we shipped</span></th>
+            <th>by risk score<br/><span class="dim">the obvious fix</span></th>
+            <th>by expected loss<br/><span class="dim">amount \u00d7 calibrated p</span></th>
+          </tr>
+          ${rows.map((r) => html`<tr key=${r.n}>
+            <td class="mono">${r.n}</td>
+            <td class="mono dim">${pct(r.arrival)}</td>
+            <td class=${'mono ' + (r.risk < r.arrival ? 'bad' : 'dim')}>${pct(r.risk)}</td>
+            <td class="mono good"><b>${pct(r.best)}</b></td>
+          </tr>`)}
+        </table>
+      </div>
+      <div class="qsplit">
+        <div>
+          <span class="wl">first 50 cases, arrival order</span>
+          <span class="wv bad">5.7%</span>
+          <span class="wn">of the queue's fraud value seen</span>
+        </div>
+        <div>
+          <span class="wl">first 50 cases, by expected loss</span>
+          <span class="wv good">47.3%</span>
+          <span class="wn">same analyst, same hour, 8\u00d7 the money</span>
+        </div>
+      </div>
+      <p class="note">
+        <b>The obvious fix would have made it worse.</b> Ranking by risk score is
+        BELOW arrival order at 50, 100 and 240 cases. Fusion's risk_score is an
+        escalation scale, not a probability \u2014 it clusters on cheap card-testing
+        transactions while expensive takeovers score lower, so multiplying rupees by
+        it is a category error. Expected loss uses the calibrated probability instead.
+        <span class="dim">Caveat we report rather than hide: arrival order looks
+        respectable at 240+ because this slice's biggest attacks fall near its end, so
+        "newest first" accidentally surfaces them. That would not survive production \u2014
+        the low-capacity rows are the ones that generalise.</span>
+      </p>
+    </div>`;
+}
+
 function Metric({ k, v, note }) {
   return html`<div class="met">
     <div class="mk">${k}</div><div class="mv">${v}</div>
@@ -890,6 +962,7 @@ function Pitch() {
     <${WhyMerchant} />
     <${CostCurve} />
     <${Capacity} />
+    <${QueueOrder} />
 
     <div class="panel">
       <h2>We attacked our own evaluation four times</h2>

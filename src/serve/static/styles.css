@@ -369,6 +369,26 @@ header .vtab:focus-visible { outline-color: #8CC5FF; }
 .wmore p { font-size: 13px; color: var(--dim); line-height: 1.6; margin: 8px 0 0; }
 @media (max-width: 700px) { .wsteps .arr { display: none; } }
 
+/* ---------- queue-order split ----------
+   Same two-up shape as .whysplit; the contrast between the two numbers IS the
+   content, so they get equal weight and only the values carry colour. */
+.qsplit {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;
+}
+.qsplit > div {
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+  background: var(--bg); display: flex; flex-direction: column; gap: 3px;
+}
+.qsplit .wl {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
+  color: var(--faint); font-weight: 700;
+}
+.qsplit .wv { font-size: 24px; font-weight: 800; letter-spacing: -.025em; }
+.qsplit .wv.bad { color: var(--red); }
+.qsplit .wv.good { color: var(--green); }
+.qsplit .wn { font-size: 12px; color: var(--dim); }
+@media (max-width: 760px) { .qsplit { grid-template-columns: 1fr; } }
+
 /* light scrollbars so the recording doesn't show chunky OS bars */
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }
