@@ -139,3 +139,79 @@ def test_the_real_docs_currently_pass():
     retired_problems, _ = check_retired(texts, build_retired())
     assert not claim_problems + retired_problems, (
         "docs disagree with artifacts:\n" + "\n".join(claim_problems + retired_problems))
+
+
+# ---------------------------------------------------------------------------
+# COUNT checks. The failure-log tally contradicted ITSELF - a badge saying 38
+# nine lines above a summary table saying 35, with CLAUDE.md carrying 38 - and
+# every other check in this module walked straight past it, because it is not a
+# figure any artifact produces. It is a tally of a file in the repo.
+# ---------------------------------------------------------------------------
+
+def test_count_check_catches_a_stale_tally():
+    """The real bug, reproduced. This is the test that would have failed."""
+    from src.audit.verify_submission import check_counts
+    actual = _real_entry_count()
+    texts = {"README.md": "| Logged failures with root causes | **%d** |" % (actual - 3)}
+    problems = check_counts(texts)
+    assert problems, "a summary table three entries stale must not pass"
+    assert str(actual) in problems[0]
+
+
+def test_count_check_catches_a_stale_badge():
+    """Both places the count lives, not just the one we noticed first - the
+    narrow-guard mistake failure-log 37 records."""
+    from src.audit.verify_submission import check_counts
+    actual = _real_entry_count()
+    texts = {"README.md": "failures_logged-%d_with_root_causes" % (actual - 7)}
+    assert check_counts(texts), "a stale badge must not pass either"
+
+
+def test_count_check_fails_loudly_when_it_finds_no_claim_at_all():
+    """A checker that passes because its pattern rotted is worse than no
+    checker - failure-log 31's 'claim not found' lesson, applied here."""
+    from src.audit.verify_submission import check_counts
+    problems = check_counts({"README.md": "no tally in this document at all"})
+    assert problems and "pattern rotted" in problems[0]
+
+
+def test_count_check_passes_on_the_truth():
+    from src.audit.verify_submission import check_counts
+    actual = _real_entry_count()
+    assert not check_counts({"README.md": "failures_logged-%d_with_root_causes" % actual})
+
+
+def _real_entry_count() -> int:
+    import re
+    claude = Path("CLAUDE.md").read_text(encoding="utf-8")
+    return len({int(m.group(1)) for m in
+                re.finditer(r"^(\d+)\. (?!\*\*)", claude, re.M)})
+
+
+def test_the_failure_log_numbering_has_no_gaps():
+    """A renumbered or lost entry would leave the tally looking plausible."""
+    import re
+    claude = Path("CLAUDE.md").read_text(encoding="utf-8")
+    nums = sorted({int(m.group(1)) for m in
+                   re.finditer(r"^(\d+)\. (?!\*\*)", claude, re.M)})
+    assert nums == list(range(1, len(nums) + 1)), "failure-log numbering has a gap"
+
+
+def test_test_count_check_ignores_per_module_counts():
+    """The docs state "(8 tests)" after individual test files. Those are not
+    the total, and flagging them would make the check cry wolf - a checker
+    people learn to ignore is worse than no checker. No shell-out happens on
+    this path, which is also how we know the filter ran."""
+    from src.audit.verify_submission import check_test_count
+    text = "See `tests/test_sharing_sweep.py` (8 tests) and `tests/test_growth_negatives.py` (6 tests)."
+    problems = check_test_count({"README.md": text})
+    assert len(problems) == 1 and "pattern rotted" in problems[0], (
+        "per-module counts must be filtered out, leaving no total to check")
+
+
+def test_test_count_check_agrees_with_the_real_suite():
+    """Shells out to pytest --collect-only, because 20 tests are parametrised
+    and a `def test_` regex undercounts by exactly those 20."""
+    from src.audit.verify_submission import check_test_count
+    texts = {f: Path(f).read_text(encoding="utf-8") for f in SCANNED}
+    assert check_test_count(texts) == []

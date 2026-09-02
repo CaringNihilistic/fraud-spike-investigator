@@ -2,8 +2,8 @@
 
 [![Track 02](https://img.shields.io/badge/Razorpay_Buildathon-Track_02%3A_AI_Risk_Manager-3395FF?style=for-the-badge&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![Defense only](https://img.shields.io/badge/Scope-Strictly_Defense_Only-027A48?style=for-the-badge)](#honest-limitations)
-[![Tests](https://img.shields.io/badge/tests-130_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![Failures logged](https://img.shields.io/badge/failures_logged-38_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
+[![Tests](https://img.shields.io/badge/tests-137_passing_·_no_network-027A48?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Failures logged](https://img.shields.io/badge/failures_logged-39_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
 > 🎥 **5-min pitch video:** `[TODO: paste link]`
@@ -43,7 +43,7 @@ known form here and is reported as weak evidence — the other four families are
 | Net protected value | **₹8.13L** simulated, after 948 reviews × ₹50 |
 | Precision / Recall | **0.996 / 0.735** at the cost-optimal threshold |
 | Legitimate merchants built to look like attacks | **3**, two sharing entities — plus a **0→100% sharing sweep** |
-| Logged failures with root causes | **35**, including two we had to retract |
+| Logged failures with root causes | **39**, including four we had to retract |
 
 **The boundary, stated up front rather than in a footnote:** the merchant-level
 layer is validated on **our own generator**. Of the nine datasets in Amazon
@@ -170,7 +170,7 @@ python -m src.models.seed_stability  # re-run the pipeline across 5 worlds (~6 m
 python -m src.models.real_data_check # same recipe on REAL data (needs a Kaggle download)
 python -m src.agent.eval             # 13-case agent eval, 3 held-out (needs ANTHROPIC_API_KEY)
 python run_demo.py                   # dashboard + live replay -> http://127.0.0.1:8000
-python -m pytest tests/ -q           # safety invariants (130 tests)
+python -m pytest tests/ -q           # safety invariants (137 tests)
 ```
 
 ## Demo — what to watch
@@ -1097,7 +1097,7 @@ run_demo.py     one-command demo: train -> serve -> replay
 tests/          safety invariants (fail-safe, LLM cannot escalate, flash-sale
                 no-fire, fusion floor/bounds, agent gate/audit/read-only,
                 serving side-effect-freedom, analyst allowlist, write-auth
-                gate, .env loader) - 130 tests
+                gate, .env loader) - 137 tests
 ```
 
 ## The repository refuses to ship a stale headline *number*

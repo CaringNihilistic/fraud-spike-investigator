@@ -25,6 +25,9 @@ THREE KINDS OF CHECK:
   2. RETIRED     a retracted phrasing must not appear unless the line marks
                  itself as history. Exemptions are PRINTED, never silent - a
                  hidden exemption would reintroduce the bug it prevents.
+  4. COUNT       a tally stated in the docs must equal the thing it counts
+                 (the failure-log count contradicted ITSELF across a badge
+                  and a table nine lines apart - see check_counts)
   3. CODE        a shipped constant - in Python OR in the dashboard's JS -
                  must equal the decision artifact that
                  derived it. Catches failure-log 31, which no documentation
@@ -41,6 +44,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -288,6 +292,100 @@ def check_code() -> list[str]:
     return problems
 
 
+def check_counts(texts: dict[str, str]) -> list[str]:
+    """Does a COUNT stated in the docs still equal the thing it counts?
+
+    This is failure-log 31 in its cheapest form. The failure-log count sat in
+    the README twice - once in a badge, once in the summary table - and the two
+    disagreed with each other AND with CLAUDE.md. Neither the CLAIMS check nor
+    the RETIRED check could see it: it is not a figure produced by an artifact,
+    it is a tally of a file in the repo. So count the file.
+
+    Entries are top-level numbered paragraphs in CLAUDE.md. The four judging
+    criteria at the top are also numbered, so they are excluded by the `**`
+    that starts each of them - a distinction asserted below rather than assumed,
+    because a counting rule that silently drifts is worse than no count.
+    """
+    problems = []
+    claude = Path("CLAUDE.md").read_text(encoding="utf-8")
+    nums = sorted({int(m.group(1)) for m in
+                   re.finditer(r"^(\d+)\. (?!\*\*)", claude, re.M)})
+    if not nums:
+        return ["CLAUDE.md: no failure-log entries matched the counting pattern "
+                "- the pattern has rotted, which is itself a failure"]
+    actual = len(nums)
+    # A gap means an entry was renumbered or lost, and the tally would still
+    # look plausible. Check the shape, not just the size.
+    if nums != list(range(1, actual + 1)):
+        missing = sorted(set(range(1, max(nums) + 1)) - set(nums))
+        problems.append(f"CLAUDE.md failure-log numbering is not contiguous "
+                        f"1..{max(nums)} - missing {missing}")
+
+    pats = [(r"failures_logged-(\d+)_with_root_causes", "README badge"),
+            (r"Logged failures with root causes \| \*\*(\d+)\*\*", "README summary table"),
+            (r"\*\*(\d+) logged failures\*\*", "prose"),
+            (r"(\d+) failure entries", "prose")]
+    found = 0
+    for fname, text in texts.items():
+        for pat, where in pats:
+            for m in re.finditer(pat, text):
+                found += 1
+                if int(m.group(1)) != actual:
+                    line = text[:m.start()].count("\n") + 1
+                    problems.append(
+                        f"{fname}:{line}  {where} says {m.group(1)} logged failures\n"
+                        f"      CLAUDE.md actually carries {actual}\n"
+                        f"      a count nobody re-ran (failure-log 31, cheapest form)")
+    if not found:
+        problems.append("no failure-log count found in any scanned doc - either the "
+                        "claim was dropped or the pattern rotted; both fail loudly")
+    return problems
+
+
+def check_test_count(texts: dict[str, str]) -> list[str]:
+    """"130 tests" is a count too, and it went stale the moment five were added.
+
+    Deliberately NOT folded into check_counts(): that one is a pure file read,
+    and this one has to shell out to pytest. It has to because 20 of the tests
+    are parametrised, so counting `def test_` undercounts by exactly those 20
+    (115 against 135). A cheaper regex here would be a checker that is
+    confidently wrong, which is the thing this module exists to prevent.
+
+    Called only from main(), so the pytest suite never re-enters pytest. If the
+    suite cannot be collected we FAIL and say why, because failure-log 31's
+    real lesson is that a check which goes quiet reads exactly like one that
+    passed.
+    """
+    claimed = []
+    for fname, text in texts.items():
+        for m in re.finditer(r"tests-(\d+)_passing|\b(?:\*\*)?(\d+)(?:\*\*)? tests\b", text):
+            # The docs also state PER-MODULE counts - "(8 tests)" after
+            # tests/test_sharing_sweep.py - and those are legitimately not the
+            # total. Flagging them would make this check cry wolf, and a
+            # checker people learn to ignore is worse than no checker at all.
+            # Every per-module count names its file immediately before it;
+            # no total ever does.
+            if "tests/test_" in text[max(0, m.start() - 60):m.start()]:
+                continue
+            claimed.append((fname, int(m.group(1) or m.group(2)),
+                            text[:m.start()].count("\n") + 1))
+    if not claimed:
+        return ["no test count found in any scanned doc - either the claim was "
+                "dropped or the pattern rotted; both must fail loudly"]
+    try:
+        out = subprocess.run(
+            [sys.executable, "-m", "pytest", "tests/", "-q", "--collect-only"],
+            cwd=Path.cwd(), capture_output=True, text=True, timeout=300).stdout
+        actual = int(re.search(r"(\d+) tests? collected", out).group(1))
+    except Exception as exc:  # noqa: BLE001 - report it, never swallow it
+        return [f"could not collect the test suite to verify the documented "
+                f"count ({exc!r}) - reporting rather than passing quietly"]
+    return [f"{fname}:{line}  docs claim {c} tests\n"
+            f"      pytest collects {actual}\n"
+            f"      a count nobody re-ran after adding tests"
+            for fname, c, line in claimed if c != actual]
+
+
 def main() -> int:
     # Windows consoles default to cp1252 and these docs are full of INR
     # signs and arrows. Never let the checker die on its own output.
@@ -302,6 +400,7 @@ def main() -> int:
     retired_problems, exemptions = check_retired(texts, build_retired())
     exemptions = claim_exempt + exemptions
     code_problems = check_code()
+    count_problems = check_counts(texts) + check_test_count(texts)
 
     print("--- headline claims checked ---")
     for name, n in seen:
@@ -315,7 +414,7 @@ def main() -> int:
             print("  " + e)
         print()
 
-    problems = claim_problems + retired_problems + code_problems
+    problems = claim_problems + retired_problems + code_problems + count_problems
     total = len(seen) + len(build_retired()) + 2
     if not problems:
         print(f"PASS - {sum(n for _, n in seen)} documented headline figures across "

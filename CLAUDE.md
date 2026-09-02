@@ -1353,3 +1353,56 @@ explainability — every component must be defensible to a judge in one sentence
    A metric whose firing condition never occurred is not a passing test, it is
    an untested test - and it will read as the former to every reader who does
    not go and check the definition.
+
+39. THE HONESTY PROJECT'S README CONTRADICTED ITSELF ABOUT ITS HONESTY METRIC.
+   Asked whether the README would survive an LLM screening pass. It would not,
+   and the reason was nine lines from the top:
+     README line  6  badge          failures_logged-38_with_root_causes
+     README line 46  summary table  Logged failures with root causes | 35
+     CLAUDE.md       actually       entries 1-38
+   The two numbers disagree with each other AND one disagrees with the file it
+   counts, inside the first screenful, in the summary table, about the single
+   metric this project offers as its differentiator. Failure-log 31(a) was the
+   retracted "0 false alarms" sitting in the headline; this is the same defect
+   in the same location, found by the same method (read the docs against the
+   artifact), fourteen entries later.
+   verify_submission.py PASSED THE WHOLE TIME. It compares a documented figure
+   to the artifact that produced it - and a tally of entries in a markdown file
+   is not produced by any artifact, so no registry row existed and none could.
+   That is the third distinct blind spot found in this checker (37: a claim with
+   no number; 38: a metric with an unreachable denominator; now: a count of a
+   file). The pattern is consistent enough to state as a rule: THE CHECKER SEES
+   WHAT AN ARTIFACT EMITS. Anything true of the repo ITSELF is outside it until
+   someone widens it.
+   CLOSED, both halves. check_counts() reads CLAUDE.md, counts top-level
+   numbered entries, and compares against BOTH the badge and the table - both
+   places, because failure-log 37's guard was narrower than the claim it
+   guarded and walked past a third instance. It also asserts the numbering is
+   CONTIGUOUS, since a lost or renumbered entry leaves the tally looking
+   plausible.
+   THEN THE FIX CREATED THE NEXT INSTANCE, IMMEDIATELY. Adding five tests for
+   check_counts() moved the suite 130 -> 135, and "130 tests" was stated in
+   five places across two documents. The same defect, committed inside the
+   commit that fixed it, roughly ninety seconds later. check_test_count() now
+   collects the suite and compares - it SHELLS OUT rather than counting
+   `def test_`, because 20 tests are parametrised and the regex undercounts by
+   exactly those 20 (115 against 137).
+   ONE REAL BUG IN THE NEW CHECK, caught before commit: the first version
+   flagged nine problems, four of them FALSE - the docs also state per-module
+   counts ("(8 tests)" after tests/test_sharing_sweep.py) and those are
+   legitimately not the total. A checker that cries wolf gets ignored, which
+   would have been a worse outcome than the staleness it was built to catch.
+   Scoped to skip any count naming its own file immediately before it, and a
+   test locks that filter.
+   VALIDATED BY REINTRODUCTION, not by passing. Both the badge path and the
+   table path were re-broken and confirmed to fail with the right line number
+   and a non-zero exit, then restored - because failure-log 38's lesson is that
+   an untested test reads exactly like a passing one.
+   THE UNCOMFORTABLE PART: this entry is number 39, so writing it made the
+   number 38 stale in two more places. That is not a joke at our expense, it is
+   the mechanism working - the check fired on its own author, in the same
+   session, and the tally moved because something moved it.
+   LESSON: we built a checker for numbers an artifact emits and then spent
+   three entries discovering that most of what we assert about this repo is not
+   that kind of number. Coverage is not a property you achieve; it is a
+   boundary you keep finding from the outside.
