@@ -216,7 +216,7 @@ function MerchantCard({ m, selected, onSelect }) {
         ${m.in_spike
           ? html`<span class="badge spike">under attack</span>`
           : isFlash
-            ? html`<span class="badge legit">6× flash sale · not flagged</span>`
+            ? html`<span class="badge legit">flash sale · not flagged</span>`
             : html`<span class="badge clear">normal</span>`}
       </div>
       <div class="gauge">
@@ -1282,6 +1282,16 @@ function App() {
                  view=${view} setView=${setView} />
       <main>
         ${view === 'pitch' ? html`<${Pitch} />` : html`<div>
+        ${/* Present in BOTH states. The three-step summary below is swapped out
+             by the boot banner during cold start - which is precisely when a
+             visitor arrives on a spun-down free instance, so the page used to
+             be least explicable at the moment it was most likely to be seen. */''}
+        <div class="whatis">
+          <b>Merchant-level fraud detection.</b> A held-out test slice replayed
+          through the real pipeline — scorer, spike detector, policy engine,
+          review queue — to answer one question per merchant:${' '}
+          <b>is this merchant under attack, and what should a human do next?</b>
+        </div>
         ${booting ? html`<${Booting} status=${status} />` : html`<div class="watching">
           ${/* 105 words of prose used to sit here - in the position a reader
                looks at first and reads least. The claim is now three numbers
@@ -1327,9 +1337,8 @@ function App() {
         <div class="panel" style=${{ marginBottom: '14px' }}>
           <h2>Merchants${' '}<span class="sandbox">judge sandbox</span></h2>
           <div class="note" style=${{ marginTop: '-4px', marginBottom: '12px' }}>
-            Live replay of a held-out test slice through the real pipeline — not a canned
-            animation. <b>Click any merchant</b> to see who is behind its flagged
-            transactions, or run an investigation on demand. Attack merchants sort to the top.
+            <b>Click any merchant</b> to see who is behind its flagged transactions, or
+            run an investigation on demand. Attack merchants sort to the top.
           </div>
           <div class="chips">
             <button class=${'chip' + (filter === 'all' ? ' active' : '')}

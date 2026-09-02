@@ -25,7 +25,8 @@
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--bg); color: var(--text);
-  font: 15px/1.55 "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable",
+        "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
@@ -63,7 +64,7 @@ header h1 {
   font-size: 17px; margin: 0; font-weight: 700;
   letter-spacing: -.015em; color: #fff;
 }
-header .sub { color: #93A5CB; font-size: 12.5px; }
+header .sub { color: #93A5CB; font-size: 13px; }
 .spacer { flex: 1; }
 
 /* labelled stat chips - an instrument panel, not a console line */
@@ -74,15 +75,15 @@ header .sub { color: #93A5CB; font-size: 12.5px; }
 }
 .stat-chip:last-of-type { border-right: 0; }
 .cl {
-  font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
   color: #7C8DB5; font-weight: 700; white-space: nowrap;
 }
 .cv {
-  font-size: 14px; font-weight: 700; color: #EEF3FF;
+  font-size: 15px; font-weight: 700; color: #EEF3FF;
   font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap;
 }
-.cv.sm { font-size: 12.5px; }
-.cvd { font-weight: 500; color: #8296BE; font-size: 12px; }
+.cv.sm { font-size: 13px; }
+.cvd { font-weight: 500; color: #8296BE; font-size: 13px; }
 .stat-chip.alarm .cv { color: #FF9B8F; }
 .stat-chip.warn .cv { color: #FFC98A; }
 
@@ -96,7 +97,7 @@ header .sub { color: #93A5CB; font-size: 12.5px; }
   transition: width .4s ease;
 }
 .pstate {
-  font-size: 11.5px; color: #93A5CB; font-weight: 600;
+  font-size: 11px; color: #93A5CB; font-weight: 600;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .speed { display: flex; align-items: center; gap: 8px; }
@@ -104,7 +105,7 @@ header .sub { color: #93A5CB; font-size: 12.5px; }
 
 header button.ghost {
   background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.18);
-  color: #fff; font-weight: 600; font-size: 12.5px; padding: 5px 13px;
+  color: #fff; font-weight: 600; font-size: 13px; padding: 5px 13px;
   letter-spacing: .01em;
 }
 header button.ghost:hover {
@@ -143,7 +144,7 @@ main { padding: 20px 26px 56px; max-width: 1680px; margin: 0 auto; }
 button {
   background: #fff; color: var(--text);
   border: 1px solid #D6DEE9; border-radius: 8px;
-  padding: 6px 13px; cursor: pointer; font-size: 13.5px; font-family: inherit;
+  padding: 6px 13px; cursor: pointer; font-size: 13px; font-family: inherit;
   transition: border-color .12s, background .12s, box-shadow .12s;
 }
 button:hover { border-color: var(--rzp-blue); box-shadow: 0 0 0 3px rgba(51,149,255,.12); }
@@ -151,7 +152,7 @@ button.primary { background: var(--rzp-blue); border-color: var(--rzp-blue); col
 button.ok { background: #12B76A; border-color: #12B76A; color: #fff; font-weight: 600; }
 button.ok:hover { background: #0E9F5D; }
 button:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
-button.sm { padding: 4px 10px; font-size: 12.5px; }
+button.sm { padding: 4px 10px; font-size: 13px; }
 input[type=range] { accent-color: var(--rzp-blue); vertical-align: middle; }
 select.sm-select {
   font: 12.5px/1.4 inherit; font-family: inherit; color: var(--text);
@@ -196,11 +197,11 @@ select.sm-select:hover { border-color: var(--rzp-blue); }
 .stat .k[title] { cursor: help; border-bottom: 1px dotted #C4CEDD; }
 .stat .v { font-variant-numeric: tabular-nums; font-weight: 500; }
 .stat.hero { font-size: 15px; padding: 6px 0 2px; }
-.stat.hero .v { font-weight: 700; font-size: 19px; letter-spacing: -.02em; }
+.stat.hero .v { font-weight: 700; font-size: 20px; letter-spacing: -.02em; }
 
 .badge {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
-  padding: 4px 10px; border-radius: 999px; font-weight: 800; white-space: nowrap;
+  font-size: 13px; letter-spacing: 0; padding: 4px 10px; border-radius: 999px;
+  font-weight: 700; white-space: nowrap;
 }
 .badge.spike { background: var(--red-soft); color: #B42318; }
 .badge.clear { background: #EEF2F6; color: #51606F; }
@@ -224,23 +225,23 @@ svg.graph circle.instrument { fill: var(--violet); }
 svg.graph circle.customer { fill: #9AA8BD; }
 svg.graph circle { transition: opacity .15s; }
 svg.graph text {
-  fill: #33415A; font-size: 10.5px; pointer-events: none; font-weight: 700;
+  fill: #33415A; font-size: 11px; pointer-events: none; font-weight: 700;
   font-variant-numeric: tabular-nums; letter-spacing: -.01em;
 }
-.legend { display: flex; gap: 16px; font-size: 12px; color: var(--dim); margin-top: 10px; flex-wrap: wrap; align-items: center; }
+.legend { display: flex; gap: 16px; font-size: 13px; color: var(--dim); margin-top: 10px; flex-wrap: wrap; align-items: center; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
 
 /* ---------- investigation ---------- */
-.kv { display: grid; grid-template-columns: 150px 1fr; gap: 7px 12px; font-size: 13.5px; align-items: baseline; }
+.kv { display: grid; grid-template-columns: 150px 1fr; gap: 7px 12px; font-size: 13px; align-items: baseline; }
 .kv .k { color: var(--dim); }
 ul.evidence { margin: 8px 0 0; padding-left: 18px; }
 ul.evidence li { margin: 5px 0; font-size: 13px; color: #3A4C6B; }
 
-.feed { max-height: 300px; overflow-y: auto; font-size: 12.5px; }
+.feed { max-height: 300px; overflow-y: auto; font-size: 13px; }
 .feed .row { padding: 5px 0; border-bottom: 1px solid var(--line-soft); display: flex; gap: 10px; }
 .feed .row:last-child { border-bottom: 0; }
 .feed .kind {
-  flex: 0 0 92px; text-transform: uppercase; font-size: 9.5px; letter-spacing: .07em;
+  flex: 0 0 92px; text-transform: uppercase; font-size: 11px; letter-spacing: .07em;
   padding-top: 3px; font-weight: 800;
 }
 .kind.spike { color: var(--red); } .kind.investigation { color: var(--violet); }
@@ -249,7 +250,7 @@ ul.evidence li { margin: 5px 0; font-size: 13px; color: #3A4C6B; }
 
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th {
-  text-align: left; color: var(--dim); font-weight: 700; font-size: 10.5px;
+  text-align: left; color: var(--dim); font-weight: 700; font-size: 11px;
   text-transform: uppercase; letter-spacing: .07em; padding: 7px 8px;
   border-bottom: 1px solid var(--line);
 }
@@ -263,13 +264,13 @@ tr.overridden td { background: #FFFAEB; }
 
 .empty { color: var(--faint); font-size: 13px; padding: 26px 12px; text-align: center; line-height: 1.6; }
 .scroll { max-height: 320px; overflow-y: auto; }
-.note { font-size: 12px; color: var(--dim); margin-top: 9px; line-height: 1.5; }
+.note { font-size: 13px; color: var(--dim); margin-top: 9px; line-height: 1.5; }
 
 .finale-banner {
   background: linear-gradient(180deg, #F0FDF5, #E7FBF0);
   border: 1px solid #A6E9C5; border-left: 4px solid var(--green);
   color: var(--green); padding: 13px 18px; border-radius: 11px;
-  font-size: 14.5px; font-weight: 600; margin-bottom: 14px;
+  font-size: 15px; font-weight: 600; margin-bottom: 14px;
   display: flex; align-items: baseline; gap: 11px;
   box-shadow: 0 1px 2px rgba(2,122,72,.06);
 }
@@ -277,7 +278,7 @@ tr.overridden td { background: #FFFAEB; }
   font-size: 15px; font-weight: 800; line-height: 1; flex: 0 0 auto;
 }
 .finale-banner b { font-weight: 700; color: #05603A; }
-.finale-banner .why { color: #3A6B54; font-weight: 450; font-size: 13.5px; }
+.finale-banner .why { color: #3A6B54; font-weight: 500; font-size: 13px; }
 
 /* ---------- cold-start banner ----------
    A free-tier instance re-trains on wake, so for the first ~40 seconds every
@@ -288,19 +289,19 @@ tr.overridden td { background: #FFFAEB; }
   background: linear-gradient(180deg, #FFFBF0, #FEF6E6);
   border: 1px solid #FCDFA6; border-left: 4px solid var(--amber);
   padding: 13px 18px; border-radius: 11px; margin-bottom: 14px;
-  font-size: 14.5px; display: flex; align-items: flex-start; gap: 12px;
+  font-size: 15px; display: flex; align-items: flex-start; gap: 12px;
   box-shadow: 0 1px 2px rgba(181,71,8,.06);
 }
 .booting b { font-weight: 700; color: #8A3A06; }
 .booting .bsub {
-  display: block; margin-top: 5px; color: #7A5B33; font-weight: 450;
-  font-size: 13.5px; line-height: 1.6;
+  display: block; margin-top: 5px; color: #7A5B33; font-weight: 500;
+  font-size: 13px; line-height: 1.6;
 }
 .booting .bnow {
   display: inline-flex; align-items: baseline; gap: 8px; margin-top: 7px;
   background: rgba(181,71,8,.09); border-radius: 6px; padding: 3px 9px;
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-  font-size: 12.5px; color: #8A3A06;
+  font-size: 13px; color: #8A3A06;
 }
 .booting .bt { font-variant-numeric: tabular-nums; font-weight: 700; }
 .booting .pulse {
@@ -323,13 +324,13 @@ tr.overridden td { background: #FFFAEB; }
   background: var(--bg); display: flex; flex-direction: column; gap: 3px;
 }
 .whysplit .wl {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
   color: var(--faint); font-weight: 700;
 }
-.whysplit .wv { font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+.whysplit .wv { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
 .whysplit .wv.bad { color: var(--red); }
 .whysplit .wv.good { color: var(--green); }
-.whysplit .wn { font-size: 12px; color: var(--dim); }
+.whysplit .wn { font-size: 13px; color: var(--dim); }
 @media (max-width: 760px) { .whysplit { grid-template-columns: 1fr; } }
 
 /* ---------- keyboard focus ----------
@@ -351,16 +352,16 @@ header .vtab:focus-visible { outline-color: #8CC5FF; }
 .wsteps { display: flex; align-items: stretch; gap: 14px; flex-wrap: wrap; }
 .wstep { display: flex; flex-direction: column; gap: 2px; min-width: 150px; flex: 1; }
 .wstep .n {
-  font-size: 26px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05;
+  font-size: 26px; font-weight: 800; letter-spacing: -.018em; line-height: 1.05;
   font-variant-numeric: tabular-nums; color: var(--text);
 }
 .wstep .n.bad { color: var(--red); }
 .wstep .n.good { color: var(--green); }
-.wstep .l { font-size: 12.5px; color: var(--dim); line-height: 1.45; }
-.wsteps .arr { align-self: center; color: var(--faint); font-size: 18px; }
+.wstep .l { font-size: 13px; color: var(--dim); line-height: 1.45; }
+.wsteps .arr { align-self: center; color: var(--faint); font-size: 17px; }
 .wmore { margin-top: 12px; border-top: 1px solid var(--line-soft); padding-top: 9px; }
 .wmore summary {
-  cursor: pointer; font-size: 12.5px; color: var(--rzp-blue-deep); font-weight: 600;
+  cursor: pointer; font-size: 13px; color: var(--rzp-blue-deep); font-weight: 600;
   list-style: none;
 }
 .wmore summary::-webkit-details-marker { display: none; }
@@ -380,13 +381,13 @@ header .vtab:focus-visible { outline-color: #8CC5FF; }
   background: var(--bg); display: flex; flex-direction: column; gap: 3px;
 }
 .qsplit .wl {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
   color: var(--faint); font-weight: 700;
 }
-.qsplit .wv { font-size: 24px; font-weight: 800; letter-spacing: -.025em; }
+.qsplit .wv { font-size: 26px; font-weight: 800; letter-spacing: -.015em; }
 .qsplit .wv.bad { color: var(--red); }
 .qsplit .wv.good { color: var(--green); }
-.qsplit .wn { font-size: 12px; color: var(--dim); }
+.qsplit .wn { font-size: 13px; color: var(--dim); }
 @media (max-width: 760px) { .qsplit { grid-template-columns: 1fr; } }
 
 /* ---------- hand-rolled SVG charts ----------
@@ -397,17 +398,29 @@ header .vtab:focus-visible { outline-color: #8CC5FF; }
 .chart svg { width: 100%; height: auto; display: block; overflow: visible; }
 .cgrid { stroke: var(--line); stroke-width: 1; }
 .cax { fill: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
-.clab { fill: var(--dim); font-size: 11.5px; }
-.cval { fill: var(--text); font-size: 11.5px; font-weight: 700;
+.clab { fill: var(--dim); font-size: 11px; }
+.cval { fill: var(--text); font-size: 11px; font-weight: 700;
         font-variant-numeric: tabular-nums; }
 .cln { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .cdot { stroke: var(--card); stroke-width: 2; }
 .clegend {
   display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px;
-  font-size: 12px; color: var(--dim);
+  font-size: 13px; color: var(--dim);
 }
 .clegend span { display: inline-flex; align-items: center; gap: 6px; }
 .clegend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+/* ---------- the one line that is always present ----------
+   Sits above the boot-banner/summary swap so the page states what it is even
+   during a cold start, which is exactly when a visitor is most likely to
+   arrive and least likely to have context. */
+.whatis {
+  background: var(--card); border: 1px solid var(--line);
+  border-left: 4px solid var(--rzp-navy);
+  border-radius: 10px; padding: 11px 18px; margin-bottom: 12px;
+  font-size: 15px; line-height: 1.55; color: var(--text);
+}
+.whatis b { font-weight: 700; }
 
 /* light scrollbars so the recording doesn't show chunky OS bars */
 ::-webkit-scrollbar { width: 9px; height: 9px; }
@@ -427,8 +440,8 @@ header .vtab:focus-visible { outline-color: #8CC5FF; }
 .contrast .side.bad { border-color: #F0A9A3; background: linear-gradient(180deg, #FFF6F5, #FFFFFF 45%); }
 .contrast .side.good { border-color: #86D9AC; background: linear-gradient(180deg, #F2FDF6, #FFFFFF 45%); }
 .contrast .side-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.contrast .side-id { font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
-.contrast .side-sub { color: var(--dim); font-size: 12.5px; margin-bottom: 10px; line-height: 1.45; }
+.contrast .side-id { font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
+.contrast .side-sub { color: var(--dim); font-size: 13px; margin-bottom: 10px; line-height: 1.45; }
 .contrast .side-graph { margin-top: 12px; }
 .contrast .vs {
   align-self: center; color: var(--dim); font-size: 11px; font-weight: 800;
@@ -443,7 +456,7 @@ svg.graph.compact { height: 210px; }
    and carry the finding visually: unconnected points, which is exactly what
    the data is. No invented nodes - the dots are a mark, not a chart. */
 .empty-compact {
-  padding: 18px 14px; font-size: 12.5px;
+  padding: 18px 14px; font-size: 13px;
   min-height: 210px; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 4px;
   border: 1px dashed #C9D6E6; border-radius: 10px; background: #FAFCFE;
@@ -452,7 +465,7 @@ svg.graph.compact { height: 210px; }
 .eg-head {
   font-size: 15px; font-weight: 700; color: var(--green); letter-spacing: -.01em;
 }
-.eg-sub { color: var(--dim); font-size: 12.5px; line-height: 1.55; max-width: 34ch; }
+.eg-sub { color: var(--dim); font-size: 13px; line-height: 1.55; max-width: 34ch; }
 
 /* ---------- view tabs + hero money ----------
    Money is the biggest number on screen. A risk product is judged on what it
@@ -467,11 +480,11 @@ svg.graph.compact { height: 210px; }
 
 .hero-inr { display: flex; flex-direction: column; align-items: flex-end; margin-right: 20px; cursor: help; }
 .hero-inr .hv {
-  font-size: 25px; font-weight: 800; letter-spacing: -.025em; line-height: 1.05;
+  font-size: 26px; font-weight: 800; letter-spacing: -.015em; line-height: 1.05;
   color: #6EE7B7; font-variant-numeric: tabular-nums;
 }
 .hero-inr .hl {
-  font-size: 9.5px; text-transform: uppercase; letter-spacing: .13em;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .13em;
   color: #93A5CB; font-weight: 700; margin-top: 2px;
 }
 
@@ -479,7 +492,7 @@ svg.graph.compact { height: 210px; }
 .sandbox {
   /* This pill inherited its caps from .panel h2's text-transform. That was
      removed when headings moved to sentence case, so it carries its own now. */
-  display: inline-block; font-size: 9.5px; letter-spacing: .1em; font-weight: 800;
+  display: inline-block; font-size: 11px; letter-spacing: .1em; font-weight: 800;
   text-transform: uppercase;
   background: var(--rzp-blue); color: #fff; padding: 3px 9px; border-radius: 999px;
   vertical-align: 1px;
@@ -489,14 +502,14 @@ svg.graph.compact { height: 210px; }
 .pitch { display: flex; flex-direction: column; gap: 16px; max-width: 940px; margin: 0 auto; }
 .pitch .panel { padding: 26px 30px; }
 .pitch h2 {
-  font-size: 19px; letter-spacing: -.02em; color: var(--text);
+  font-size: 20px; letter-spacing: -.02em; color: var(--text);
   margin-bottom: 15px; font-weight: 700; line-height: 1.3;
 }
 .pitch h2::before { top: .12em; bottom: .12em; width: 3.5px; }
 .pitch p { max-width: 74ch; margin: 0 0 12px; }
 .pitch p:last-child { margin-bottom: 0; }
 .pitch p.big { font-size: 20px; line-height: 1.45; letter-spacing: -.015em; color: var(--text); }
-.pitch p.note { font-size: 13.5px; color: var(--dim); }
+.pitch p.note { font-size: 13px; color: var(--dim); }
 .pitch h3 { font-size: 15px; margin: 0 0 5px; letter-spacing: -.01em; }
 
 .flow { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
@@ -504,8 +517,8 @@ svg.graph.compact { height: 210px; }
   border: 1px solid var(--line); border-radius: 9px; padding: 10px 15px;
   background: #FBFCFE; min-width: min(560px, 100%);
 }
-.fstep b { display: block; font-size: 14px; letter-spacing: -.01em; }
-.fstep span { display: block; font-size: 12.5px; color: var(--dim); margin-top: 2px; }
+.fstep b { display: block; font-size: 15px; letter-spacing: -.01em; }
+.fstep span { display: block; font-size: 13px; color: var(--dim); margin-top: 2px; }
 .fstep.hot { border-color: var(--rzp-blue); background: #F2F8FF; box-shadow: 0 0 0 3px rgba(51,149,255,.1); }
 .farr { color: var(--faint); font-size: 13px; padding-left: 24px; line-height: 1.2; }
 
@@ -513,20 +526,20 @@ svg.graph.compact { height: 210px; }
 .met { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: #FBFCFE; }
 .met .mk { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 700; }
 .met .mv {
-  font-size: 23px; font-weight: 800; letter-spacing: -.03em; margin-top: 5px;
+  font-size: 26px; font-weight: 800; letter-spacing: -.018em; margin-top: 5px;
   color: var(--text); font-variant-numeric: tabular-nums;
 }
-.met .mn { font-size: 12px; color: var(--faint); margin-top: 3px; }
+.met .mn { font-size: 13px; color: var(--faint); margin-top: 3px; }
 
 .audits { display: flex; flex-direction: column; gap: 4px; margin: 16px 0 14px; }
 .aud { display: grid; grid-template-columns: 46px minmax(0,1fr); gap: 14px; padding: 14px 0; border-top: 1px solid var(--line-soft); }
 .aud:first-child { border-top: 0; }
-.aud .an { font-size: 20px; font-weight: 800; color: var(--line); letter-spacing: -.03em; }
-.aud p { font-size: 13.5px; color: var(--dim); margin: 0; }
-.aud .mono { font-size: 12.5px; color: var(--violet); }
+.aud .an { font-size: 20px; font-weight: 800; color: var(--line); letter-spacing: -.018em; }
+.aud p { font-size: 13px; color: var(--dim); margin: 0; }
+.aud .mono { font-size: 13px; color: var(--violet); }
 
 .lims { margin: 0; padding-left: 20px; }
-.lims li { margin: 8px 0; font-size: 13.5px; color: var(--dim); max-width: 76ch; }
+.lims li { margin: 8px 0; font-size: 13px; color: var(--dim); max-width: 76ch; }
 
 @media (max-width: 900px) {
   .views { margin-left: 0; order: 3; width: 100%; }
@@ -538,7 +551,7 @@ svg.graph.compact { height: 210px; }
 .crow {
   display: grid; grid-template-columns: 96px minmax(0,1fr) 78px 104px 108px;
   gap: 12px; align-items: center; padding: 5px 8px; border-radius: 7px;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .crow.on { background: #EEF6FF; box-shadow: inset 0 0 0 1px rgba(51,149,255,.4); }
 .crow.old { background: #FAFBFD; }
@@ -547,15 +560,15 @@ svg.graph.compact { height: 210px; }
 .crow .cbar > i { display: block; height: 100%; background: #9FC7F5; border-radius: 5px; }
 .crow.on .cbar > i { background: var(--rzp-blue); }
 .crow .cn { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
-.crow .cl { color: var(--amber); font-variant-numeric: tabular-nums; text-align: right; font-size: 12px; }
-.crow .ct { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; color: var(--rzp-blue-deep); }
+.crow .cl { color: var(--amber); font-variant-numeric: tabular-nums; text-align: right; font-size: 13px; }
+.crow .ct { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; color: var(--rzp-blue-deep); }
 .crow.old .ct { color: var(--faint); }
-.legend2 { display: flex; gap: 20px; font-size: 11.5px; color: var(--faint); margin: 0 0 14px 8px; }
+.legend2 { display: flex; gap: 20px; font-size: 11px; color: var(--faint); margin: 0 0 14px 8px; }
 
 .tscroll2 { overflow-x: auto; margin: 4px 0 14px; }
 table.cap { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 460px; }
 table.cap th {
-  text-align: right; font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+  text-align: right; font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
   color: var(--faint); font-weight: 800; padding: 8px 12px; border-bottom: 1px solid var(--line);
 }
 table.cap th:first-child, table.cap td:first-child { text-align: left; }
@@ -572,7 +585,7 @@ table.cap td.bad { color: var(--red); font-weight: 700; }
    out of the numbers themselves. Verdict, then the evidence that supports
    it, then what the system actually DID, then the supporting metrics. */
 .verdict {
-  font-size: 14px; line-height: 1.5; color: var(--text);
+  font-size: 15px; line-height: 1.5; color: var(--text);
   margin: 2px 0 6px; letter-spacing: -.005em;
 }
 .verdict b { font-weight: 700; }
@@ -581,7 +594,7 @@ table.cap td.bad { color: var(--red); font-weight: 700; }
 /* The signature is COUNTED, never inferred - "3 devices shared by 41
    accounts", never "this is a device farm". Styled as evidence, not verdict. */
 .sig {
-  font-size: 12.5px; color: var(--dim); cursor: help;
+  font-size: 13px; color: var(--dim); cursor: help;
   padding: 5px 8px; margin-bottom: 9px;
   background: #F7F9FC; border-left: 2px solid var(--line);
   border-radius: 0 4px 4px 0;
@@ -592,11 +605,11 @@ table.cap td.bad { color: var(--red); font-weight: 700; }
   margin-bottom: 10px; padding-bottom: 9px; border-bottom: 1px solid var(--line-soft);
 }
 .acts .al {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
   color: var(--faint); font-weight: 700; margin-right: 2px;
 }
 .act {
-  font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 5px;
+  font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 5px;
   font-variant-numeric: tabular-nums;
 }
 .act.r { background: var(--red-soft); color: #B42318; }
@@ -611,13 +624,13 @@ table.cap td.bad { color: var(--red); font-weight: 700; }
   background: var(--card); border: 1px solid var(--line);
   border-left: 4px solid var(--rzp-blue);
   border-radius: 10px; padding: 13px 18px; margin-bottom: 14px;
-  font-size: 14.5px; line-height: 1.6; color: var(--text);
+  font-size: 15px; line-height: 1.6; color: var(--text);
 }
 .watching b { font-weight: 700; }
 .watching b.bad { color: var(--red); }
 .watching .wsub {
   display: block; margin-top: 5px; color: var(--dim);
-  font-size: 13.5px; line-height: 1.55;
+  font-size: 13px; line-height: 1.55;
 }
 
 /* Keep the label on one line and let the value wrap under itself, so a row
