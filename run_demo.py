@@ -31,6 +31,25 @@ from src.serve import replay  # noqa: E402
 from src.serve.state import STATE  # noqa: E402
 
 
+def should_loop(loop: bool, no_loop: bool, defer_prepare: bool) -> bool:
+    """Does the replay repeat? Derived from whether we are HOSTED.
+
+    --defer-prepare already means "running on a PaaS host" (see its help text).
+    On such a host an uptime pinger keeps the free instance warm, so it never
+    cold-boots - and without a loop every visitor for the next month lands on a
+    FINISHED replay. The cold start was the only thing making the demo look
+    live; removing it without this makes the demo strictly worse.
+
+    Derived rather than configured because the first attempt WAS configured:
+    --loop went into render.yaml, Render redeployed the code but not the
+    blueprint's start command, and the live service kept serving one finished
+    pass. Caught by polling /api/status - it sat at 14160/14160 for 92 seconds
+    when a restart was due at 42. A setting that only takes effect if a
+    dashboard is also updated is a setting that will eventually be wrong.
+    """
+    return (loop or defer_prepare) and not no_loop
+
+
 def main():
     ap = argparse.ArgumentParser(description="Fraud Spike Investigator demo")
     ap.add_argument("--speed", type=float, default=250.0,
@@ -47,13 +66,17 @@ def main():
                          "and on a shared-CPU free instance, training first can exceed it.")
     ap.add_argument("--loop", action="store_true",
                     help="replay on repeat instead of stopping when the slice ends. "
-                         "For the hosted demo: a free instance that is kept warm "
-                         "never cold-boots, so without this every visitor would "
-                         "arrive at a FINISHED replay. Trains once, streams many.")
+                         "ON BY DEFAULT whenever --defer-prepare is set, i.e. on a "
+                         "hosted deployment; this flag only exists to force it on "
+                         "locally. Trains once, streams many.")
+    ap.add_argument("--no-loop", action="store_true",
+                    help="force a single pass even on a hosted deployment")
     ap.add_argument("--loop-pause", type=float, default=20.0,
                     help="seconds to hold the finished board before restarting, so "
                          "the final totals are readable (default 20)")
     args = ap.parse_args()
+
+    args.loop = should_loop(args.loop, args.no_loop, args.defer_prepare)
 
     STATE.speed = args.speed
     api_mod.set_agent_enabled(not args.no_agent)

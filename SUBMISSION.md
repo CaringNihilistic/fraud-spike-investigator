@@ -19,7 +19,7 @@
 | **Calibration** | Brier **0.0123**, ECE **0.0074** — measured, not assumed, and measurably *worse* since the hard negatives |
 | **Real public data**, same pipeline, zero tuning | ULB (284k txns): **PR-AUC 0.731** vs 0.0017 random · IEEE-CIS (590k txns): **0.460** vs 0.035 random. **Transaction level only** — neither dataset exercises the spike detector, entity graph or policy engine, so this validates the *methodology*, never the merchant-level product claim |
 | **LLM safety** | **0/13** policy violations · **0 of 7 attacks** let through · unsafe actions **0/13 but vacuous** (no case had a live attack at report time, so the check could not fire — [failure 38](CLAUDE.md)) · the LLM cannot authorize anything, pytest-enforced |
-| **Engineering** | **141 tests**, no network or credentials needed · one-command demo · **38 logged entries** with root causes |
+| **Engineering** | **144 tests**, no network or credentials needed · one-command demo · **38 logged entries** with root causes |
 
 Evaluation is temporal throughout — day-boundary splits, never random. Model selection, threshold tuning and calibration all happen on a validation slice; the test slice is read once, at the end. Every number above reproduces from a clean clone.
 
@@ -35,7 +35,7 @@ The hardest part of the problem is not catching attacks — it's **not crying wo
 
 ## 2. Build quality
 
-One command runs it: `python run_demo.py` (trains, serves, replays 14,160 transactions through the real pipeline). **141 tests pass with no network and no credentials.**
+One command runs it: `python run_demo.py` (trains, serves, replays 14,160 transactions through the real pipeline). **144 tests pass with no network and no credentials.**
 
 | Metric — temporal held-out test slice, synthetic data (labeled as such) | Value |
 |---|---|

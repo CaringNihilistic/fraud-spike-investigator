@@ -13,12 +13,19 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements-serve.txt
-    # --loop matters more than it looks. A free instance sleeps after 15
-    # minutes, so until now every visitor triggered a cold boot and therefore
-    # saw a LIVE replay - the 86s wait was the only thing making the demo look
-    # live. Keeping the instance warm (an uptime pinger on /api/health) removes
-    # the wait, and without --loop it would leave every visitor staring at a
-    # FINISHED replay instead. Trains once, streams on repeat.
+    # A free instance sleeps after 15 minutes, so every visitor used to trigger
+    # a cold boot and therefore see a LIVE replay - the 86s wait was the only
+    # thing making the demo look live. An uptime pinger on /api/health removes
+    # the wait, and without a loop it would leave every visitor staring at a
+    # FINISHED replay for a month instead. Trains once, streams on repeat.
+    #
+    # --loop below is now REDUNDANT and kept only as documentation: looping is
+    # derived from --defer-prepare in run_demo.should_loop(), because putting it
+    # here alone did not work. Render redeployed the code but NOT the
+    # blueprint's start command, so the live service kept serving a single
+    # finished pass - /api/status sat at 14160/14160 for 92 seconds when a
+    # restart was due at 42. The behaviour must not depend on a dashboard
+    # having been synced.
     startCommand: python run_demo.py --host 0.0.0.0 --port $PORT --no-browser --no-agent --defer-prepare --speed 800 --loop --loop-pause 15
     envVars:
       # 3.11 not 3.11.9: an exact patch pin fails if the host has not built

@@ -396,3 +396,28 @@ def test_reset_does_not_replace_the_lock():
     lock = STATE._lock
     STATE.reset()
     assert STATE._lock is lock
+
+
+def test_a_hosted_deployment_loops_without_anyone_setting_a_flag():
+    """The bug this rule exists for: --loop was put in render.yaml, Render
+    redeployed the CODE but not the blueprint's start command, and the live
+    service served one finished pass. Polling /api/status showed 14160/14160
+    at 92s when a restart was due at 42s. Looping is a property of being
+    hosted, so derive it from --defer-prepare rather than from a flag someone
+    has to remember in a dashboard."""
+    from run_demo import should_loop
+    assert should_loop(loop=False, no_loop=False, defer_prepare=True), (
+        "a hosted deployment must loop even when nobody passed --loop")
+
+
+def test_a_local_run_still_stops_at_the_end_of_the_slice():
+    from run_demo import should_loop
+    assert not should_loop(loop=False, no_loop=False, defer_prepare=False)
+
+
+def test_loop_can_be_forced_on_locally_and_off_when_hosted():
+    from run_demo import should_loop
+    assert should_loop(loop=True, no_loop=False, defer_prepare=False)
+    assert not should_loop(loop=False, no_loop=True, defer_prepare=True), (
+        "--no-loop must win, or there is no way back to a single pass")
+    assert not should_loop(loop=True, no_loop=True, defer_prepare=True)
