@@ -97,7 +97,17 @@ def main():
         """
         while True:
             replay.run(scored, ctx, investigate_enabled=not args.no_agent)
-            time.sleep(args.loop_pause)   # let the totals actually be read
+            # Hold on the finished board. Pausing MID-replay already freezes
+            # everything correctly - the transaction loop in replay.run()
+            # blocks on STATE.paused and never returns, so this line is never
+            # reached. But once a pass finishes, the old code slept a fixed
+            # loop_pause and reset REGARDLESS of pause - so pausing to narrate
+            # over a just-finished board still got reset out from under you
+            # partway through. Poll pause instead of sleeping through it once.
+            held = 0.0
+            while held < args.loop_pause or STATE.paused:
+                time.sleep(0.5)
+                held += 0.5
             replay.INVESTIGATED.clear()   # else investigations never re-fire
             STATE.reset()
             STATE.log_event("system", "replay restarting")
