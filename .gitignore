@@ -42,3 +42,6 @@ Thumbs.db
 # files (react, react-dom, htm) are what make the demo build-free and
 # offline-safe - ignoring them would break `python run_demo.py` on a clean
 # clone, which is the single most important thing a judge will run.
+
+# --- video production notes: personal working files, not project code ---
+video/

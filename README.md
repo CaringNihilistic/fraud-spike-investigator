@@ -6,7 +6,7 @@
 [![Failures logged](https://img.shields.io/badge/failures_logged-39_with_root_causes-B54708?style=for-the-badge)](CLAUDE.md)
 [![Real data](https://img.shields.io/badge/validated_on-2_public_datasets-6E56CF?style=for-the-badge)](#real-data-check--our-recipe-someone-elses-data)
 
-> 🎥 **5-min pitch video:** `[TODO: paste link]`
+> 🎥 **5-min pitch video:** https://youtu.be/oxSEKrxQIF0
 > 🖥️ **Live console:** **https://fraud-spike-investigator.onrender.com/** — or run it locally in one command (below)
 > 📄 **Judges:** [SUBMISSION.md](SUBMISSION.md) is the one-page summary mapped to the judging criteria.
 
